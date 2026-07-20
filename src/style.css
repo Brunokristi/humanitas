@@ -43,7 +43,6 @@ select {
 :focus,
 :focus-visible {
   outline: none !important;
-  box-shadow: none !important;
 }
 
 .subtle-grid {
@@ -83,12 +82,6 @@ select {
     height: auto;
     min-height: min(76dvh, 740px);
     border-radius: 1.7rem;
-  }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .page-card:not(.is-expanded):hover {
-    box-shadow: var(--shadow-mid) !important;
   }
 }
 

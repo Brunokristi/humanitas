@@ -14,7 +14,7 @@ const props = defineProps({
 })
 
 const renderedCards = computed(() => {
-    const ids = [...props.stack.cardOrder.value]
+    const ids = [...props.stack.cardOrder.value].reverse()
 
     return ids
         .map((id) => {
@@ -51,11 +51,12 @@ function handleCardElementChange(payload) {
             card-stage
             relative
             w-full
+            max-w-[900px]
         "
         :class="
             stack.mode.value === 'expanded'
-                ? 'h-auto min-h-[70dvh] max-w-[900px]'
-                : 'h-[min(72dvh,720px)] max-w-[760px]'
+                ? 'h-auto min-h-[70dvh]'
+                : 'h-[min(76dvh,780px)]'
         "
         aria-label="Card interface"
     >

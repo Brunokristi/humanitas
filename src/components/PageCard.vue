@@ -46,6 +46,9 @@ const stackDragY = ref(0)
 const stackDragRotate = ref(0)
 const suppressPreviewActivate = ref(false)
 
+const CARD_SHADOW =
+    '0 28px 70px rgba(18, 33, 24, 0.30), 0 10px 28px rgba(18, 33, 24, 0.20)'
+    
 let stackDragPointerId = null
 let stackDragStartX = 0
 let stackDragStartY = 0
@@ -100,15 +103,14 @@ const cardStyle = computed(() => {
             opacity: props.visual.opacity,
             visibility: props.visual.visibility ?? 'visible',
             zIndex: props.visual.zIndex,
-            boxShadow: props.visual.shadow,
+            boxShadow: CARD_SHADOW,
             borderRadius: `${props.visual.borderRadius}px`,
             overflow: 'hidden',
             transitionProperty: [
                 'top',
                 'width',
                 'height',
-                'border-radius',
-                'box-shadow'
+                'border-radius'
             ].join(', '),
             transitionDuration: `${transitionDuration.value}ms`,
             transitionTimingFunction: fixedTimingFunction,
@@ -133,16 +135,16 @@ const cardStyle = computed(() => {
             opacity: props.visual.opacity,
             visibility: props.visual.visibility ?? 'visible',
             zIndex: props.visual.zIndex,
-            boxShadow: props.visual.shadow,
+            boxShadow: CARD_SHADOW,
             borderRadius: `${props.visual.borderRadius}px`,
             overflow: 'visible',
             transitionProperty: [
                 'transform',
-                'border-radius',
-                'box-shadow'
+                'border-radius'
             ].join(', '),
             transitionDuration: `${transitionDuration.value}ms`,
-            transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)'
+            transitionTimingFunction:
+                'cubic-bezier(0.22, 1, 0.36, 1)'
         }
     }
 
@@ -188,10 +190,7 @@ const cardStyle = computed(() => {
         opacity: props.visual.opacity,
         visibility: props.visual.visibility ?? 'visible',
         zIndex: props.visual.zIndex,
-        boxShadow:
-            isPreviewMode.value && isHovered.value
-                ? '0 32px 64px rgba(18, 33, 24, 0.32), 0 10px 24px rgba(18, 33, 24, 0.2)'
-                : props.visual.shadow,
+        boxShadow: CARD_SHADOW,
         borderRadius: `${props.visual.borderRadius}px`,
         overflow: 'hidden',
         transitionProperty: [
@@ -465,7 +464,6 @@ function onMouseLeave() {
             page-card
             bg-green
             text-baige
-            shadow-black
         "
         :class="cardClass"
         :style="cardStyle"

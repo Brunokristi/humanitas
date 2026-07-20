@@ -64,7 +64,6 @@ onUnmounted(() => {
     >
         <div
             class="
-                subtle-grid
                 pointer-events-none
                 absolute
                 inset-0
@@ -86,7 +85,7 @@ onUnmounted(() => {
                 items-start
                 justify-center
                 px-4
-                pt-28
+                pt-12
                 sm:px-6
                 sm:pt-32
             "
