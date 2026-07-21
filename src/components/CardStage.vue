@@ -51,7 +51,7 @@ function handleCardElementChange(payload) {
             card-stage
             relative
             w-full
-            max-w-[900px]
+            
         "
         :class="
             stack.mode.value === 'expanded'

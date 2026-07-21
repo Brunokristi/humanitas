@@ -66,6 +66,9 @@ function createCardStack({
     let previewEffectsTimer = null
     let pendingRouteOpenId = null
     let wheelInertiaRafId = null
+    let isScrollLocked = false
+    let previousHtmlOverflow = ''
+    let previousBodyOverflow = ''
 
     const reducedMotionQuery = window.matchMedia(
         '(prefers-reduced-motion: reduce)'
@@ -177,6 +180,33 @@ function createCardStack({
             previewEffectsReady.value = true
             previewEffectsTimer = null
         }, delay)
+    }
+
+    function lockViewportScroll() {
+        if (isScrollLocked) {
+            return
+        }
+
+        previousHtmlOverflow =
+            document.documentElement.style.overflow
+        previousBodyOverflow = document.body.style.overflow
+
+        document.documentElement.style.overflow = 'hidden'
+        document.body.style.overflow = 'hidden'
+        isScrollLocked = true
+    }
+
+    function unlockViewportScroll() {
+        if (!isScrollLocked) {
+            return
+        }
+
+        document.documentElement.style.overflow =
+            previousHtmlOverflow
+        document.body.style.overflow =
+            previousBodyOverflow
+
+        isScrollLocked = false
     }
 
     function moveCardToFront(cardId) {
@@ -297,11 +327,9 @@ function createCardStack({
                 )
             )
 
-        const top = stageRect?.top ?? (
-            viewportWidth < 640
-                ? 96
-                : 112
-        )
+        const top = viewportWidth < 640
+            ? 48
+            : 128
 
         const minExpandedHeight = viewportWidth <= 768
             ? Math.min(window.innerHeight * 0.76, 740)
@@ -388,6 +416,7 @@ function createCardStack({
     function resetTransitionState() {
         clearFallbackTimer()
         clearPreviewEffectsTimer()
+        unlockViewportScroll()
 
         phase.value = 'stacked'
         openCardId.value = null
@@ -425,11 +454,6 @@ function createCardStack({
 
         const sourceRect =
             sourceElement.getBoundingClientRect()
-
-        stackedRects.set(
-            cardId,
-            sourceRect
-        )
 
         transitionBox.value = {
             source: createBox(sourceRect),
@@ -493,6 +517,12 @@ function createCardStack({
         }
 
         clearFallbackTimer()
+
+        window.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: 'auto'
+        })
 
         suppressTransition.value = true
         phase.value = 'expanded'
@@ -573,6 +603,7 @@ function createCardStack({
 
         clearFallbackTimer()
         clearPreviewEffectsTimer()
+        unlockViewportScroll()
 
         suppressTransition.value = true
 
@@ -588,14 +619,11 @@ function createCardStack({
         expandedDragY.value = 0
         transitionBox.value = null
         previewEffectsReady.value = false
+        stackScrollOffset.value = 0
+        stackWheelOffset.value = 0
+        stackWheelVelocity.value = 0
 
         nextTick(() => {
-            window.scrollTo({
-                top: 0,
-                left: 0,
-                behavior: 'auto'
-            })
-
             rememberAllStackedRects()
 
             requestAnimationFrame(() => {
@@ -625,6 +653,8 @@ function createCardStack({
         ) {
             return
         }
+
+        lockViewportScroll()
 
         const cardId = openCardId.value
         const element = cardElements.get(cardId)

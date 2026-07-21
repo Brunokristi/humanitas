@@ -3,7 +3,6 @@ import {
     computed,
     onMounted,
     onUnmounted,
-    onUpdated,
     ref,
     watch
 } from 'vue'
@@ -229,10 +228,6 @@ function emitCardElementChange(element) {
 }
 
 onMounted(() => {
-    emitCardElementChange(rootElementRef.value)
-})
-
-onUpdated(() => {
     emitCardElementChange(rootElementRef.value)
 })
 
