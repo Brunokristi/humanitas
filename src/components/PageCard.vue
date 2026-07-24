@@ -68,6 +68,10 @@ const previewEffectsReady = computed(() => {
     return props.visual.previewEffectsReady ?? true
 })
 
+const contentContainerClass = computed(() => {
+    return 'flex flex-col'
+})
+
 const cardStyle = computed(() => {
     if (usesFixedTransitionBox.value) {
         const box = props.visual.fixedBox
@@ -76,6 +80,22 @@ const cardStyle = computed(() => {
         const fixedTimingFunction =
             props.visual.fixedTimingFunction ??
             'cubic-bezier(0.22, 1, 0.36, 1)'
+        const fixedTransitionProperty =
+            props.visual.fixedTransitionProperty ??
+            [
+                'top',
+                'left',
+                'width',
+                'height',
+                'border-radius',
+                'box-shadow'
+            ].join(', ')
+        const fixedWillChange =
+            props.visual.fixedWillChange ??
+            'top, left, width, height, border-radius, box-shadow'
+        const fixedTransformOrigin =
+            props.visual.fixedTransformOrigin ??
+            'center top'
 
         const usesCenterAnchor =
             fixedAnchor === 'center'
@@ -88,6 +108,9 @@ const cardStyle = computed(() => {
             ? 'translate3d(-50%, 0, 0)'
             : 'translate3d(0, 0, 0)'
 
+        const transform =
+            props.visual.fixedTransform ?? fixedTransform
+
         return {
             position: 'fixed',
             top: `${box.top}px`,
@@ -97,23 +120,18 @@ const cardStyle = computed(() => {
             maxWidth: 'none',
             minHeight: '0',
             margin: '0',
-            transform: fixedTransform,
-            transformOrigin: 'center top',
+            transform,
+            transformOrigin: fixedTransformOrigin,
             opacity: props.visual.opacity,
             visibility: props.visual.visibility ?? 'visible',
             zIndex: props.visual.zIndex,
-            boxShadow: CARD_SHADOW,
+            boxShadow: props.visual.shadow ?? CARD_SHADOW,
             borderRadius: `${props.visual.borderRadius}px`,
             overflow: 'hidden',
-            transitionProperty: [
-                'top',
-                'width',
-                'height',
-                'border-radius'
-            ].join(', '),
+            transitionProperty: fixedTransitionProperty,
             transitionDuration: `${transitionDuration.value}ms`,
             transitionTimingFunction: fixedTimingFunction,
-            willChange: 'top, width, height'
+            willChange: fixedWillChange
         }
     }
 
@@ -122,7 +140,7 @@ const cardStyle = computed(() => {
             position: 'relative',
             width: props.visual.width,
             height: props.visual.height,
-            minHeight: props.visual.minHeight,
+            minHeight: props.visual.minHeight ?? props.visual.height,
             maxWidth: 'none',
             marginInline: 'auto',
             transform: [
@@ -134,7 +152,7 @@ const cardStyle = computed(() => {
             opacity: props.visual.opacity,
             visibility: props.visual.visibility ?? 'visible',
             zIndex: props.visual.zIndex,
-            boxShadow: CARD_SHADOW,
+            boxShadow: props.visual.shadow ?? CARD_SHADOW,
             borderRadius: `${props.visual.borderRadius}px`,
             overflow: 'visible',
             transitionProperty: [
@@ -174,7 +192,7 @@ const cardStyle = computed(() => {
 
     return {
         position: 'absolute',
-        bottom: '0',
+        top: '0',
         left: '50%',
         width: props.visual.width,
         height: props.visual.height,
@@ -185,11 +203,11 @@ const cardStyle = computed(() => {
             `rotate(${stackedRotate}deg)`,
             `scale(${props.visual.scale ?? 1})`
         ].join(' '),
-        transformOrigin: 'center bottom',
+        transformOrigin: 'center top',
         opacity: props.visual.opacity,
         visibility: props.visual.visibility ?? 'visible',
         zIndex: props.visual.zIndex,
-        boxShadow: CARD_SHADOW,
+        boxShadow: props.visual.shadow ?? CARD_SHADOW,
         borderRadius: `${props.visual.borderRadius}px`,
         overflow: 'hidden',
         transitionProperty: [
@@ -475,7 +493,7 @@ function onMouseLeave() {
         @mouseleave="onMouseLeave"
         @transitionend="onTransitionEnd"
     >
-        <div class="flex min-h-[min(74dvh,760px)] flex-col">
+        <div :class="contentContainerClass">
             <div
                 class="
                     flex
@@ -505,7 +523,7 @@ function onMouseLeave() {
                         focus-visible:ring-offset-2
                         focus-visible:ring-offset-green
                     "
-                    :class="visual.isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'"
+                    :class="visual.showExpandedControls ? 'opacity-100' : 'pointer-events-none opacity-0'"
                     aria-label="Potiahnutím nadol minimalizovať stránku"
                     @pointerdown.stop="onHandlePointerDown"
                     @pointermove.stop="onHandlePointerMove"
@@ -542,7 +560,7 @@ function onMouseLeave() {
             >
                 <div
                     class="mb-6 flex justify-end transition-opacity duration-200"
-                    :class="visual.isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'"
+                    :class="visual.showExpandedControls ? 'opacity-100' : 'pointer-events-none opacity-0'"
                 >
                     <button
                         type="button"
@@ -574,7 +592,7 @@ function onMouseLeave() {
 
                 <component
                     :is="card.component"
-                    :expanded="visual.isOpen"
+                    :expanded="true"
                 />
             </div>
         </div>

@@ -1,5 +1,5 @@
 import HomePage from '../pages/HomePage.vue'
-import FocusPage from '../pages/FocusPage.vue'
+import FocusPage from '../pages/ServicesPage.vue/index.js'
 import ContactPage from '../pages/ContactPage.vue'
 
 export const pages = [

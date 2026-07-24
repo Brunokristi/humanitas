@@ -3,6 +3,10 @@ defineProps({
     showMenu: {
         type: Boolean,
         default: true
+    },
+    isFixed: {
+        type: Boolean,
+        default: false
     }
 })
 
@@ -12,23 +16,31 @@ const emit = defineEmits([
 </script>
 
 <template>
-    <header class="pointer-events-none fixed inset-x-0 top-0 z-[100]">
-        <div class="mx-auto flex w-full max-w-[1200px] items-center justify-between px-5 pb-4 pt-5 sm:px-8 sm:pt-7">
+    <header
+        class="pointer-events-none top-0 z-[500] transparent"
+        :class="isFixed ? 'fixed inset-x-0' : 'sticky'"
+    >
+        <div class="flex w-full items-center justify-between p-5">
             <div class="pointer-events-auto flex items-center gap-3">
-                <div
-                    class="h-10 w-10 rounded-full border border-green/35 bg-baige"
-                    aria-hidden="true"
-                />
-                <span class="text-xs font-semibold uppercase tracking-[0.16em] text-green/80">Humanitas</span>
+                <img
+                    src="/images/humanitas_logo.png"
+                    alt="Humanitas"
+                    class="h-8 w-8 object-contain"
+                >
+
+                <span class="heading uppercase text-green">
+                    Humanitas
+                </span>
             </div>
+
             <button
                 v-if="showMenu"
                 type="button"
-                class="pointer-events-auto rounded-full border border-green/35 bg-baige/90 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-green transition-colors hover:bg-baige/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green/70 focus-visible:ring-offset-2 focus-visible:ring-offset-baige"
+                class="pointer-events-auto cursor-pointer text-regular text-green"
                 aria-label="Open menu"
                 @click="emit('menu-click')"
             >
-                Menu
+                menu
             </button>
         </div>
     </header>

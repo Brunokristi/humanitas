@@ -1,5 +1,6 @@
 <script setup>
 import {
+    computed,
     onMounted,
     onUnmounted
 } from 'vue'
@@ -20,6 +21,10 @@ const stack = useCardStack({
     pages,
     router,
     route
+})
+
+const isFullyExpanded = computed(() => {
+    return stack.mode.value === 'expanded'
 })
 
 function handleGlobalKeydown(event) {
@@ -56,6 +61,8 @@ onUnmounted(() => {
     <div
         class="
             relative
+            flex
+            flex-col
             min-h-[100dvh]
             overflow-x-hidden
             bg-baige
@@ -71,29 +78,25 @@ onUnmounted(() => {
             aria-hidden="true"
         />
 
-        <AppHeader
-            :show-menu="stack.mode.value === 'expanded'"
-            @menu-click="handleMenuClick"
-        />
+        <div class="relative h-[72px] w-full">
+            <AppHeader
+                :show-menu="isFullyExpanded"
+                :is-fixed="isFullyExpanded"
+                @menu-click="handleMenuClick"
+            />
+        </div>
 
         <main
             class="
                 relative
                 z-20
                 flex
-                min-h-[100dvh]
                 items-start
                 justify-center
-                px-4
-                pt-12
-                sm:px-6
-                sm:pt-32
+                px-5
+                pb-20
             "
-            :class="
-                stack.mode.value === 'expanded'
-                    ? 'pb-14 sm:pb-20'
-                    : 'pb-20 sm:pb-24'
-            "
+
         >
             <CardStage
                 :pages="pages"

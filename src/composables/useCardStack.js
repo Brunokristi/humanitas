@@ -20,14 +20,12 @@ function createCardStack({
     const cardOrder = ref([...defaultOrder])
     const phase = ref('stacked')
     const openCardId = ref(null)
+    const isTransitioning = ref(false)
 
-    const openingAtTarget = ref(false)
     const isExpandedDragging = ref(false)
     const closingAtTarget = ref(false)
-    const openingTopDone = ref(false)
-    const openingWidthDone = ref(false)
-    const openingHeightDone = ref(false)
     const closingTopDone = ref(false)
+    const closingLeftDone = ref(false)
     const closingWidthDone = ref(false)
     const closingHeightDone = ref(false)
 
@@ -43,7 +41,6 @@ function createCardStack({
     const mode = computed(() => {
         if (
             phase.value === 'stacked' ||
-            phase.value === 'preparing-open' ||
             phase.value === 'closing'
         ) {
             return 'stacked'
@@ -55,10 +52,8 @@ function createCardStack({
     const cardElements = new Map()
     const stackedRects = new Map()
 
-    const stackedOffset = 42
+    const stackedOffset = 60
     const transitionDuration = 440
-    const openingDuration = 560
-    const openingSettleDelay = 140
     const minimizeThreshold = 130
     const minimizeVelocityThreshold = 0.55
 
@@ -69,6 +64,8 @@ function createCardStack({
     let isScrollLocked = false
     let previousHtmlOverflow = ''
     let previousBodyOverflow = ''
+    let openingOverlayElement = null
+    let openingOverlayAnimation = null
 
     const reducedMotionQuery = window.matchMedia(
         '(prefers-reduced-motion: reduce)'
@@ -145,12 +142,6 @@ function createCardStack({
         wheelInertiaRafId = requestAnimationFrame(tick)
     }
 
-    function getOpeningTransitionMs() {
-        return reducedMotion.value
-            ? 0
-            : openingDuration
-    }
-
     function getIndex(cardId) {
         return cardOrder.value.indexOf(cardId)
     }
@@ -171,6 +162,113 @@ function createCardStack({
 
         window.clearTimeout(previewEffectsTimer)
         previewEffectsTimer = null
+    }
+
+    function cleanupOpeningOverlay() {
+        if (openingOverlayAnimation) {
+            openingOverlayAnimation.cancel()
+            openingOverlayAnimation = null
+        }
+
+        if (openingOverlayElement) {
+            openingOverlayElement.remove()
+            openingOverlayElement = null
+        }
+    }
+
+    function createOpeningOverlay(sourceElement, sourceRect) {
+        cleanupOpeningOverlay()
+
+        const overlay = sourceElement.cloneNode(true)
+        const sourceStyles = window.getComputedStyle(sourceElement)
+        const offsetParent = sourceElement.offsetParent
+
+        let startTop = sourceRect.top
+        let startLeft = sourceRect.left
+        let startWidth = sourceRect.width
+        let startHeight = sourceRect.height
+        let startTransform = 'none'
+        let startTransformOrigin = 'top left'
+
+        if (offsetParent instanceof HTMLElement) {
+            const parentRect =
+                offsetParent.getBoundingClientRect()
+
+            startTop =
+                parentRect.top +
+                offsetParent.clientTop +
+                sourceElement.offsetTop -
+                offsetParent.scrollTop
+            startLeft =
+                parentRect.left +
+                offsetParent.clientLeft +
+                sourceElement.offsetLeft -
+                offsetParent.scrollLeft
+            startWidth = sourceElement.offsetWidth
+            startHeight = sourceElement.offsetHeight
+            startTransform =
+                sourceStyles.transform === 'none'
+                    ? 'none'
+                    : sourceStyles.transform
+            startTransformOrigin =
+                sourceStyles.transformOrigin
+        }
+
+        overlay.setAttribute('aria-hidden', 'true')
+        overlay.removeAttribute('tabindex')
+        overlay.classList.add('card-opening-overlay')
+
+        overlay.querySelectorAll('[id]').forEach((element) => {
+            element.removeAttribute('id')
+        })
+
+        overlay.querySelectorAll(
+            'button, a, input, textarea, select, [tabindex]'
+        ).forEach((element) => {
+            element.setAttribute('tabindex', '-1')
+        })
+
+        Object.assign(overlay.style, {
+            position: 'fixed',
+            top: `${startTop}px`,
+            left: `${startLeft}px`,
+            width: `${startWidth}px`,
+            height: `${startHeight}px`,
+            maxWidth: 'none',
+            minHeight: '0',
+            margin: '0',
+            transform: startTransform,
+            transformOrigin: startTransformOrigin,
+            opacity: '1',
+            visibility: 'visible',
+            zIndex: '9999',
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            transition: 'none',
+            willChange: (
+                'top, left, width, height, transform, ' +
+                'border-radius, box-shadow'
+            ),
+            borderRadius: sourceStyles.borderRadius,
+            boxShadow: sourceStyles.boxShadow
+        })
+
+        document.body.appendChild(overlay)
+        openingOverlayElement = overlay
+
+        return {
+            element: overlay,
+            startFrame: {
+                top: `${startTop}px`,
+                left: `${startLeft}px`,
+                width: `${startWidth}px`,
+                height: `${startHeight}px`,
+                transform: startTransform,
+                transformOrigin: startTransformOrigin,
+                borderRadius: sourceStyles.borderRadius,
+                boxShadow: sourceStyles.boxShadow
+            }
+        }
     }
 
     function schedulePreviewEffectsEnable(delay = 200) {
@@ -283,103 +381,30 @@ function createCardStack({
         }
     }
 
-    function getExpandedTargetBox(
-        sourceRect = null,
-        sourceElement = null
-    ) {
-        const viewportWidth = window.innerWidth
-
-        const horizontalMargin = viewportWidth < 640
-            ? 16
-            : 24
-
-        const maxWidth = 860
-
-        const stageRect = sourceElement
-            ?.closest('.card-stage')
-            ?.getBoundingClientRect()
-
-        const isMobileViewport = viewportWidth < 640
-
-        const availableWidth = isMobileViewport
-            ? (
-                stageRect
-                    ? stageRect.width
-                    : viewportWidth - horizontalMargin * 2
-            )
-            : viewportWidth - horizontalMargin * 2
-
-        const width = Math.min(
-            Math.max(0, availableWidth),
-            maxWidth
-        )
-
-        const left = isMobileViewport && stageRect
-            ? stageRect.left + (stageRect.width - width) / 2
-            : Math.min(
-                Math.max(
-                    horizontalMargin,
-                    viewportWidth / 2 - width / 2
-                ),
-                Math.max(
-                    horizontalMargin,
-                    viewportWidth - horizontalMargin - width
-                )
-            )
-
-        const top = viewportWidth < 640
-            ? 48
-            : 128
-
-        const minExpandedHeight = viewportWidth <= 768
-            ? Math.min(window.innerHeight * 0.76, 740)
-            : Math.min(window.innerHeight * 0.74, 760)
-
-        let measuredExpandedHeight = minExpandedHeight
-
-        if (sourceElement) {
-            const probe = sourceElement.cloneNode(true)
-
-            probe.style.position = 'fixed'
-            probe.style.left = '-100000px'
-            probe.style.right = 'auto'
-            probe.style.top = '0'
-            probe.style.bottom = 'auto'
-            probe.style.width = `${width}px`
-            probe.style.height = 'auto'
-            probe.style.minHeight = `${minExpandedHeight}px`
-            probe.style.maxHeight = 'none'
-            probe.style.margin = '0'
-            probe.style.transform = 'none'
-            probe.style.transition = 'none'
-            probe.style.visibility = 'hidden'
-            probe.style.pointerEvents = 'none'
-            probe.style.overflow = 'visible'
-            probe.style.opacity = '1'
-
-            document.body.appendChild(probe)
-            measuredExpandedHeight =
-                probe.getBoundingClientRect().height
-            document.body.removeChild(probe)
-        }
-
-        const height = Math.max(
-            minExpandedHeight,
-            measuredExpandedHeight
-        )
-
+    function getStackedCardDimensions() {
         return {
-            top,
-            left,
-            width,
-            height
+            width: '100%',
+            height: 'min(68dvh, 620px)'
         }
     }
 
-    function getStackedTopCardSize() {
+    function getStackedTopCardSize(referenceRect = null) {
+        const isMobileViewport = window.innerWidth < 640
+
+        const width = referenceRect?.width ?? (
+            isMobileViewport
+                ? Math.min(window.innerWidth * 0.92, 680)
+                : Math.max(0, window.innerWidth - 48)
+        )
+
+        const height = Math.min(
+            window.innerHeight * 0.68,
+            620
+        )
+
         return {
-            width: Math.min(window.innerWidth * 0.92, 680),
-            height: Math.min(window.innerHeight * 0.54, 520)
+            width,
+            height
         }
     }
 
@@ -388,7 +413,7 @@ function createCardStack({
             return null
         }
 
-        const canonical = getStackedTopCardSize()
+        const canonical = getStackedTopCardSize(rect)
         const centerX = rect.left + rect.width / 2
         const bottom = rect.top + rect.height
 
@@ -416,17 +441,16 @@ function createCardStack({
     function resetTransitionState() {
         clearFallbackTimer()
         clearPreviewEffectsTimer()
+        cleanupOpeningOverlay()
         unlockViewportScroll()
 
         phase.value = 'stacked'
         openCardId.value = null
-        openingAtTarget.value = false
+        isTransitioning.value = false
         isExpandedDragging.value = false
         closingAtTarget.value = false
-        openingTopDone.value = false
-        openingWidthDone.value = false
-        openingHeightDone.value = false
         closingTopDone.value = false
+        closingLeftDone.value = false
         closingWidthDone.value = false
         closingHeightDone.value = false
 
@@ -443,102 +467,119 @@ function createCardStack({
         if (
             !cardId ||
             !sourceElement ||
-            phase.value !== 'stacked'
+            phase.value !== 'stacked' ||
+            isTransitioning.value
         ) {
             return
         }
 
+        isTransitioning.value = true
         clearFallbackTimer()
         clearPreviewEffectsTimer()
         previewEffectsReady.value = false
 
         const sourceRect =
             sourceElement.getBoundingClientRect()
-
-        transitionBox.value = {
-            source: createBox(sourceRect),
-            target: getExpandedTargetBox(
-                sourceRect,
-                sourceElement
-            ),
-            updateRoute: shouldUpdateRoute
-        }
+        const openingVisual = createOpeningOverlay(
+            sourceElement,
+            sourceRect
+        )
+        const overlay = openingVisual.element
 
         openCardId.value = cardId
-        phase.value = 'preparing-open'
-        openingAtTarget.value = false
-        openingTopDone.value = false
-        openingWidthDone.value = false
-        openingHeightDone.value = false
+        phase.value = 'opening'
+        suppressTransition.value = true
 
         await nextTick()
 
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                if (
-                    phase.value !== 'preparing-open' ||
-                    openCardId.value !== cardId
-                ) {
-                    return
+        const expandedElement =
+            cardElements.get(cardId)
+
+        if (!expandedElement || !overlay) {
+            finishOpening(cardId, shouldUpdateRoute)
+            return
+        }
+
+        const targetRect =
+            expandedElement.getBoundingClientRect()
+
+        suppressTransition.value = false
+
+        if (reducedMotion.value) {
+            finishOpening(cardId, shouldUpdateRoute)
+            return
+        }
+
+        openingOverlayAnimation = overlay.animate(
+            [
+                openingVisual.startFrame,
+                {
+                    top: `${targetRect.top}px`,
+                    left: `${targetRect.left}px`,
+                    width: `${targetRect.width}px`,
+                    height: `${targetRect.height}px`,
+                    transform: 'none',
+                    transformOrigin: 'top left',
+                    borderRadius: '28px',
+                    boxShadow: 'var(--shadow-strong)'
                 }
+            ],
+            {
+                duration: getTransitionMs(),
+                easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+                fill: 'both'
+            }
+        )
 
-                phase.value = 'opening'
+        fallbackTimer = window.setTimeout(() => {
+            finishOpening(cardId, shouldUpdateRoute)
+        }, getTransitionMs() + 100)
 
-                requestAnimationFrame(() => {
-                    if (
-                        phase.value !== 'opening' ||
-                        openCardId.value !== cardId
-                    ) {
-                        return
-                    }
+        try {
+            await openingOverlayAnimation.finished
+        } catch {
+            // The guarded finalizer handles cancelled animations too.
+        }
 
-                    openingAtTarget.value = true
+        finishOpening(cardId, shouldUpdateRoute)
+    }
 
-                    fallbackTimer = window.setTimeout(() => {
-                        finishOpening()
-                    }, getOpeningTransitionMs() + 80)
-                })
+    function finishOpening(
+        cardId = openCardId.value,
+        shouldUpdateRoute = true
+    ) {
+        if (
+            phase.value !== 'opening' ||
+            openCardId.value !== cardId
+        ) {
+            return
+        }
+
+        clearFallbackTimer()
+        suppressTransition.value = true
+
+        phase.value = 'expanded'
+        transitionBox.value = null
+        previewEffectsReady.value = false
+
+        nextTick(() => {
+            cleanupOpeningOverlay()
+            isTransitioning.value = false
+
+            requestAnimationFrame(() => {
+                suppressTransition.value = false
             })
-        })
 
-        if (shouldUpdateRoute) {
+            if (!shouldUpdateRoute) {
+                return
+            }
+
             const path =
                 navigation.getPathByCardId(cardId)
 
             if (path) {
                 pushRoute(path)
             }
-        }
-    }
-
-    function finishOpening() {
-        if (phase.value !== 'opening') {
-            return
-        }
-
-        clearFallbackTimer()
-
-        window.scrollTo({
-            top: 0,
-            left: 0,
-            behavior: 'auto'
-        })
-
-        suppressTransition.value = true
-        phase.value = 'expanded'
-        openingAtTarget.value = false
-        openingTopDone.value = false
-        openingWidthDone.value = false
-        openingHeightDone.value = false
-        transitionBox.value = null
-        previewEffectsReady.value = false
-
-        nextTick(() => {
-            window.setTimeout(() => {
-                requestAnimationFrame(() => {
-                    suppressTransition.value = false
-                })
-            }, openingSettleDelay)
         })
     }
 
@@ -557,7 +598,10 @@ function createCardStack({
             sourceElement ||
             cardElements.get(cardId)
 
-        if (phase.value !== 'stacked') {
+        if (
+            phase.value !== 'stacked' ||
+            isTransitioning.value
+        ) {
             return
         }
 
@@ -575,14 +619,6 @@ function createCardStack({
 
         openCardId.value = cardId
         phase.value = 'expanded'
-
-        nextTick(() => {
-            window.scrollTo({
-                top: 0,
-                left: 0,
-                behavior: 'auto'
-            })
-        })
 
         if (!shouldUpdateRoute) {
             return
@@ -603,16 +639,18 @@ function createCardStack({
 
         clearFallbackTimer()
         clearPreviewEffectsTimer()
+        cleanupOpeningOverlay()
         unlockViewportScroll()
 
         suppressTransition.value = true
+        isTransitioning.value = false
 
         phase.value = 'stacked'
         openCardId.value = null
-        openingAtTarget.value = false
         isExpandedDragging.value = false
         closingAtTarget.value = false
         closingTopDone.value = false
+        closingLeftDone.value = false
         closingWidthDone.value = false
         closingHeightDone.value = false
 
@@ -649,10 +687,13 @@ function createCardStack({
         if (
             phase.value !== 'expanded' ||
             !openCardId.value ||
-            isExpandedDragging.value
+            isExpandedDragging.value ||
+            isTransitioning.value
         ) {
             return
         }
+
+        isTransitioning.value = true
 
         lockViewportScroll()
 
@@ -671,14 +712,10 @@ function createCardStack({
             topSlotRect ||
             getStackedRect(cardId)
 
-        const normalizedTargetBox =
-            normalizeClosingTargetBox(targetRect)
-
         if (
             !element ||
             !sourceRect ||
-            !targetRect ||
-            !normalizedTargetBox
+            !targetRect
         ) {
             finalizeMinimize({
                 updateRoute: shouldUpdateRoute
@@ -689,7 +726,7 @@ function createCardStack({
 
         transitionBox.value = {
             source: createBox(sourceRect),
-            target: normalizedTargetBox,
+            target: createBox(targetRect),
             updateRoute: shouldUpdateRoute
         }
 
@@ -697,9 +734,26 @@ function createCardStack({
         isExpandedDragging.value = false
         phase.value = 'closing'
         closingAtTarget.value = false
-        closingTopDone.value = false
-        closingWidthDone.value = false
-        closingHeightDone.value = false
+        closingTopDone.value =
+            Math.abs(
+                transitionBox.value.source.top -
+                transitionBox.value.target.top
+            ) < 0.5
+        closingLeftDone.value =
+            Math.abs(
+                transitionBox.value.source.left -
+                transitionBox.value.target.left
+            ) < 0.5
+        closingWidthDone.value =
+            Math.abs(
+                transitionBox.value.source.width -
+                transitionBox.value.target.width
+            ) < 0.5
+        closingHeightDone.value =
+            Math.abs(
+                transitionBox.value.source.height -
+                transitionBox.value.target.height
+            ) < 0.5
 
         nextTick(() => {
             requestAnimationFrame(() => {
@@ -724,6 +778,10 @@ function createCardStack({
 
     function minimizeCard(options = {}) {
         if (reducedMotion.value) {
+            if (openCardId.value) {
+                moveCardToFront(openCardId.value)
+            }
+
             finalizeMinimize(options)
             return
         }
@@ -794,72 +852,43 @@ function createCardStack({
 
     function handleTransitionEnd(event) {
         if (
-            event.target !== event.currentTarget
+            event.target !== event.currentTarget ||
+            phase.value !== 'closing'
         ) {
             return
+        }
+
+        if (event.propertyName === 'top') {
+            closingTopDone.value = true
+        }
+
+        if (event.propertyName === 'left') {
+            closingLeftDone.value = true
+        }
+
+        if (event.propertyName === 'width') {
+            closingWidthDone.value = true
+        }
+
+        if (event.propertyName === 'height') {
+            closingHeightDone.value = true
         }
 
         if (
-            event.propertyName !== 'top' &&
-            event.propertyName !== 'width' &&
-            event.propertyName !== 'height'
+            !closingTopDone.value ||
+            !closingLeftDone.value ||
+            !closingWidthDone.value ||
+            !closingHeightDone.value
         ) {
             return
         }
 
-        if (phase.value === 'opening') {
-            if (event.propertyName === 'top') {
-                openingTopDone.value = true
-            }
+        const shouldUpdateRoute =
+            transitionBox.value?.updateRoute ?? true
 
-            if (event.propertyName === 'width') {
-                openingWidthDone.value = true
-            }
-
-            if (event.propertyName === 'height') {
-                openingHeightDone.value = true
-            }
-
-            if (
-                !openingTopDone.value ||
-                !openingWidthDone.value ||
-                !openingHeightDone.value
-            ) {
-                return
-            }
-
-            finishOpening()
-            return
-        }
-
-        if (phase.value === 'closing') {
-            if (event.propertyName === 'top') {
-                closingTopDone.value = true
-            }
-
-            if (event.propertyName === 'width') {
-                closingWidthDone.value = true
-            }
-
-            if (event.propertyName === 'height') {
-                closingHeightDone.value = true
-            }
-
-            if (
-                !closingTopDone.value ||
-                !closingWidthDone.value ||
-                !closingHeightDone.value
-            ) {
-                return
-            }
-
-            const shouldUpdateRoute =
-                transitionBox.value?.updateRoute ?? true
-
-            finalizeMinimize({
-                updateRoute: shouldUpdateRoute
-            })
-        }
+        finalizeMinimize({
+            updateRoute: shouldUpdateRoute
+        })
     }
 
     function getCardVisual(cardId) {
@@ -867,15 +896,16 @@ function createCardStack({
         const cardCount = cardOrder.value.length
         const selected =
             openCardId.value === cardId
-        const preparing =
-            phase.value === 'preparing-open'
+        const stackedCardDimensions =
+            getStackedCardDimensions()
+        const maxStackOffset =
+            Math.max(0, cardCount - 1) * stackedOffset
+        const stackedBaseY =
+            maxStackOffset - index * stackedOffset
 
-        if (
-            phase.value === 'stacked' ||
-            preparing
-        ) {
+        if (phase.value === 'stacked') {
             const stackedY =
-                index * -stackedOffset +
+                stackedBaseY +
                 getStackedParallaxY(index)
 
             return {
@@ -890,42 +920,29 @@ function createCardStack({
                 previewEffectsReady:
                     phase.value === 'stacked' &&
                     previewEffectsReady.value,
+                showExpandedControls: false,
                 fixedBox: null,
                 x: 0,
                 y: stackedY,
                 scale: getStackedScale(index),
-                opacity:
-                    preparing && !selected
-                        ? 0
-                        : 1,
-                visibility:
-                    preparing && !selected
-                        ? 'hidden'
-                        : 'visible',
-                zIndex:
-                    preparing && selected
-                        ? 100
-                        : cardCount - index,
+                opacity: 1,
+                visibility: 'visible',
+                zIndex: cardCount - index,
                 shadow: index === 0
                     ? 'var(--shadow-mid)'
                     : 'var(--shadow-soft)',
                 borderRadius: 32,
-                width: 'min(92vw, 680px)',
-                height: 'min(54dvh, 520px)',
+                width: stackedCardDimensions.width,
+                height: stackedCardDimensions.height,
                 transitionMs:
-                    preparing ||
-                        suppressTransition.value
+                    suppressTransition.value
                         ? 0
                         : getTransitionMs()
             }
         }
 
         if (phase.value === 'opening') {
-            if (selected && transitionBox.value) {
-                const box = openingAtTarget.value
-                    ? transitionBox.value.target
-                    : transitionBox.value.source
-
+            if (selected) {
                 return {
                     isOpen: true,
                     isOpening: true,
@@ -933,22 +950,21 @@ function createCardStack({
                     isDragging: false,
                     interactive: false,
                     previewEffectsReady: false,
-                    fixedBox: box,
-                    fixedAnchor: 'center',
+                    showExpandedControls: false,
+                    fixedBox: null,
                     x: 0,
                     y: 0,
+                    rotateDeg: 0,
                     scale: 1,
                     opacity: 1,
-                    visibility: 'visible',
-                    zIndex: 100,
+                    visibility: 'hidden',
+                    zIndex: 900,
                     shadow: 'var(--shadow-strong)',
-                    borderRadius: openingAtTarget.value
-                        ? 28
-                        : 32,
-                    transitionMs:
-                        getOpeningTransitionMs(),
-                    fixedTimingFunction:
-                        'cubic-bezier(0.2, 0.9, 0.24, 1)'
+                    borderRadius: 28,
+                    width: '100%',
+                    height: 'auto',
+                    minHeight: 'min(68dvh, 620px)',
+                    transitionMs: 0
                 }
             }
 
@@ -959,17 +975,18 @@ function createCardStack({
                 isDragging: false,
                 interactive: false,
                 previewEffectsReady: false,
+                showExpandedControls: false,
                 fixedBox: null,
                 x: 0,
-                y: index * -stackedOffset,
-                scale: 1,
+                y: stackedBaseY,
+                scale: getStackedScale(index),
                 opacity: 0,
                 visibility: 'hidden',
                 zIndex: cardCount - index,
                 shadow: 'var(--shadow-soft)',
                 borderRadius: 32,
-                width: 'min(92vw, 680px)',
-                height: 'min(54dvh, 520px)',
+                width: stackedCardDimensions.width,
+                height: stackedCardDimensions.height,
                 transitionMs: 0
             }
         }
@@ -987,6 +1004,7 @@ function createCardStack({
                     isDragging: false,
                     interactive: false,
                     previewEffectsReady: false,
+                    showExpandedControls: true,
                     fixedBox: box,
                     fixedAnchor: 'left',
                     x: 0,
@@ -994,7 +1012,7 @@ function createCardStack({
                     scale: 1,
                     opacity: 1,
                     visibility: 'visible',
-                    zIndex: 100,
+                    zIndex: 900,
                     shadow: closingAtTarget.value
                         ? 'var(--shadow-soft)'
                         : 'var(--shadow-strong)',
@@ -1012,10 +1030,11 @@ function createCardStack({
                 isDragging: false,
                 interactive: false,
                 previewEffectsReady: false,
+                showExpandedControls: false,
                 fixedBox: null,
                 x: 0,
                 y:
-                    index * -stackedOffset +
+                    stackedBaseY +
                     getStackedParallaxY(index),
                 scale: getStackedScale(index),
                 opacity: 1,
@@ -1025,8 +1044,8 @@ function createCardStack({
                     ? 'var(--shadow-mid)'
                     : 'var(--shadow-soft)',
                 borderRadius: 32,
-                width: 'min(92vw, 680px)',
-                height: 'min(54dvh, 520px)',
+                width: stackedCardDimensions.width,
+                height: stackedCardDimensions.height,
                 transitionMs: 0
             }
         }
@@ -1039,17 +1058,18 @@ function createCardStack({
                 isDragging: false,
                 interactive: false,
                 previewEffectsReady: false,
+                showExpandedControls: false,
                 fixedBox: null,
                 x: 0,
-                y: index * -stackedOffset,
+                y: stackedBaseY,
                 scale: 1,
                 opacity: 0,
                 visibility: 'hidden',
                 zIndex: cardCount - index,
                 shadow: 'var(--shadow-soft)',
                 borderRadius: 32,
-                width: 'min(92vw, 680px)',
-                height: 'min(54dvh, 520px)',
+                width: stackedCardDimensions.width,
+                height: stackedCardDimensions.height,
                 transitionMs: 0
             }
         }
@@ -1067,6 +1087,7 @@ function createCardStack({
             dragProgress,
             interactive: true,
             previewEffectsReady: false,
+            showExpandedControls: true,
             fixedBox: null,
             x: 0,
             y: expandedDragY.value,
@@ -1074,14 +1095,14 @@ function createCardStack({
             scale: 1 - dragProgress * 0.045,
             opacity: 1,
             visibility: 'visible',
-            zIndex: 50,
+            zIndex: 900,
             shadow: dragProgress > 0
                 ? '0 36px 78px rgba(31, 55, 43, 0.34), 0 14px 34px rgba(31, 55, 43, 0.24)'
                 : 'var(--shadow-strong)',
             borderRadius: 28 + dragProgress * 4,
-            width: 'min(100%, 860px)',
+            width: '100%',
             height: 'auto',
-            minHeight: 'min(74dvh, 760px)',
+            minHeight: 'min(68dvh, 620px)',
             transitionMs:
                 suppressTransition.value ||
                     isExpandedDragging.value
@@ -1094,7 +1115,10 @@ function createCardStack({
         cardId,
         sourceElement = null
     ) {
-        if (phase.value !== 'stacked') {
+        if (
+            phase.value !== 'stacked' ||
+            isTransitioning.value
+        ) {
             return
         }
 
@@ -1214,6 +1238,7 @@ function createCardStack({
         mode,
         cardOrder,
         openCardId,
+        isTransitioning,
         isExpandedDragging,
         expandedDragY,
         reducedMotion,

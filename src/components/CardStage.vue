@@ -47,16 +47,11 @@ function handleCardElementChange(payload) {
 
 <template>
     <section
-        class="
-            card-stage
-            relative
-            w-full
-            
-        "
+        class="card-stage relative w-full"
         :class="
             stack.mode.value === 'expanded'
-                ? 'h-auto min-h-[70dvh]'
-                : 'h-[min(76dvh,780px)]'
+                ? 'mt-2 h-auto overflow-visible'
+                : 'mt-2 h-[min(76dvh,780px)] overflow-visible'
         "
         aria-label="Card interface"
     >
