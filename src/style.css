@@ -32,8 +32,7 @@
     0 8px 20px rgba(31, 55, 43, 0.14);
 
   --shadow-strong:
-    0 32px 70px rgba(31, 55, 43, 0.28),
-    0 12px 30px rgba(31, 55, 43, 0.2);
+    0 -10px 16px 0 rgba(0, 0, 0, 0.2);
 }
 
 *,
@@ -101,20 +100,10 @@ video {
   letter-spacing: 0;
 }
 
-.text-bold {
-  margin: 0;
-  font-family: var(--font-body);
-  font-size: 20px;
-  font-weight: 700;
-  line-height: normal;
-  letter-spacing: 0;
-}
-
 .text-regular {
   margin: 0;
   font-family: var(--font-body);
   font-size: 14px;
-  font-weight: 400;
   line-height: normal;
   letter-spacing: 0;
 }

@@ -1,6 +1,8 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useClinviaPublicSite } from '../composables/useClinviaPublicSite'
+import FaqCarousel from '../components/Carousel.vue'
+import Button from '../components/Button.vue'
 
 defineProps({
     expanded: {
@@ -502,7 +504,7 @@ function toggleFaq(index) {
 </script>
 
 <template>
-    <div class="page-home">
+    <div class="">
         <div
             v-if="loading"
             class="space-y-16"
@@ -546,22 +548,43 @@ function toggleFaq(index) {
 
         <div
             v-else
-            class="space-y-24 sm:space-y-28"
+            class="space-y-3"
         >
-            <!-- Hero -->
-            <section class="max-w-4xl">
-                <p class="text-bold text-baige/55">
-                    {{ openingHoursTodayLabel }}
-                </p>
-
-                <h1 class="mt-7 font-heading text-[clamp(3.4rem,9vw,7rem)] font-bold leading-[0.88] tracking-[-0.035em] text-baige">
-                    {{ branchName }}
+            <section class="flex flex-col items-center justify-center gap-6 text-center p-5">
+                <h1 class="regular text-baige text-xl text-center">
+                    Podeľte sa s nami o <br /><strong>váš príbeh</strong>
                 </h1>
 
-                <p class="text-regular mt-9 max-w-[62ch] leading-relaxed text-baige/72">
-                    {{ branchDescription }}
-                </p>
+                <h2 class="regular text-baige">
+                    Ambulancia klinickej a dopravnej psychológie a psychoterapie v Rimavskej Sobote
+                </h2>
 
+                <Button background-color="#FFE5E5" text-color="#5A1F1F">
+                    Čomu sa venujeme
+                </Button>
+            </section>
+        
+            <section class="">
+                <img
+                    src="/images/humanitas_rodina.png"
+                    alt="Humanitas"
+                    class="h-auto w-full max-w-[480px] object-contain"
+                >
+            </section>
+
+            <section class="flex flex-col items-center justify-center gap-6 text-center p-5">
+                <h1 class="regular text-baige text-xl text-center">
+                    <strong>Časté otázky</strong>
+                </h1>
+
+                <h2 class="regular text-baige">
+                    Prelistujte sa najčastejšie sa vyskytujúcimi otázkami
+                </h2>
+            </section>
+            <FaqCarousel :items="generatedFaq" />
+                   
+
+            <section class="max-w-4xl">
                 <div class="mt-10 flex flex-wrap gap-x-8 gap-y-4">
                     <a
                         :href="servicesUrl"
@@ -750,58 +773,18 @@ function toggleFaq(index) {
             </section>
 
             <!-- FAQ -->
-            <section class="max-w-4xl">
-                <p class="text-bold text-baige/45">
-                    Informácie
-                </p>
+            <section>
+                <div class="mb-12 max-w-xl">
+                    <p class="text-bold text-baige/45">
+                        Informácie
+                    </p>
 
-                <h2 class="heading mt-3 text-baige">
-                    Často sa pýtate
-                </h2>
-
-                <div class="mt-10">
-                    <article
-                        v-for="(item, index) in generatedFaq"
-                        :key="`${item.question}-${index}`"
-                        class="py-5"
-                    >
-                        <button
-                            type="button"
-                            class="flex w-full items-start justify-between gap-8 text-left"
-                            :aria-expanded="openedFaqIndex === index"
-                            @click="toggleFaq(index)"
-                        >
-                            <span class="text-bold text-baige">
-                                {{ item.question }}
-                            </span>
-
-                            <span
-                                class="text-regular shrink-0 text-baige/45 transition-transform duration-300"
-                                :class="{
-                                    'rotate-45': openedFaqIndex === index
-                                }"
-                                aria-hidden="true"
-                            >
-                                +
-                            </span>
-                        </button>
-
-                        <div
-                            class="grid transition-[grid-template-rows,opacity] duration-300"
-                            :class="
-                                openedFaqIndex === index
-                                    ? 'grid-rows-[1fr] opacity-100'
-                                    : 'grid-rows-[0fr] opacity-0'
-                            "
-                        >
-                            <div class="overflow-hidden">
-                                <p class="text-regular max-w-[65ch] pb-3 pt-5 leading-relaxed text-baige/58">
-                                    {{ item.answer }}
-                                </p>
-                            </div>
-                        </div>
-                    </article>
+                    <h2 class="heading mt-3 text-baige">
+                        Často sa pýtate
+                    </h2>
                 </div>
+
+                
             </section>
 
             <!-- Contact CTA -->

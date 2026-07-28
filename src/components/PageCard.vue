@@ -12,14 +12,17 @@ const props = defineProps({
         type: Object,
         required: true
     },
+
     mode: {
         type: String,
         required: true
     },
+
     visual: {
         type: Object,
         required: true
     },
+
     reducedMotion: {
         type: Boolean,
         default: false
@@ -38,21 +41,51 @@ const emit = defineEmits([
 ])
 
 const rootElementRef = ref(null)
+
 const isHovered = ref(false)
 const isStackDragActive = ref(false)
+
 const stackDragX = ref(0)
 const stackDragY = ref(0)
 const stackDragRotate = ref(0)
+
 const suppressPreviewActivate = ref(false)
 
-const CARD_SHADOW =
-    '0 28px 70px rgba(18, 33, 24, 0.30), 0 10px 28px rgba(18, 33, 24, 0.20)'
-    
+const topBarPointerId = ref(null)
+const topBarPointerStartX = ref(0)
+const topBarPointerStartY = ref(0)
+const topBarPointerMoved = ref(false)
+
+const CARD_SHADOW = 'var(--shadow-strong)'
+
 let stackDragPointerId = null
 let stackDragStartX = 0
 let stackDragStartY = 0
 
-const isPreviewMode = computed(() => !props.visual.isOpen)
+const isPreviewMode = computed(() => {
+    return !props.visual.isOpen
+})
+
+const isMenuMorphOpen = computed(() => {
+    return Boolean(
+        props.visual.isOpen &&
+        props.visual.showExpandedControls
+    )
+})
+
+const isMenuActionReady = computed(() => {
+    return isMenuMorphOpen.value
+})
+
+const cardLabel = computed(() => {
+    return (
+        props.card.menuLabel ??
+        props.card.label ??
+        props.card.title ??
+        props.card.name ??
+        ''
+    )
+})
 
 const transitionDuration = computed(() => {
     return props.reducedMotion
@@ -69,17 +102,32 @@ const previewEffectsReady = computed(() => {
 })
 
 const contentContainerClass = computed(() => {
-    return 'flex flex-col'
+    return 'flex min-h-full flex-col'
+})
+
+const menuControlStyle = computed(() => {
+    const dragProgress =
+        props.visual.dragProgress ?? 0
+
+    return {
+        transform: [
+            `translate3d(0, ${dragProgress * 3}px, 0)`,
+            `scale(${1 - dragProgress * 0.025})`
+        ].join(' ')
+    }
 })
 
 const cardStyle = computed(() => {
     if (usesFixedTransitionBox.value) {
         const box = props.visual.fixedBox
+
         const fixedAnchor =
             props.visual.fixedAnchor ?? 'left'
+
         const fixedTimingFunction =
             props.visual.fixedTimingFunction ??
             'cubic-bezier(0.22, 1, 0.36, 1)'
+
         const fixedTransitionProperty =
             props.visual.fixedTransitionProperty ??
             [
@@ -90,9 +138,11 @@ const cardStyle = computed(() => {
                 'border-radius',
                 'box-shadow'
             ].join(', ')
+
         const fixedWillChange =
             props.visual.fixedWillChange ??
             'top, left, width, height, border-radius, box-shadow'
+
         const fixedTransformOrigin =
             props.visual.fixedTransformOrigin ??
             'center top'
@@ -109,7 +159,8 @@ const cardStyle = computed(() => {
             : 'translate3d(0, 0, 0)'
 
         const transform =
-            props.visual.fixedTransform ?? fixedTransform
+            props.visual.fixedTransform ??
+            fixedTransform
 
         return {
             position: 'fixed',
@@ -123,15 +174,22 @@ const cardStyle = computed(() => {
             transform,
             transformOrigin: fixedTransformOrigin,
             opacity: props.visual.opacity,
-            visibility: props.visual.visibility ?? 'visible',
+            visibility:
+                props.visual.visibility ??
+                'visible',
             zIndex: props.visual.zIndex,
-            boxShadow: props.visual.shadow ?? CARD_SHADOW,
-            borderRadius: `${props.visual.borderRadius}px`,
+            boxShadow: CARD_SHADOW,
+            borderRadius:
+                `${props.visual.borderRadius}px`,
             overflow: 'hidden',
-            transitionProperty: fixedTransitionProperty,
-            transitionDuration: `${transitionDuration.value}ms`,
-            transitionTimingFunction: fixedTimingFunction,
-            willChange: fixedWillChange
+            transitionProperty:
+                fixedTransitionProperty,
+            transitionDuration:
+                `${transitionDuration.value}ms`,
+            transitionTimingFunction:
+                fixedTimingFunction,
+            willChange:
+                fixedWillChange
         }
     }
 
@@ -140,7 +198,9 @@ const cardStyle = computed(() => {
             position: 'relative',
             width: props.visual.width,
             height: props.visual.height,
-            minHeight: props.visual.minHeight ?? props.visual.height,
+            minHeight:
+                props.visual.minHeight ??
+                props.visual.height,
             maxWidth: 'none',
             marginInline: 'auto',
             transform: [
@@ -150,16 +210,21 @@ const cardStyle = computed(() => {
             ].join(' '),
             transformOrigin: 'center top',
             opacity: props.visual.opacity,
-            visibility: props.visual.visibility ?? 'visible',
+            visibility:
+                props.visual.visibility ??
+                'visible',
             zIndex: props.visual.zIndex,
-            boxShadow: props.visual.shadow ?? CARD_SHADOW,
-            borderRadius: `${props.visual.borderRadius}px`,
+            boxShadow: CARD_SHADOW,
+            borderRadius:
+                `${props.visual.borderRadius}px`,
             overflow: 'visible',
             transitionProperty: [
                 'transform',
-                'border-radius'
+                'border-radius',
+                'box-shadow'
             ].join(', '),
-            transitionDuration: `${transitionDuration.value}ms`,
+            transitionDuration:
+                `${transitionDuration.value}ms`,
             transitionTimingFunction:
                 'cubic-bezier(0.22, 1, 0.36, 1)'
         }
@@ -173,17 +238,20 @@ const cardStyle = computed(() => {
             : 0
 
     const stackPlayX =
-        isPreviewMode.value && props.visual.interactive
+        isPreviewMode.value &&
+        props.visual.interactive
             ? stackDragX.value
             : 0
 
     const stackPlayY =
-        isPreviewMode.value && props.visual.interactive
+        isPreviewMode.value &&
+        props.visual.interactive
             ? stackDragY.value
             : 0
 
     const stackPlayRotate =
-        isPreviewMode.value && props.visual.interactive
+        isPreviewMode.value &&
+        props.visual.interactive
             ? stackDragRotate.value
             : 0
 
@@ -205,10 +273,13 @@ const cardStyle = computed(() => {
         ].join(' '),
         transformOrigin: 'center top',
         opacity: props.visual.opacity,
-        visibility: props.visual.visibility ?? 'visible',
+        visibility:
+            props.visual.visibility ??
+            'visible',
         zIndex: props.visual.zIndex,
-        boxShadow: props.visual.shadow ?? CARD_SHADOW,
-        borderRadius: `${props.visual.borderRadius}px`,
+        boxShadow: CARD_SHADOW,
+        borderRadius:
+            `${props.visual.borderRadius}px`,
         overflow: 'hidden',
         transitionProperty: [
             'transform',
@@ -216,22 +287,33 @@ const cardStyle = computed(() => {
             'box-shadow',
             'border-radius'
         ].join(', '),
-        transitionDuration: `${transitionDuration.value}ms`,
-        transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)'
+        transitionDuration:
+            `${transitionDuration.value}ms`,
+        transitionTimingFunction:
+            'cubic-bezier(0.22, 1, 0.36, 1)'
     }
 })
 
 const cardClass = computed(() => {
     return {
-        'pointer-events-none': !props.visual.interactive,
-        'is-expanded': props.visual.isOpen,
+        'pointer-events-none':
+            !props.visual.interactive,
+
+        'is-expanded':
+            props.visual.isOpen,
+
         'will-change-transform': true,
+
         'rounded-[2rem]': true,
+
         'touch-none':
-            isPreviewMode.value && props.visual.interactive,
+            isPreviewMode.value &&
+            props.visual.interactive,
+
         'cursor-grab':
-            (props.visual.isOpen && !props.visual.isDragging) ||
-            (isPreviewMode.value && props.visual.interactive),
+            isPreviewMode.value &&
+            props.visual.interactive,
+
         'cursor-grabbing':
             props.visual.isDragging ||
             isStackDragActive.value
@@ -246,7 +328,9 @@ function emitCardElementChange(element) {
 }
 
 onMounted(() => {
-    emitCardElementChange(rootElementRef.value)
+    emitCardElementChange(
+        rootElementRef.value
+    )
 })
 
 onUnmounted(() => {
@@ -259,13 +343,29 @@ watch(
         usesFixedTransitionBox.value,
         previewEffectsReady.value
     ],
-    ([isPreview, isFixedTransition, effectsReady]) => {
-        // Prevent stale hover tilt from snapping in at minimize handoff.
-        if (!isPreview || isFixedTransition || !effectsReady) {
+    (
+        [
+            isPreview,
+            isFixedTransition,
+            effectsReady
+        ]
+    ) => {
+        if (
+            !isPreview ||
+            isFixedTransition ||
+            !effectsReady
+        ) {
             isHovered.value = false
         }
     }
 )
+
+function activateCard() {
+    emit(
+        'activate',
+        rootElementRef.value
+    )
+}
 
 function handleClick() {
     if (suppressPreviewActivate.value) {
@@ -277,7 +377,7 @@ function handleClick() {
         return
     }
 
-    emit('activate', rootElementRef.value)
+    activateCard()
 }
 
 function onKeydown(event) {
@@ -290,32 +390,41 @@ function onKeydown(event) {
         event.key === ' '
     ) {
         event.preventDefault()
-        emit('activate', rootElementRef.value)
+        activateCard()
     }
 }
 
-function onHandlePointerDown(event) {
+function onMenuControlClick() {
+    if (topBarPointerMoved.value) {
+        topBarPointerMoved.value = false
+        return
+    }
+
+    if (isPreviewMode.value) {
+        activateCard()
+        return
+    }
+
+    if (isMenuActionReady.value) {
+        emit('minimize')
+    }
+}
+
+function onTopBarPointerDown(event) {
     if (!props.visual.isOpen) {
         return
     }
 
-    emit('handle-pointer-down', event)
-}
+    topBarPointerId.value =
+        event.pointerId
 
-function shouldIgnoreCardDragStart(target) {
-    return Boolean(
-        target?.closest?.(
-            'button, a, input, textarea, select, label, [data-no-drag]'
-        )
-    )
-}
+    topBarPointerStartX.value =
+        event.clientX
 
-function beginStackDrag(event) {
-    isStackDragActive.value = true
-    suppressPreviewActivate.value = false
-    stackDragPointerId = event.pointerId
-    stackDragStartX = event.clientX
-    stackDragStartY = event.clientY
+    topBarPointerStartY.value =
+        event.clientY
+
+    topBarPointerMoved.value = false
 
     try {
         event.currentTarget?.setPointerCapture?.(
@@ -324,38 +433,48 @@ function beginStackDrag(event) {
     } catch {
         // Pointer capture is optional.
     }
+
+    emit(
+        'handle-pointer-down',
+        event
+    )
 }
 
-function updateStackDrag(event) {
+function onTopBarPointerMove(event) {
     if (
-        !isStackDragActive.value ||
-        event.pointerId !== stackDragPointerId
+        !props.visual.isOpen ||
+        topBarPointerId.value !==
+            event.pointerId
     ) {
         return
     }
 
-    const rawX = event.clientX - stackDragStartX
-    const rawY = event.clientY - stackDragStartY
+    const distanceX =
+        event.clientX -
+        topBarPointerStartX.value
 
-    const clampedX = Math.max(-34, Math.min(34, rawX))
-    const clampedY = Math.max(-24, Math.min(24, rawY))
-
-    stackDragX.value = clampedX
-    stackDragY.value = clampedY
-    stackDragRotate.value = clampedX * 0.08
+    const distanceY =
+        event.clientY -
+        topBarPointerStartY.value
 
     if (
-        Math.abs(clampedX) > 4 ||
-        Math.abs(clampedY) > 4
+        Math.abs(distanceX) > 5 ||
+        Math.abs(distanceY) > 5
     ) {
-        suppressPreviewActivate.value = true
+        topBarPointerMoved.value = true
     }
+
+    emit(
+        'handle-pointer-move',
+        event
+    )
 }
 
-function endStackDrag(event) {
+function onTopBarPointerUp(event) {
     if (
-        !isStackDragActive.value ||
-        event.pointerId !== stackDragPointerId
+        !props.visual.isOpen ||
+        topBarPointerId.value !==
+            event.pointerId
     ) {
         return
     }
@@ -368,15 +487,148 @@ function endStackDrag(event) {
         // Pointer capture might not exist.
     }
 
+    emit(
+        'handle-pointer-up',
+        event
+    )
+
+    topBarPointerId.value = null
+}
+
+function onTopBarPointerCancel(event) {
+    if (
+        !props.visual.isOpen ||
+        topBarPointerId.value !==
+            event.pointerId
+    ) {
+        return
+    }
+
+    emit(
+        'handle-pointer-cancel',
+        event
+    )
+
+    topBarPointerId.value = null
+    topBarPointerMoved.value = false
+}
+
+function shouldIgnoreCardDragStart(target) {
+    return Boolean(
+        target?.closest?.(
+            [
+                'button',
+                'a',
+                'input',
+                'textarea',
+                'select',
+                'label',
+                '[data-no-drag]'
+            ].join(', ')
+        )
+    )
+}
+
+function beginStackDrag(event) {
+    isStackDragActive.value = true
+    suppressPreviewActivate.value = false
+
+    stackDragPointerId =
+        event.pointerId
+
+    stackDragStartX =
+        event.clientX
+
+    stackDragStartY =
+        event.clientY
+
+    try {
+        event.currentTarget
+            ?.setPointerCapture?.(
+                event.pointerId
+            )
+    } catch {
+        // Pointer capture is optional.
+    }
+}
+
+function updateStackDrag(event) {
+    if (
+        !isStackDragActive.value ||
+        event.pointerId !==
+            stackDragPointerId
+    ) {
+        return
+    }
+
+    const rawX =
+        event.clientX -
+        stackDragStartX
+
+    const rawY =
+        event.clientY -
+        stackDragStartY
+
+    const clampedX = Math.max(
+        -34,
+        Math.min(34, rawX)
+    )
+
+    const clampedY = Math.max(
+        -24,
+        Math.min(24, rawY)
+    )
+
+    stackDragX.value =
+        clampedX
+
+    stackDragY.value =
+        clampedY
+
+    stackDragRotate.value =
+        clampedX * 0.08
+
+    if (
+        Math.abs(clampedX) > 4 ||
+        Math.abs(clampedY) > 4
+    ) {
+        suppressPreviewActivate.value = true
+    }
+}
+
+function endStackDrag(event) {
+    if (
+        !isStackDragActive.value ||
+        event.pointerId !==
+            stackDragPointerId
+    ) {
+        return
+    }
+
+    try {
+        event.currentTarget
+            ?.releasePointerCapture?.(
+                event.pointerId
+            )
+    } catch {
+        // Pointer capture might not exist.
+    }
+
     isStackDragActive.value = false
+
     stackDragX.value = 0
     stackDragY.value = 0
     stackDragRotate.value = 0
+
     stackDragPointerId = null
 }
 
 function onCardPointerDown(event) {
-    if (shouldIgnoreCardDragStart(event.target)) {
+    if (
+        shouldIgnoreCardDragStart(
+            event.target
+        )
+    ) {
         return
     }
 
@@ -385,73 +637,39 @@ function onCardPointerDown(event) {
         props.visual.interactive
     ) {
         beginStackDrag(event)
-        return
     }
-
-    if (!props.visual.isOpen) {
-        return
-    }
-
-    emit('handle-pointer-down', event)
 }
 
 function onCardPointerMove(event) {
     if (isStackDragActive.value) {
         updateStackDrag(event)
-        return
     }
-
-    if (!props.visual.isOpen) {
-        return
-    }
-
-    emit('handle-pointer-move', event)
 }
 
 function onCardPointerUp(event) {
     if (isStackDragActive.value) {
         endStackDrag(event)
-        return
     }
-
-    if (!props.visual.isOpen) {
-        return
-    }
-
-    emit('handle-pointer-up', event)
 }
 
 function onCardPointerCancel(event) {
     if (isStackDragActive.value) {
         endStackDrag(event)
-        return
     }
-
-    if (!props.visual.isOpen) {
-        return
-    }
-
-    emit('handle-pointer-cancel', event)
-}
-
-function onHandlePointerMove(event) {
-    emit('handle-pointer-move', event)
-}
-
-function onHandlePointerUp(event) {
-    emit('handle-pointer-up', event)
-}
-
-function onHandlePointerCancel(event) {
-    emit('handle-pointer-cancel', event)
 }
 
 function onTransitionEnd(event) {
-    if (event.target !== event.currentTarget) {
+    if (
+        event.target !==
+        event.currentTarget
+    ) {
         return
     }
 
-    emit('transition-end', event)
+    emit(
+        'transition-end',
+        event
+    )
 }
 
 function onMouseEnter() {
@@ -480,9 +698,23 @@ function onMouseLeave() {
         "
         :class="cardClass"
         :style="cardStyle"
-        :aria-current="visual.isOpen ? 'page' : undefined"
-        :tabindex="isPreviewMode && visual.interactive ? 0 : -1"
-        :role="isPreviewMode && visual.interactive ? 'button' : undefined"
+        :aria-current="
+            visual.isOpen
+                ? 'page'
+                : undefined
+        "
+        :tabindex="
+            isPreviewMode &&
+            visual.interactive
+                ? 0
+                : -1
+        "
+        :role="
+            isPreviewMode &&
+            visual.interactive
+                ? 'button'
+                : undefined
+        "
         @click="handleClick"
         @keydown="onKeydown"
         @pointerdown="onCardPointerDown"
@@ -496,105 +728,270 @@ function onMouseLeave() {
         <div :class="contentContainerClass">
             <div
                 class="
+                    relative
+                    z-50
                     flex
+                    h-[4.5rem]
                     w-full
-                    justify-center
-                    px-6
-                    pb-3
-                    pt-4
+                    shrink-0
+                    touch-none
+                    items-center
+                    justify-end
+                    px-5
                     sm:px-7
                 "
+                :class="{
+                    'cursor-grab':
+                        visual.isOpen &&
+                        !visual.isDragging,
+
+                    'cursor-grabbing':
+                        visual.isDragging
+                }"
+                aria-label="Potiahnutím nadol minimalizovať stránku"
+                @pointerdown.stop="onTopBarPointerDown"
+                @pointermove.stop="onTopBarPointerMove"
+                @pointerup.stop="onTopBarPointerUp"
+                @pointercancel.stop="onTopBarPointerCancel"
             >
                 <button
                     type="button"
                     class="
+                        page-card-menu
+                        relative
                         flex
-                        min-h-10
-                        w-20
-                        touch-none
-                        items-start
-                        justify-center
+                        min-h-11
+                        max-w-full
+                        items-center
+                        justify-end
                         rounded-full
-                        transition-opacity
-                        duration-200
-                        focus-visible:outline-none
+                        text-right
+                        outline-none
+                        transition-[color,transform]
+                        duration-500
+                        ease-[cubic-bezier(0.16,1,0.3,1)]
+                        hover:text-baige
                         focus-visible:ring-2
-                        focus-visible:ring-baige/90
+                        focus-visible:ring-baige/80
                         focus-visible:ring-offset-2
                         focus-visible:ring-offset-green
                     "
-                    :class="visual.showExpandedControls ? 'opacity-100' : 'pointer-events-none opacity-0'"
-                    aria-label="Potiahnutím nadol minimalizovať stránku"
-                    @pointerdown.stop="onHandlePointerDown"
-                    @pointermove.stop="onHandlePointerMove"
-                    @pointerup.stop="onHandlePointerUp"
-                    @pointercancel.stop="onHandlePointerCancel"
+                    :class="{
+                        'page-card-menu--open':
+                            isMenuMorphOpen,
+
+                        'pointer-events-none':
+                            visual.isOpen &&
+                            !isMenuActionReady
+                    }"
+                    :style="menuControlStyle"
+                    :aria-label="
+                        isMenuMorphOpen
+                            ? 'Otvoriť hlavné menu'
+                            : `Otvoriť stránku ${cardLabel}`
+                    "
+                    @click.stop="onMenuControlClick"
                 >
                     <span
                         class="
-                            mt-2
-                            h-1.5
-                            w-12
-                            rounded-full
-                            bg-white/40
-                            transition-all
-                            duration-150
+                            page-card-menu__text-window
+                            relative
+                            inline-grid
+                            h-5
+                            min-w-0
+                            overflow-hidden
+                            text-right
                         "
-                        :style="{
-                            transform: `translate3d(0, ${-((visual.dragProgress ?? 0) * 1.6)}px, 0) scaleX(${1 + (visual.dragProgress ?? 0) * 0.18})`,
-                            opacity: `${0.4 + (visual.dragProgress ?? 0) * 0.4}`
-                        }"
-                        role="presentation"
-                    />
+                        aria-hidden="true"
+                    >
+                        <span
+                            class="
+                                page-card-menu__label
+                                page-card-menu__label--card
+                                col-start-1
+                                row-start-1
+                                whitespace-nowrap
+                                text-regular
+                                font-bold
+                            "
+                        >
+                            {{ cardLabel }}
+                        </span>
+
+                        <span
+                            class="
+                                page-card-menu__label
+                                page-card-menu__label--menu
+                                col-start-1
+                                row-start-1
+                                whitespace-nowrap
+                                text-regular
+                                font-bold
+                            "
+                        >
+                            Hlavné menu
+                        </span>
+                    </span>
+
+                    <span
+                        class="page-card-menu__icon"
+                        aria-hidden="true"
+                    >
+                        <span
+                            class="
+                                page-card-menu__line
+                                page-card-menu__line--primary
+                            "
+                        />
+
+                        <span
+                            class="
+                                page-card-menu__line
+                                page-card-menu__line--secondary
+                            "
+                        />
+                    </span>
                 </button>
             </div>
 
-            <div
-                class="
-                    touch-none
-                    px-6
-                    pb-8
-                    pt-2
-                    sm:px-7
-                "
-            >
-                <div
-                    class="mb-6 flex justify-end transition-opacity duration-200"
-                    :class="visual.showExpandedControls ? 'opacity-100' : 'pointer-events-none opacity-0'"
-                >
-                    <button
-                        type="button"
-                        class="
-                            rounded-full
-                            border
-                            border-baige/35
-                            px-3
-                            py-1
-                            text-xs
-                            font-semibold
-                            uppercase
-                            tracking-[0.1em]
-                            text-baige
-                            transition-colors
-                            hover:bg-baige/10
-                            focus-visible:outline-none
-                            focus-visible:ring-2
-                            focus-visible:ring-baige/90
-                            focus-visible:ring-offset-2
-                            focus-visible:ring-offset-green
-                        "
-                        aria-label="Minimalizovať kartu"
-                        @click.stop="emit('minimize')"
-                    >
-                        Zavrieť
-                    </button>
-                </div>
-
-                <component
-                    :is="card.component"
-                    :expanded="true"
-                />
-            </div>
+            <component
+                :is="card.component"
+                :expanded="true"
+            />
         </div>
     </article>
 </template>
+
+<style scoped>
+.page-card-menu__text-window {
+    width: max-content;
+}
+
+.page-card-menu__label {
+    display: block;
+    min-width: max-content;
+    text-align: right;
+
+    transition:
+        transform 620ms cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 320ms ease;
+
+    will-change:
+        transform,
+        opacity;
+}
+
+.page-card-menu__label--card {
+    opacity: 1;
+
+    transform:
+        translate3d(0, 0, 0);
+}
+
+.page-card-menu__label--menu {
+    opacity: 0;
+
+    transform:
+        translate3d(8px, 115%, 0);
+}
+
+.page-card-menu--open
+.page-card-menu__label--card {
+    opacity: 0;
+
+    transform:
+        translate3d(-8px, -115%, 0);
+}
+
+.page-card-menu--open
+.page-card-menu__label--menu {
+    opacity: 1;
+
+    transform:
+        translate3d(0, 0, 0);
+}
+
+.page-card-menu__icon {
+    position: relative;
+    display: block;
+    width: 2px;
+    height: 20px;
+    margin-left: 12px;
+    flex-shrink: 0;
+    overflow: visible;
+
+    transition:
+        width 660ms cubic-bezier(0.16, 1, 0.3, 1);
+
+    will-change:
+        width;
+}
+
+.page-card-menu--open
+.page-card-menu__icon {
+    width: 16px;
+}
+
+.page-card-menu__line {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    display: block;
+    width: 16px;
+    height: 2px;
+    border-radius: 9999px;
+    background: currentColor;
+    transform-origin: center;
+
+    transition:
+        transform 660ms cubic-bezier(0.16, 1, 0.3, 1),
+        opacity 300ms ease;
+
+    will-change:
+        transform,
+        opacity;
+}
+
+.page-card-menu__line--primary {
+    transform:
+        translate3d(-50%, -50%, 0)
+        rotate(90deg)
+        scaleX(1);
+}
+
+.page-card-menu__line--secondary {
+    opacity: 0;
+
+    transform:
+        translate3d(-50%, -50%, 0)
+        rotate(0deg)
+        scaleX(0);
+}
+
+.page-card-menu--open
+.page-card-menu__line--primary {
+    transform:
+        translate3d(-50%, -4px, 0)
+        rotate(0deg)
+        scaleX(1);
+}
+
+.page-card-menu--open
+.page-card-menu__line--secondary {
+    opacity: 1;
+
+    transform:
+        translate3d(-50%, 4px, 0)
+        rotate(0deg)
+        scaleX(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .page-card-menu,
+    .page-card-menu__label,
+    .page-card-menu__icon,
+    .page-card-menu__line {
+        transition-duration: 0ms !important;
+    }
+}
+</style>

@@ -1,5 +1,5 @@
 import HomePage from '../pages/HomePage.vue'
-import FocusPage from '../pages/ServicesPage.vue/index.js'
+import ServicesPage from '../pages/ServicesPage.vue'
 import ContactPage from '../pages/ContactPage.vue'
 
 export const pages = [
@@ -10,10 +10,10 @@ export const pages = [
         component: HomePage
     },
     {
-        id: 'zameranie',
-        title: 'Naše zameranie',
-        route: '/zameranie',
-        component: FocusPage
+        id: 'sluzby',
+        title: 'Služby',
+        route: '/sluzby',
+        component: ServicesPage
     },
     {
         id: 'kontakt',

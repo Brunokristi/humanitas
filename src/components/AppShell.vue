@@ -78,7 +78,7 @@ onUnmounted(() => {
             aria-hidden="true"
         />
 
-        <div class="relative h-[72px] w-full">
+        <div class="relative h-[50px] w-full">
             <AppHeader
                 :show-menu="isFullyExpanded"
                 :is-fixed="isFullyExpanded"
@@ -93,8 +93,7 @@ onUnmounted(() => {
                 flex
                 items-start
                 justify-center
-                px-5
-                pb-20
+                p-2
             "
 
         >

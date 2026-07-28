@@ -484,8 +484,8 @@ function onLogoError() {
 </script>
 
 <template>
-    <footer class="bg-baige text-green">
-        <div class="mx-auto w-full max-w-[1200px] px-5 pb-10 pt-20 sm:px-8 sm:pb-12 sm:pt-28 lg:pt-32">
+    <footer class="bg-baige text-green p-5">
+        <div class="mx-auto w-full pb-10 pt-20 sm:pb-12 sm:pt-28 lg:pt-32">
             <!-- Loading -->
             <div
                 v-if="loading"
@@ -559,9 +559,7 @@ function onLogoError() {
                             </p>
 
                             <div
-                                v-if="branchAddress.length"
-                                class="mt-5"
-                            >
+                                v-if="branchAddress.length"                            >
                                 <p
                                     v-for="line in branchAddress"
                                     :key="line"
@@ -571,12 +569,7 @@ function onLogoError() {
                                 </p>
                             </div>
 
-                            <p
-                                v-if="branchDescription"
-                                class="text-regular mt-7 max-w-xl text-green/60"
-                            >
-                                {{ branchDescription }}
-                            </p>
+                            
                         </div>
 
                         <div class="mt-12">
