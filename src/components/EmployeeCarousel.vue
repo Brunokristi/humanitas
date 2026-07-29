@@ -6,7 +6,9 @@ import {
     watch
 } from 'vue';
 
-import Card from './Card.vue';
+const emit = defineEmits([
+    'select'
+]);
 
 const props = defineProps({
     items: {
@@ -21,22 +23,17 @@ const props = defineProps({
 
     ariaLabel: {
         type: String,
-        default: 'Posuvné karty'
+        default: 'Náš tím'
     },
 
     previousLabel: {
         type: String,
-        default: 'Predchádzajúca karta'
+        default: 'Predchádzajúci zamestnanec'
     },
 
     nextLabel: {
         type: String,
-        default: 'Nasledujúca karta'
-    },
-
-    image: {
-        type: String,
-        default: '/images/faq.png'
+        default: 'Nasledujúci zamestnanec'
     }
 });
 
@@ -66,6 +63,8 @@ const pointerStartX = ref(0);
 const previousPointerX = ref(0);
 const previousPointerTime = ref(0);
 const pointerVelocity = ref(0);
+
+const pointerMoved = ref(false);
 
 const exitingCards = ref({});
 
@@ -127,40 +126,98 @@ const totalNumber = computed(() => {
 
 const stackPositions = [
     {
-        x: -12,
-        y: -16,
-        scale: 0.975,
-        rotate: -1.8
+        x: -25,
+        y: -150,
+        scale: 0.99,
+        rotate: -2
     },
 
     {
         x: 12,
-        y: -29,
+        y: -200,
+        scale: 0.98,
+        rotate: 2.4
+    },
+
+    {
+        x: -8,
+        y: -138,
+        scale: 0.97,
+        rotate: -1.8
+    },
+
+    {
+        x: 10,
+        y: -184,
+        scale: 0.96,
+        rotate: 2
+    },
+
+    {
+        x: -6,
+        y: -230,
         scale: 0.95,
-        rotate: 1.8
+        rotate: -1.4
     },
 
     {
-        x: -9,
-        y: -42,
-        scale: 0.925,
-        rotate: -1.2
-    },
-
-    {
-        x: 9,
-        y: -54,
-        scale: 0.9,
-        rotate: 1.2
+        x: 8,
+        y: -276,
+        scale: 0.94,
+        rotate: 1.6
     },
 
     {
         x: 0,
-        y: -65,
-        scale: 0.875,
+        y: -322,
+        scale: 0.93,
         rotate: 0
     }
 ];
+
+const stackTopSpace = computed(() => {
+    if (cardCount.value <= 1) {
+        return 24;
+    }
+
+    const backgroundCardCount =
+        Math.min(
+            cardCount.value - 1,
+            stackPositions.length
+        );
+
+    let highestOffset = 0;
+
+    for (
+        let depth = 1;
+        depth <= backgroundCardCount;
+        depth++
+    ) {
+        const stack =
+            getStackTransform(
+                depth
+            );
+
+        highestOffset =
+            Math.max(
+                highestOffset,
+                Math.abs(
+                    Math.min(
+                        stack.y,
+                        0
+                    )
+                )
+            );
+    }
+
+    const breathingRoom =
+        28;
+
+    return (
+        highestOffset +
+        breathingRoom
+    );
+});
 
 function clamp(
     value,
@@ -189,11 +246,70 @@ function circularIndex(index) {
         cardCount.value;
 }
 
+function buildPublicAssetUrl(path) {
+    if (!path) {
+        return null;
+    }
+
+    if (
+        path.startsWith(
+            'http://'
+        ) ||
+        path.startsWith(
+            'https://'
+        )
+    ) {
+        return path;
+    }
+
+    const apiBaseUrl =
+        import.meta.env.VITE_CLINVIA_API_URL ??
+        'https://clinvia.studiokristian.com';
+
+    const normalizedPath =
+        path.startsWith('/')
+            ? path
+            : `/${path}`;
+
+    return `${apiBaseUrl}${normalizedPath}`;
+}
+
+function employeePhotoUrl(employee) {
+    return buildPublicAssetUrl(
+        employee?.photoUrl ??
+        employee?.photoPath ??
+        employee?.photo_url ??
+        employee?.photo_path
+    );
+}
+
+function employeeName(employee) {
+    return [
+        employee?.titleBefore,
+        employee?.firstName,
+        employee?.lastName,
+        employee?.titleAfter
+    ]
+        .filter(Boolean)
+        .join(' ');
+}
+
+function employeeInitials(employee) {
+    return [
+        employee?.firstName
+            ?.charAt(0),
+        employee?.lastName
+            ?.charAt(0)
+    ]
+        .filter(Boolean)
+        .join('');
+}
+
 function updateCardWidth() {
     const cardElement =
         stageElement.value
             ?.querySelector(
-                '[data-carousel-card]'
+                '[data-employee-card]'
             );
 
     const rect =
@@ -268,14 +384,14 @@ function isCardActive(index) {
     );
 }
 
-function getCardWrapperClasses(index) {
+function getCardWrapperClasses(
+    index
+) {
     const active =
         isCardActive(index);
 
     return [
-        active
-            ? 'pointer-events-auto'
-            : 'pointer-events-none',
+        'pointer-events-auto cursor-pointer',
 
         active &&
         isDragging.value
@@ -292,7 +408,9 @@ function getCardWrapperClasses(index) {
     ];
 }
 
-function getCardWrapperStyle(index) {
+function getCardWrapperStyle(
+    index
+) {
     const exitState =
         exitingCards.value[
             index
@@ -432,15 +550,15 @@ function clearExitState(index) {
         ...exitingCards.value
     };
 
-    delete nextStates[
-        index
-    ];
+    delete nextStates[index];
 
     exitingCards.value =
         nextStates;
 }
 
-function scheduleExitRemoval(index) {
+function scheduleExitRemoval(
+    index
+) {
     const existingTimer =
         exitTimers.get(index);
 
@@ -528,23 +646,24 @@ function commitMovement(
     const targetX =
         direction > 0
             ? -cardWidth.value *
-                1.15
+                0.72
             : cardWidth.value *
-                1.15;
+                0.72;
 
     exitingCards.value = {
         ...exitingCards.value,
 
         [outgoingIndex]: {
             x: targetX,
-            y: 8,
+
+            y: 18,
 
             rotate:
                 direction > 0
-                    ? -5
-                    : 5,
+                    ? -8
+                    : 8,
 
-            scale: 0.985
+            scale: 0.97
         }
     };
 
@@ -559,15 +678,11 @@ function commitMovement(
 }
 
 function goNext() {
-    commitMovement(
-        1
-    );
+    commitMovement(1);
 }
 
 function goPrevious() {
-    commitMovement(
-        -1
-    );
+    commitMovement(-1);
 }
 
 function goTo(index) {
@@ -607,7 +722,9 @@ function goTo(index) {
     );
 }
 
-function shouldIgnorePointerStart(target) {
+function shouldIgnorePointerStart(
+    target
+) {
     return Boolean(
         target?.closest?.(
             [
@@ -623,7 +740,9 @@ function shouldIgnorePointerStart(target) {
     );
 }
 
-function handlePointerDown(event) {
+function handlePointerDown(
+    event
+) {
     if (
         shouldIgnorePointerStart(
             event.target
@@ -633,9 +752,23 @@ function handlePointerDown(event) {
     }
 
     if (
-        cardCount.value <= 1 ||
         event.button !== 0 ||
         isDragging.value
+    ) {
+        return;
+    }
+
+    pointerMoved.value =
+        false;
+
+    /*
+     * We only need drag handling when there
+     * is more than one card.
+     *
+     * A single card still remains clickable.
+     */
+    if (
+        cardCount.value <= 1
     ) {
         return;
     }
@@ -673,7 +806,9 @@ function handlePointerDown(event) {
     }
 }
 
-function handlePointerMove(event) {
+function handlePointerMove(
+    event
+) {
     if (
         !isDragging.value ||
         pointerId.value !==
@@ -710,6 +845,14 @@ function handlePointerMove(event) {
         event.clientX -
         pointerStartX.value;
 
+    if (
+        Math.abs(distance) >
+        6
+    ) {
+        pointerMoved.value =
+            true;
+    }
+
     const maximumDrag =
         cardWidth.value *
         0.72;
@@ -722,7 +865,9 @@ function handlePointerMove(event) {
         );
 }
 
-function handlePointerEnd(event) {
+function handlePointerEnd(
+    event
+) {
     if (
         !isDragging.value ||
         pointerId.value !==
@@ -762,6 +907,7 @@ function handlePointerEnd(event) {
 
     if (!shouldChange) {
         resetDragState();
+
         return;
     }
 
@@ -783,11 +929,12 @@ function handlePointerEnd(event) {
 }
 
 function handlePointerCancel() {
-    if (
-        !isDragging.value
-    ) {
+    if (!isDragging.value) {
         return;
     }
+
+    pointerMoved.value =
+        true;
 
     resetDragState();
 }
@@ -810,6 +957,60 @@ function handleKeydown(event) {
 
         goNext();
     }
+
+    if (
+        event.key ===
+            'Enter' ||
+        event.key ===
+            ' '
+    ) {
+        event.preventDefault();
+
+        selectCurrent();
+    }
+}
+
+function selectEmployee(
+    employee
+) {
+    if (!employee) {
+        return;
+    }
+
+    emit(
+        'select',
+        employee
+    );
+}
+
+function selectCurrent() {
+    selectEmployee(
+        props.items[
+            currentIndex.value
+        ]
+    );
+}
+
+function handleCardClick(
+    item
+) {
+    /*
+     * Ignore the synthetic click emitted
+     * by the browser immediately after
+     * a swipe gesture.
+     */
+    if (
+        pointerMoved.value
+    ) {
+        pointerMoved.value =
+            false;
+
+        return;
+    }
+
+    selectEmployee(
+        item
+    );
 }
 
 watch(
@@ -853,7 +1054,8 @@ onBeforeUnmount(() => {
     <section
         class="
             w-full
-            overflow-hidden
+            overflow-x-clip
+            overflow-y-visible
         "
         :aria-label="ariaLabel"
     >
@@ -861,10 +1063,15 @@ onBeforeUnmount(() => {
             class="
                 mx-auto
                 w-full
-                px-7
-                pb-15
-                pt-10
+                overflow-x-clip
+                overflow-y-visible
+                px-5
+                pb-8
             "
+            :style="{
+                paddingTop:
+                    `${stackTopSpace}px`
+            }"
         >
             <div
                 ref="stageElement"
@@ -875,10 +1082,14 @@ onBeforeUnmount(() => {
                     grid
                     w-full
                     place-items-center
+
+                    overflow-visible
+
                     cursor-grab
                     touch-pan-y
                     select-none
                     outline-none
+
                     active:cursor-grabbing
                 "
                 @keydown="
@@ -906,18 +1117,24 @@ onBeforeUnmount(() => {
                         item.id ??
                         index
                     "
-                    data-carousel-card
+                    data-employee-card
                     class="
                         relative
                         col-start-1
                         row-start-1
-                        flex
-                        w-full
-                        max-w-[36rem]
+
+                        w-[62vw]
+                        max-w-[15.5rem]
+
                         justify-self-center
+
                         origin-[50%_92%]
+
                         [backface-visibility:hidden]
                         [will-change:transform]
+
+                        sm:w-[16rem]
+                        md:w-[17rem]
                     "
                     :class="
                         getCardWrapperClasses(
@@ -929,58 +1146,144 @@ onBeforeUnmount(() => {
                             index
                         )
                     "
-                    :aria-hidden="
-                        !isCardActive(
-                            index
+                    @click="
+                        handleCardClick(
+                            item
                         )
                     "
                 >
-                    <Card
-                        :item="item"
-                        :active="isCardActive(index)"
-                        background-image="/images/humanitas_pozadie.png"
-                        :image-opacity="0.50"
-                        :image-scale="2.8"
+                    <article
+                        class="
+                            relative
+                            aspect-[3/4.2]
+                            w-full
+                            overflow-hidden
+                            rounded-[2.1rem]
+                            bg-baige
+                            shadow-[var(--shadow-mid)]
+                            transition-transform
+                            duration-200
+                            hover:scale-[1.015]
+                            active:scale-[0.99]
+                        "
                     >
-                        <template #default="slotProps">
-                            <slot
-                                name="card"
-                                :item="slotProps.item"
-                                :index="index"
-                                :active="slotProps.active"
-                            >
-                                <div
-                                    class="
-                                        flex
-                                        w-full
-                                        flex-col
-                                        gap-4
-                                    "
-                                >
-                                    <h3
-                                        class="
-                                            text-regular
-                                            font-bold
-                                            text-green
-                                        "
-                                    >
-                                        {{ slotProps.item.question }}
-                                    </h3>
+                        <!-- Photo -->
+                        <img
+                            v-if="
+                                employeePhotoUrl(
+                                    item
+                                )
+                            "
+                            :src="
+                                employeePhotoUrl(
+                                    item
+                                )
+                            "
+                            :alt="
+                                employeeName(
+                                    item
+                                )
+                            "
+                            draggable="false"
+                            class="
+                                absolute
+                                inset-0
+                                h-full
+                                w-full
+                                select-none
+                                object-cover
+                                object-center
+                            "
+                        >
 
-                                    <p
-                                        class="
-                                            text-regular
-                                            mt-8
-                                            max-w-[25rem]
-                                            text-green
-                                        "
-                                    >
-                                        {{ slotProps.item.answer }}
-                                    </p>
-                                </div>
-                            </slot>
-                        </template>
-                    </Card>
+                        <!-- Fallback -->
+                        <div
+                            v-else
+                            class="
+                                absolute
+                                inset-0
+                                flex
+                                items-center
+                                justify-center
+                                bg-baige
+                            "
+                        >
+                            <span
+                                class="
+                                    font-heading
+                                    text-5xl
+                                    font-bold
+                                    text-green/25
+                                "
+                            >
+                                {{
+                                    employeeInitials(
+                                        item
+                                    )
+                                }}
+                            </span>
+                        </div>
+
+                        <!-- Gradient -->
+                        <div
+                            class="
+                                pointer-events-none
+                                absolute
+                                inset-x-0
+                                bottom-0
+                                h-[45%]
+                                bg-gradient-to-t
+                                from-black/70
+                                via-black/20
+                                to-transparent
+                            "
+                        />
+
+                        <!-- Content -->
+                        <div
+                            class="
+                                pointer-events-none
+                                absolute
+                                inset-x-0
+                                bottom-0
+                                p-5
+                            "
+                        >
+                            <h3
+                                class="
+                                    text-regular
+                                    text-base
+                                    font-bold
+                                    leading-tight
+                                    text-white
+                                "
+                            >
+                                {{
+                                    employeeName(
+                                        item
+                                    )
+                                }}
+                            </h3>
+
+                            <p
+                                v-if="
+                                    item.position
+                                "
+                                class="
+                                    text-regular
+                                    mt-1
+                                    line-clamp-2
+                                    text-sm
+                                    leading-snug
+                                    text-white/80
+                                "
+                            >
+                                {{
+                                    item.position
+                                }}
+                            </p>
+                        </div>
+                    </article>
                 </div>
             </div>
         </div>
@@ -1005,28 +1308,22 @@ onBeforeUnmount(() => {
                     items-center
                     justify-center
                     gap-3
-                    px-10
                 "
             >
                 <button
                     type="button"
                     class="
                         flex
-                        h-13
-                        w-13
+                        h-11
+                        w-11
                         cursor-pointer
                         items-center
                         justify-center
                         text-baige
                         transition-transform
                         duration-200
-                        ease-[cubic-bezier(0.2,0.85,0.25,1)]
                         hover:scale-110
                         active:scale-95
-                        focus-visible:outline
-                        focus-visible:outline-2
-                        focus-visible:outline-offset-4
-                        focus-visible:outline-baige/70
                     "
                     :aria-label="
                         previousLabel
@@ -1039,22 +1336,17 @@ onBeforeUnmount(() => {
                         class="
                             bi
                             bi-chevron-left
-                            text-base
                         "
-                        aria-hidden="true"
                     />
                 </button>
 
                 <div
                     class="
                         flex
-                        min-w-20
                         items-center
                         justify-center
                         gap-2
                     "
-                    role="tablist"
-                    aria-label="Výber karty"
                 >
                     <button
                         v-for="
@@ -1068,14 +1360,8 @@ onBeforeUnmount(() => {
                             cursor-pointer
                             rounded-full
                             bg-baige/40
-                            transition-[width,background-color,transform]
+                            transition-[width,background-color]
                             duration-200
-                            ease-[cubic-bezier(0.2,0.85,0.25,1)]
-                            hover:scale-110
-                            focus-visible:outline
-                            focus-visible:outline-2
-                            focus-visible:outline-offset-4
-                            focus-visible:outline-baige/70
                         "
                         :class="
                             index ===
@@ -1084,13 +1370,8 @@ onBeforeUnmount(() => {
                                 : 'w-1.5'
                         "
                         :aria-label="
-                            `Zobraziť kartu ${index + 1}`
+                            `Zobraziť zamestnanca ${index + 1}`
                         "
-                        :aria-selected="
-                            index ===
-                            currentIndex
-                        "
-                        role="tab"
                         @click="
                             goTo(index)
                         "
@@ -1101,21 +1382,16 @@ onBeforeUnmount(() => {
                     type="button"
                     class="
                         flex
-                        h-13
-                        w-13
+                        h-11
+                        w-11
                         cursor-pointer
                         items-center
                         justify-center
                         text-baige
                         transition-transform
                         duration-200
-                        ease-[cubic-bezier(0.2,0.85,0.25,1)]
                         hover:scale-110
                         active:scale-95
-                        focus-visible:outline
-                        focus-visible:outline-2
-                        focus-visible:outline-offset-4
-                        focus-visible:outline-baige/70
                     "
                     :aria-label="
                         nextLabel
@@ -1128,21 +1404,17 @@ onBeforeUnmount(() => {
                         class="
                             bi
                             bi-chevron-right
-                            text-base
                         "
-                        aria-hidden="true"
                     />
                 </button>
             </div>
         </div>
 
         <p
-            class="
-                sr-only
-            "
+            class="sr-only"
             aria-live="polite"
         >
-            Karta
+            Zamestnanec
             {{ currentNumber }}
             z
             {{ totalNumber }}

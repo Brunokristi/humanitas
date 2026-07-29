@@ -94,6 +94,7 @@ onUnmounted(() => {
                 items-start
                 justify-center
                 p-2
+                sm:p-6
             "
 
         >

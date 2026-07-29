@@ -107,6 +107,45 @@ function createCardStack({
         return combinedOffset * depthFactor
     }
 
+    const stackBottomCompensation = computed(() => {
+        if (phase.value !== 'stacked') {
+            return 0
+        }
+
+        const combinedOffset =
+            stackScrollOffset.value +
+            stackWheelOffset.value
+
+        if (combinedOffset <= 0) {
+            return 0
+        }
+
+        let largestDownwardMovement = 0
+
+        cardOrder.value.forEach((_, index) => {
+            const depthFactor = Math.max(
+                0.06,
+                0.26 - index * 0.1
+            )
+
+            const movement =
+                combinedOffset * depthFactor
+
+            largestDownwardMovement = Math.max(
+                largestDownwardMovement,
+                movement
+            )
+        })
+
+        if (largestDownwardMovement <= 0) {
+            return 0
+        }
+
+        return Math.ceil(
+            largestDownwardMovement + 16
+        )
+    })
+
     function startWheelInertia() {
         if (wheelInertiaRafId !== null) {
             return
@@ -1242,6 +1281,7 @@ function createCardStack({
         isExpandedDragging,
         expandedDragY,
         reducedMotion,
+        stackBottomCompensation,
         registerCardElement,
         rememberStackedRect,
         rememberAllStackedRects,

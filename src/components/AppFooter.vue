@@ -3,12 +3,7 @@ import { computed } from 'vue'
 import { useClinviaPublicSite } from '../composables/useClinviaPublicSite'
 
 const {
-    data,
-    loading,
-    error,
-    logoUrl,
-    markLogoFallbackFailed,
-    load
+    data
 } = useClinviaPublicSite()
 
 const footerData = computed(() => {
@@ -144,24 +139,29 @@ const contacts = computed(() => {
         })
     }
 
-    if (branch.value?.website) {
-        fallbackContacts.push({
-            type: 'website',
-            value: branch.value.website
-        })
-    }
-
-    if (
-        !branch.value?.website &&
-        company.value?.website
-    ) {
-        fallbackContacts.push({
-            type: 'website',
-            value: company.value.website
-        })
-    }
-
     return fallbackContacts
+})
+
+const phoneContact = computed(() => {
+    return contacts.value.find((contact) => {
+        return contact.type === 'phone'
+    }) ?? contacts.value.find((contact) => {
+        return contact.type === 'booking_phone'
+    }) ?? null
+})
+
+const emailContact = computed(() => {
+    return contacts.value.find((contact) => {
+        return contact.type === 'email'
+    }) ?? null
+})
+
+const formattedBranchAddress = computed(() => {
+    return branchAddress.value.join(', ')
+})
+
+const formattedCompanyAddress = computed(() => {
+    return companyAddress.value.join(', ')
 })
 
 const openingHours = computed(() => {
@@ -170,102 +170,23 @@ const openingHours = computed(() => {
         []
 })
 
-const contractedInsuranceCompanies = computed(() => {
-    return branch.value
-        ?.contractedInsuranceCompanies ??
-        branch.value
-            ?.contracted_insurance_companies ??
-        []
-})
-
-const otherCompanyBranches = computed(() => {
-    return footerData.value?.otherBranches ??
-        footerData.value?.other_branches ??
-        branch.value?.otherCompanyBranches ??
-        branch.value?.other_company_branches ??
-        publicSite.value?.otherBranches ??
-        publicSite.value?.other_branches ??
-        []
-})
-
-const showOtherBranches = computed(() => {
-    const setting =
-        branch.value?.showOtherBranchesInFooter ??
-        branch.value
-            ?.show_other_branches_in_footer
-
-    /*
-     * When the API does not provide the setting,
-     * display branches whenever they exist.
-     */
-    return setting === undefined
-        ? otherCompanyBranches.value.length > 0
-        : Boolean(setting) &&
-            otherCompanyBranches.value.length > 0
-})
-
-const footerIds = computed(() => {
-    const parts = []
-
-    const ico =
-        company.value?.ico ??
+const companyIco = computed(() => {
+    return company.value?.ico ??
         company.value?.companyIdNumber ??
-        company.value?.company_id_number
+        company.value?.company_id_number ??
+        null
+})
 
-    const dic =
-        company.value?.dic ??
+const companyDic = computed(() => {
+    return company.value?.dic ??
         company.value?.taxId ??
-        company.value?.tax_id
-
-    const icDph =
-        company.value?.icDph ??
-        company.value?.ic_dph ??
-        company.value?.vatId ??
-        company.value?.vat_id
-
-    if (ico) {
-        parts.push(`IČO ${ico}`)
-    }
-
-    if (dic) {
-        parts.push(`DIČ ${dic}`)
-    }
-
-    if (icDph) {
-        parts.push(`IČ DPH ${icDph}`)
-    }
-
-    return parts
-})
-
-const hasLegalLinks = computed(() => {
-    return Boolean(
-        publicSite.value?.privacyUrl ||
-        publicSite.value?.privacy_url ||
-        publicSite.value?.termsUrl ||
-        publicSite.value?.terms_url ||
-        publicSite.value?.cookiesUrl ||
-        publicSite.value?.cookies_url
-    )
-})
-
-const hasFooterData = computed(() => {
-    return Boolean(
-        company.value ||
-        branch.value ||
-        publicSite.value
-    )
+        company.value?.tax_id ??
+        null
 })
 
 const privacyUrl = computed(() => {
     return publicSite.value?.privacyUrl ??
         publicSite.value?.privacy_url ??
-        null
-})
-
-const termsUrl = computed(() => {
-    return publicSite.value?.termsUrl ??
-        publicSite.value?.terms_url ??
         null
 })
 
@@ -275,50 +196,34 @@ const cookiesUrl = computed(() => {
         null
 })
 
-const socialLinks = computed(() => {
-    const providedSocials =
-        publicSite.value?.socials ?? []
-
-    if (providedSocials.length) {
-        return providedSocials
-    }
-
-    return contacts.value
-        .filter((contact) => {
-            return [
-                'facebook',
-                'instagram'
-            ].includes(contact.type)
-        })
-        .map((contact) => {
-            return {
-                label: contact.type === 'facebook'
-                    ? 'Facebook'
-                    : 'Instagram',
-                url: contact.value
-            }
-        })
-})
-
-const mainContacts = computed(() => {
-    return contacts.value.filter((contact) => {
-        return ![
-            'facebook',
-            'instagram'
-        ].includes(contact.type)
+const legalLinks = computed(() => {
+    return [
+        {
+            label: 'Ochrana osobných údajov',
+            url: privacyUrl.value
+        },
+        {
+            label: 'Cookies',
+            url: cookiesUrl.value
+        }
+    ].filter((link) => {
+        return Boolean(link.url)
     })
 })
 
-function contactLabel(contact) {
-    return {
-        email: 'E-mail',
-        phone: 'Telefón',
-        booking_phone: 'Objednávanie',
-        website: 'Web',
-        facebook: 'Facebook',
-        instagram: 'Instagram'
-    }[contact.type] ?? contact.label ?? null
-}
+const ambulances = [
+    {
+        name: 'Mentis',
+        logo: '/images/mentis_logo.png',
+        nameClass: ['text-[#BB5264]'],
+        href: 'https://humanitas.sk',
+    },
+    {
+        name: 'Humanitas',
+        logo: '/images/humanitas_logo.png',
+        href: 'https://humanitas.sk',
+    }
+]
 
 function contactHref(contact) {
     if (!contact?.value) {
@@ -339,30 +244,7 @@ function contactHref(contact) {
         )}`
     }
 
-    if (
-        contact.type === 'website' ||
-        contact.type === 'facebook' ||
-        contact.type === 'instagram'
-    ) {
-        return normalizeUrl(contact.value)
-    }
-
     return null
-}
-
-function normalizeUrl(url) {
-    if (!url) {
-        return null
-    }
-
-    if (
-        /^https?:\/\//i.test(url) ||
-        url.startsWith('/')
-    ) {
-        return url
-    }
-
-    return `https://${url}`
 }
 
 function openingHoursDayLabel(entry) {
@@ -431,38 +313,6 @@ function openingHoursSchedule(entry) {
         .join(', ')
 }
 
-function insuranceLabel(insurance) {
-    return insurance.label ??
-        insurance.name ??
-        insurance.code ??
-        ''
-}
-
-function otherBranchName(branchItem) {
-    return branchItem.name ??
-        branchItem.branchName ??
-        branchItem.branch_name ??
-        'Pobočka'
-}
-
-function otherBranchSecondaryLabel(branchItem) {
-    return branchItem.city ||
-        branchItem.addressLine1 ||
-        branchItem.address_line_1 ||
-        branchItem.address?.city ||
-        branchItem.address?.line1 ||
-        branchItem.address?.line_1 ||
-        null
-}
-
-function otherBranchHref(branchItem) {
-    return branchItem.href ??
-        branchItem.url ??
-        branchItem.publicUrl ??
-        branchItem.public_url ??
-        '#'
-}
-
 function isExternalUrl(url) {
     return /^https?:\/\//i.test(url)
 }
@@ -477,343 +327,204 @@ function linkAttrs(url) {
         rel: 'noopener noreferrer'
     }
 }
-
-function onLogoError() {
-    markLogoFallbackFailed()
-}
 </script>
 
 <template>
-    <footer class="bg-baige text-green p-5">
-        <div class="mx-auto w-full pb-10 pt-20 sm:pb-12 sm:pt-28 lg:pt-32">
-            <!-- Loading -->
+    <footer class="bg-baige px-6 pt-20 sm:pt-10 pb-4 text-green">
+        <div class="mx-auto w-full">
+
+            <!-- Main footer sections -->
             <div
-                v-if="loading"
-                class="space-y-20"
+                class="grid grid-cols-1 gap-x-12 gap-y-14 pt-14 lg:grid-cols-3 sm:grid-cols-2 sm:pt-16 xl:gap-x-30"
             >
-                <div class="grid gap-x-20 gap-y-16 md:grid-cols-2">
-                    <div>
-                        <div class="h-16 w-44 animate-pulse rounded-full bg-green/8" />
+                <!-- Contact -->
+                <section class="lg:mx-auto w-full max-w-[350px]">
+                    <h2 class="text-regular font-bold text-green">
+                        Kontakt
+                    </h2>
 
-                        <div class="mt-10 space-y-4">
-                            <div class="h-5 w-56 animate-pulse rounded-full bg-green/8" />
-                            <div class="h-4 w-72 animate-pulse rounded-full bg-green/8" />
-                            <div class="h-4 w-52 animate-pulse rounded-full bg-green/8" />
-                        </div>
-                    </div>
-
-                    <div class="space-y-5 md:pt-28">
-                        <div class="h-5 w-40 animate-pulse rounded-full bg-green/8" />
-                        <div class="h-4 w-full animate-pulse rounded-full bg-green/8" />
-                        <div class="h-4 w-5/6 animate-pulse rounded-full bg-green/8" />
-                    </div>
-                </div>
-
-                <div class="grid gap-12 md:grid-cols-2">
-                    <div class="h-24 animate-pulse rounded-3xl bg-green/8" />
-                    <div class="h-24 animate-pulse rounded-3xl bg-green/8" />
-                </div>
-            </div>
-
-            <!-- Error -->
-            <div
-                v-else-if="error"
-                class="max-w-2xl py-10"
-            >
-                <p class="heading">
-                    Údaje sa nepodarilo načítať
-                </p>
-
-                <p class="text-regular mt-4 max-w-xl text-green/60">
-                    {{ error }}
-                </p>
-
-                <button
-                    type="button"
-                    class="text-bold mt-8 transition-opacity hover:opacity-55"
-                    @click="load"
-                >
-                    Skúsiť znova
-                </button>
-            </div>
-
-            <!-- Footer content -->
-            <div
-                v-else-if="hasFooterData"
-                class="space-y-20 sm:space-y-24"
-            >
-                <!-- Main footer content -->
-                <div class="grid gap-x-20 gap-y-16 md:grid-cols-2">
-                    <!-- Left: branch and contacts -->
-                    <section>
-                        <img
-                            :src="logoUrl"
-                            :alt="displayedBranchName"
-                            class="h-16 w-auto max-w-[220px] object-contain object-left sm:h-20"
-                            @error="onLogoError"
+                    <div class="mt-6 flex flex-col gap-1">
+                        <a
+                            v-if="phoneContact"
+                            :href="contactHref(phoneContact)"
+                            class="group flex min-h-9 items-center gap-3"
                         >
-
-                        <div class="mt-10">
-                            <p class="heading">
-                                {{ displayedBranchName }}
-                            </p>
-
-                            <div
-                                v-if="branchAddress.length"                            >
-                                <p
-                                    v-for="line in branchAddress"
-                                    :key="line"
-                                    class="text-regular text-green/60"
-                                >
-                                    {{ line }}
-                                </p>
-                            </div>
-
-                            
-                        </div>
-
-                        <div class="mt-12">
-                            <p class="text-bold">
-                                Kontakt
-                            </p>
-
-                            <div
-                                v-if="mainContacts.length"
-                                class="mt-6 space-y-5"
+                            <span
+                                class="flex shrink-0 items-center justify-center text-green"
                             >
-                                <div
-                                    v-for="(contact, index) in mainContacts"
-                                    :key="`${contact.type}-${contact.value}-${index}`"
-                                >
-                                    <p
-                                        v-if="contactLabel(contact)"
-                                        class="text-regular text-green/40"
-                                    >
-                                        {{ contactLabel(contact) }}
-                                    </p>
+                                <i
+                                    class="bi bi-telephone text-base"
+                                    aria-hidden="true"
+                                />
+                            </span>
 
-                                    <component
-                                        :is="contactHref(contact) ? 'a' : 'p'"
-                                        :href="contactHref(contact)"
-                                        v-bind="linkAttrs(contactHref(contact))"
-                                        class="text-regular mt-1 block w-fit max-w-full break-words text-green/80 transition-opacity hover:opacity-55"
-                                    >
-                                        {{ contact.value }}
-                                    </component>
-                                </div>
-                            </div>
-
-                            <p
-                                v-else
-                                class="text-regular mt-6 text-green/50"
+                            <span
+                                class="text-regular break-words text-green transition-opacity group-hover:opacity-55"
                             >
-                                Kontaktné údaje zatiaľ nie sú uvedené.
-                            </p>
+                                {{ phoneContact.value }}
+                            </span>
+                        </a>
 
-                            <div
-                                v-if="socialLinks.length"
-                                class="mt-9 flex flex-wrap gap-x-8 gap-y-3"
+                        <a
+                            v-if="emailContact"
+                            :href="contactHref(emailContact)"
+                            class="group flex min-h-9 items-center gap-3"
+                        >
+                            <span
+                                class="flex shrink-0 items-center justify-center text-green"
                             >
-                                <a
-                                    v-for="social in socialLinks"
-                                    :key="`${social.label}-${social.url}`"
-                                    :href="normalizeUrl(social.url)"
-                                    v-bind="linkAttrs(normalizeUrl(social.url))"
-                                    class="text-bold text-green/65 transition-opacity hover:opacity-55"
-                                >
-                                    {{ social.label }}
-                                </a>
-                            </div>
-                        </div>
-                    </section>
+                                <i
+                                    class="bi bi-envelope text-base"
+                                    aria-hidden="true"
+                                />
+                            </span>
 
-                    <!-- Right: opening hours -->
-                    <section class="md:pt-[7.5rem]">
-                        <p class="text-bold">
-                            Otváracie hodiny
-                        </p>
+                            <span
+                                class="text-regular min-w-0 break-words text-green transition-opacity group-hover:opacity-55"
+                            >
+                                {{ emailContact.value }}
+                            </span>
+                        </a>
 
                         <div
-                            v-if="openingHours.length"
-                            class="mt-8 space-y-4"
+                            v-if="formattedBranchAddress"
+                            class="flex min-h-9 items-start gap-3"
                         >
-                            <div
-                                v-for="entry in openingHours"
-                                :key="`${entry.dayOfWeek || entry.day_of_week || entry.day}-${openingHoursSchedule(entry)}`"
-                                class="grid grid-cols-[minmax(0,1fr)_auto] gap-8"
+                            <span
+                                class="flex shrink-0 items-center justify-center text-green"
                             >
-                                <p class="text-regular text-green/55">
-                                    {{ openingHoursDayLabel(entry) }}
+                                <i
+                                    class="bi bi-geo-alt text-base"
+                                    aria-hidden="true"
+                                />
+                            </span>
+
+                            <span class="text-regular pt-2 text-green">
+                                {{ formattedBranchAddress }}
+                            </span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Opening hours -->
+                <section class="lg:mx-auto w-full max-w-[350px]">
+                    <h2 class="text-regular font-bold text-green">
+                        Otváracie hodiny
+                    </h2>
+
+                    <div
+                        v-if="openingHours.length"
+                        class="mt-6 flex flex-col"
+                    >
+                        <div
+                            v-for="entry in openingHours"
+                            :key="`${entry.dayOfWeek || entry.day_of_week || entry.day}-${openingHoursSchedule(entry)}`"
+                            class="grid min-h-9 grid-cols-[minmax(0,1fr)_auto] items-center gap-4"
+                        >
+                            <span class="text-regular text-green">
+                                {{ openingHoursDayLabel(entry) }}
+                            </span>
+
+                            <span
+                                class="text-regular text-right text-green"
+                            >
+                                {{ openingHoursSchedule(entry) }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <p
+                        v-else
+                        class="text-regular mt-6 text-green/50"
+                    >
+                        Otváracie hodiny zatiaľ nie sú uvedené.
+                    </p>
+                </section>
+
+                <!-- Company -->
+                <section class="w-full max-w-[350px] lg:mx-auto">
+                    <div>
+                        <h2 class="text-regular font-bold text-green">
+                            Prevádzkovateľ
+                        </h2>
+
+                        <div class="mt-6 flex flex-col gap-3">
+                            <p class="text-regular flex min-h-9 items-center text-green">
+                                {{ displayedCompanyName }}
+                            </p>
+
+                            <div class="flex flex-col gap-1 text-regular text-green">
+                                <p
+                                    v-if="formattedCompanyAddress"
+                                    class="break-words"
+                                >
+                                    {{ formattedCompanyAddress }}
                                 </p>
 
-                                <p class="text-regular text-right text-green/85">
-                                    {{ openingHoursSchedule(entry) }}
+                                <p>
+                                    IČO: {{ companyIco }}
+                                </p>
+
+                                <p>
+                                    DIČ: {{ companyDic }}
                                 </p>
                             </div>
                         </div>
 
-                        <p
-                            v-else
-                            class="text-regular mt-8 text-green/50"
-                        >
-                            Otváracie hodiny zatiaľ nie sú uvedené.
-                        </p>
-                    </section>
-                </div>
-
-                <!-- Insurance companies and other branches -->
-                <div
-                    v-if="
-                        contractedInsuranceCompanies.length ||
-                        showOtherBranches
-                    "
-                    class="grid gap-x-20 gap-y-14 md:grid-cols-2"
-                >
-                    <section
-                        v-if="contractedInsuranceCompanies.length"
-                    >
-                        <p class="text-bold">
-                            Zmluvné poisťovne
-                        </p>
-
-                        <div class="mt-5 flex flex-wrap gap-x-3 gap-y-2">
-                            <template
-                                v-for="(insurance, index) in contractedInsuranceCompanies"
-                                :key="insurance.id || insuranceLabel(insurance)"
+                        <div class="mt-6 flex flex-col gap-3">
+                            <a
+                                v-for="ambulance in ambulances"
+                                :key="ambulance.name"
+                                :href="ambulance.href"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="group flex min-h-9 w-fit items-center gap-2 transition-opacity hover:opacity-60"
+                                :aria-label="`Navštíviť web ${ambulance.name}`"
                             >
-                                <span class="text-regular text-green/65">
-                                    {{ insuranceLabel(insurance) }}
-                                </span>
+                                <img
+                                    :src="ambulance.logo"
+                                    :alt="ambulance.name"
+                                    class="h-7 w-auto max-w-10 shrink-0 object-contain"
+                                >
 
                                 <span
-                                    v-if="index < contractedInsuranceCompanies.length - 1"
-                                    class="text-regular text-green/25"
-                                    aria-hidden="true"
+                                    class="heading uppercase"
+                                    :class="ambulance.nameClass"
                                 >
-                                    ·
+                                    {{ ambulance.name }}
                                 </span>
-                            </template>
+                            </a>
                         </div>
-                    </section>
-
-                    <section
-                        v-if="showOtherBranches"
-                    >
-                        <p class="text-bold">
-                            Naše pobočky
-                        </p>
-
-                        <ul class="mt-5 space-y-5">
-                            <li
-                                v-for="branchItem in otherCompanyBranches"
-                                :key="branchItem.id || otherBranchName(branchItem)"
-                            >
-                                <a
-                                    :href="otherBranchHref(branchItem)"
-                                    v-bind="linkAttrs(otherBranchHref(branchItem))"
-                                    class="group inline-flex flex-col"
-                                >
-                                    <span class="text-regular text-green/80 transition-opacity group-hover:opacity-55">
-                                        {{ otherBranchName(branchItem) }}
-                                    </span>
-
-                                    <span
-                                        v-if="otherBranchSecondaryLabel(branchItem)"
-                                        class="text-regular mt-1 text-green/40"
-                                    >
-                                        {{ otherBranchSecondaryLabel(branchItem) }}
-                                    </span>
-                                </a>
-                            </li>
-                        </ul>
-                    </section>
-                </div>
-
-                <!-- Company information -->
-                <section class="grid gap-x-16 gap-y-12 md:grid-cols-[1.35fr_1fr]">
-                    <div>
-                        <p class="text-regular text-green/40">
-                            Prevádzkovateľ
-                        </p>
-
-                        <p class="text-bold mt-2 text-green/65">
-                            {{ displayedCompanyName }}
-                        </p>
-
-                        <div
-                            v-if="companyAddress.length"
-                            class="mt-4"
-                        >
-                            <p
-                                v-for="line in companyAddress"
-                                :key="line"
-                                class="text-regular text-green/45"
-                            >
-                                {{ line }}
-                            </p>
-                        </div>
-
-                        <p
-                            v-if="footerIds.length"
-                            class="text-regular mt-4 text-green/45"
-                        >
-                            {{ footerIds.join(' · ') }}
-                        </p>
-
-                        <p class="text-regular mt-5 text-green/35">
-                            © {{ currentYear }} {{ displayedBranchName }}
-                        </p>
                     </div>
-
-                    <nav
-                        v-if="hasLegalLinks"
-                        class="flex flex-col items-start gap-3 md:items-end md:text-right"
-                        aria-label="Právne informácie"
-                    >
-                        <a
-                            v-if="privacyUrl"
-                            :href="privacyUrl"
-                            v-bind="linkAttrs(privacyUrl)"
-                            class="text-regular text-green/45 transition-opacity hover:opacity-55"
-                        >
-                            Ochrana osobných údajov
-                        </a>
-
-                        <a
-                            v-if="termsUrl"
-                            :href="termsUrl"
-                            v-bind="linkAttrs(termsUrl)"
-                            class="text-regular text-green/45 transition-opacity hover:opacity-55"
-                        >
-                            Obchodné podmienky
-                        </a>
-
-                        <a
-                            v-if="cookiesUrl"
-                            :href="cookiesUrl"
-                            v-bind="linkAttrs(cookiesUrl)"
-                            class="text-regular text-green/45 transition-opacity hover:opacity-55"
-                        >
-                            Cookies
-                        </a>
-                    </nav>
                 </section>
             </div>
 
-            <!-- Empty state -->
+            <!-- Bottom bar -->
             <div
-                v-else
-                class="max-w-2xl py-10"
+                class="mt-14 flex flex-col gap-5 sm:mt-16 sm:flex-row sm:items-center sm:justify-between"
             >
-                <p class="heading">
-                    Údaje zatiaľ nie sú dostupné
+                <p class="text-regular text-green">
+                    © {{ currentYear }} {{ displayedBranchName }}
                 </p>
 
-                <p class="text-regular mt-4 text-green/60">
-                    Po pripojení Clinvia API sa tu zobrazia údaje
-                    pobočky, kontakty, otváracie hodiny, poisťovne,
-                    ďalšie pobočky a firemné údaje.
-                </p>
+                <nav
+                    class="flex flex-wrap items-center gap-x-6 gap-y-3"
+                    aria-label="Právne odkazy"
+                >
+                    <a
+                        href="/ochrana-osobnych-udajov"
+                        class="text-regular text-green/60 transition-opacity hover:opacity-55"
+                    >
+                        Ochrana osobných údajov
+                    </a>
+
+                    <a
+                        href="/cookies"
+                        class="text-regular text-green/60 transition-opacity hover:opacity-55"
+                    >
+                        Cookies
+                    </a>
+                </nav>
             </div>
         </div>
     </footer>

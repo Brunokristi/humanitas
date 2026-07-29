@@ -738,7 +738,6 @@ function onMouseLeave() {
                     items-center
                     justify-end
                     px-5
-                    sm:px-7
                 "
                 :class="{
                     'cursor-grab':
@@ -757,22 +756,26 @@ function onMouseLeave() {
                 <button
                     type="button"
                     class="
+                        cursor-pointer
                         page-card-menu
                         relative
-                        flex
+                        z-10
+                        inline-flex
                         min-h-11
                         max-w-full
                         items-center
                         justify-end
-                        rounded-full
+                        px-4
+                        py-2
                         text-right
+                        text-baige/50
                         outline-none
-                        transition-[color,transform]
-                        duration-500
+                        transition-[transform]
+                        duration-300
                         ease-[cubic-bezier(0.16,1,0.3,1)]
-                        hover:text-baige
+                        active:scale-[0.98]
                         focus-visible:ring-2
-                        focus-visible:ring-baige/80
+                        focus-visible:ring-baige
                         focus-visible:ring-offset-2
                         focus-visible:ring-offset-green
                     "
@@ -780,7 +783,7 @@ function onMouseLeave() {
                         'page-card-menu--open':
                             isMenuMorphOpen,
 
-                        'pointer-events-none':
+                        'pointer-events-none opacity-60':
                             visual.isOpen &&
                             !isMenuActionReady
                     }"
@@ -790,6 +793,9 @@ function onMouseLeave() {
                             ? 'Otvoriť hlavné menu'
                             : `Otvoriť stránku ${cardLabel}`
                     "
+                    @pointerdown.stop
+                    @pointerup.stop
+                    @pointercancel.stop
                     @click.stop="onMenuControlClick"
                 >
                     <span

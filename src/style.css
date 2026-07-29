@@ -1,5 +1,6 @@
 @import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=Mulish:wght@400;700&display=swap");
 @import "tailwindcss";
+@import 'bootstrap-icons/font/bootstrap-icons.css';
 
 @theme {
   --color-baige: #fbf9f3;
@@ -103,7 +104,7 @@ video {
 .text-regular {
   margin: 0;
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 16px;
   line-height: normal;
   letter-spacing: 0;
 }

@@ -7,6 +7,7 @@ const props = defineProps({
         type: Array,
         required: true
     },
+
     stack: {
         type: Object,
         required: true
@@ -14,17 +15,41 @@ const props = defineProps({
 })
 
 const renderedCards = computed(() => {
-    const ids = [...props.stack.cardOrder.value].reverse()
+    const ids = [
+        ...props.stack.cardOrder.value
+    ].reverse()
 
     return ids
         .map((id) => {
-            return props.pages.find((page) => page.id === id)
+            return props.pages.find((page) => {
+                return page.id === id
+            })
         })
         .filter(Boolean)
 })
 
+const stackBottomCompensation = computed(() => {
+    return props.stack
+        .stackBottomCompensation
+        ?.value ?? 0
+})
+
+const cardStageStyle = computed(() => {
+    if (props.stack.mode.value === 'expanded') {
+        return {}
+    }
+
+    return {
+        paddingBottom:
+            `${stackBottomCompensation.value}px`
+    }
+})
+
 function activateCard(cardId, element) {
-    props.stack.handleCardActivate(cardId, element)
+    props.stack.handleCardActivate(
+        cardId,
+        element
+    )
 }
 
 function handleCardElementChange(payload) {
@@ -51,8 +76,9 @@ function handleCardElementChange(payload) {
         :class="
             stack.mode.value === 'expanded'
                 ? 'mt-2 h-auto overflow-visible'
-                : 'mt-2 h-[min(76dvh,780px)] overflow-visible'
+                : 'mt-2 min-h-[min(76dvh,780px)] overflow-visible'
         "
+        :style="cardStageStyle"
         aria-label="Card interface"
     >
         <PageCard
@@ -62,22 +88,39 @@ function handleCardElementChange(payload) {
             :mode="stack.mode.value"
             :visual="stack.getCardVisual(card.id)"
             :reduced-motion="stack.reducedMotion.value"
-            @activate="activateCard(card.id, $event)"
+            @activate="
+                activateCard(
+                    card.id,
+                    $event
+                )
+            "
             @handle-pointer-down="
-                stack.handleExpandedHandlePointerDown($event)
+                stack.handleExpandedHandlePointerDown(
+                    $event
+                )
             "
             @handle-pointer-move="
-                stack.handleExpandedHandlePointerMove($event)
+                stack.handleExpandedHandlePointerMove(
+                    $event
+                )
             "
             @handle-pointer-up="
-                stack.handleExpandedHandlePointerUp($event)
+                stack.handleExpandedHandlePointerUp(
+                    $event
+                )
             "
             @handle-pointer-cancel="
-                stack.handleExpandedHandlePointerCancel($event)
+                stack.handleExpandedHandlePointerCancel(
+                    $event
+                )
             "
-            @minimize="stack.minimizeCard()"
+            @minimize="
+                stack.minimizeCard()
+            "
             @transition-end="
-                stack.handleTransitionEnd($event)
+                stack.handleTransitionEnd(
+                    $event
+                )
             "
             @card-element-change="
                 handleCardElementChange
