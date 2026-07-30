@@ -723,10 +723,8 @@ onBeforeUnmount(() => {
                 transition-[height]
                 duration-300
                 active:cursor-grabbing
+                h-[420px]
             "
-            :style="{
-                height: sliderHeight
-            }"
             @keydown="
                 handleKeydown
             "

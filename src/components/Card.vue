@@ -33,7 +33,12 @@ defineProps({
     imageScale: {
         type: Number,
         default: 2.8
-    }
+    },
+
+    backgroundPosition: {
+    type: String,
+    default: 'center'
+}
 });
 </script>
 
@@ -72,11 +77,11 @@ defineProps({
                 h-full
                 w-full
                 object-cover
-                object-center
             "
             :style="{
                 opacity: imageOpacity,
-                transform: `scale(${imageScale})`
+                transform: `scale(${imageScale})`,
+                objectPosition: backgroundPosition
             }"
         >
 
