@@ -6,6 +6,10 @@ import {
     watch
 } from 'vue';
 
+import {
+    useScrollMotion
+} from '../composables/useScrollMotion';
+
 import Card from './Card.vue';
 
 const props = defineProps({
@@ -34,11 +38,15 @@ const props = defineProps({
         default: 'Nasledujúca karta'
     },
 
-    image: {
-        type: String,
-        default: '/images/faq.png'
+    scrollMotion: {
+        type: Boolean,
+        default: false
     }
 });
+
+const {
+    motionRoot
+} = useScrollMotion();
 
 const currentIndex = ref(
     Math.min(
@@ -53,21 +61,38 @@ const currentIndex = ref(
     )
 );
 
-const stageElement = ref(null);
+const stageElement =
+    ref(null);
 
-const dragX = ref(0);
-const cardWidth = ref(1);
+const dragX =
+    ref(0);
 
-const isDragging = ref(false);
-const lastDirection = ref(1);
+const cardWidth =
+    ref(1);
 
-const pointerId = ref(null);
-const pointerStartX = ref(0);
-const previousPointerX = ref(0);
-const previousPointerTime = ref(0);
-const pointerVelocity = ref(0);
+const isDragging =
+    ref(false);
 
-const exitingCards = ref({});
+const lastDirection =
+    ref(1);
+
+const pointerId =
+    ref(null);
+
+const pointerStartX =
+    ref(0);
+
+const previousPointerX =
+    ref(0);
+
+const previousPointerTime =
+    ref(0);
+
+const pointerVelocity =
+    ref(0);
+
+const exitingCards =
+    ref({});
 
 const exitTimers =
     new Map();
@@ -81,10 +106,10 @@ const dragProgress = computed(() => {
         Math.abs(
             dragX.value
         ) /
-        Math.max(
-            cardWidth.value,
-            1
-        ),
+            Math.max(
+                cardWidth.value,
+                1
+            ),
         1
     );
 });
@@ -93,7 +118,8 @@ const deckDirection = computed(() => {
     if (
         Math.abs(
             dragX.value
-        ) > 2
+        ) >
+        2
     ) {
         return dragX.value < 0
             ? 1
@@ -201,7 +227,8 @@ function updateCardWidth() {
             ?.getBoundingClientRect();
 
     cardWidth.value =
-        rect?.width || 1;
+        rect?.width ||
+        1;
 }
 
 function getDeckDepth(index) {
@@ -264,13 +291,19 @@ function isCardActive(index) {
     return (
         index ===
             currentIndex.value &&
-        !isCardExiting(index)
+        !isCardExiting(
+            index
+        )
     );
 }
 
-function getCardWrapperClasses(index) {
+function getCardWrapperClasses(
+    index
+) {
     const active =
-        isCardActive(index);
+        isCardActive(
+            index
+        );
 
     return [
         active
@@ -286,13 +319,17 @@ function getCardWrapperClasses(index) {
                 'ease-[cubic-bezier(0.2,0.85,0.25,1)]'
             ].join(' '),
 
-        isCardExiting(index)
+        isCardExiting(
+            index
+        )
             ? 'pointer-events-none'
             : ''
     ];
 }
 
-function getCardWrapperStyle(index) {
+function getCardWrapperStyle(
+    index
+) {
     const exitState =
         exitingCards.value[
             index
@@ -306,7 +343,8 @@ function getCardWrapperStyle(index) {
                 `scale(${exitState.scale})`
             ].join(' '),
 
-            zIndex: 60
+            zIndex:
+                60
         };
     }
 
@@ -328,10 +366,12 @@ function getCardWrapperStyle(index) {
             );
 
         const verticalMovement =
-            absoluteProgress * 7;
+            absoluteProgress *
+            7;
 
         const rotation =
-            normalizedDrag * 5;
+            normalizedDrag *
+            5;
 
         const scale =
             1 -
@@ -345,12 +385,15 @@ function getCardWrapperStyle(index) {
                 `scale(${scale})`
             ].join(' '),
 
-            zIndex: 40
+            zIndex:
+                40
         };
     }
 
     const depth =
-        getDeckDepth(index);
+        getDeckDepth(
+            index
+        );
 
     const stack =
         getStackTransform(
@@ -406,9 +449,76 @@ function getCardWrapperStyle(index) {
     };
 }
 
+/*
+ * Returns the rotation currently owned
+ * by the carousel wrapper.
+ *
+ * The scroll-motion engine uses the
+ * opposite amount while scrolling so
+ * the visible card wants to straighten.
+ */
+function getCardBaseRotation(
+    index
+) {
+    const exitState =
+        exitingCards.value[
+            index
+        ];
+
+    if (exitState) {
+        return (
+            exitState.rotate ??
+            0
+        );
+    }
+
+    const active =
+        index ===
+        currentIndex.value;
+
+    if (active) {
+        const normalizedDrag =
+            dragX.value /
+            Math.max(
+                cardWidth.value,
+                1
+            );
+
+        return (
+            normalizedDrag *
+            5
+        );
+    }
+
+    const depth =
+        getDeckDepth(
+            index
+        );
+
+    const stack =
+        getStackTransform(
+            depth
+        );
+
+    const revealProgress =
+        depth === 1
+            ? dragProgress.value
+            : 0;
+
+    return (
+        stack.rotate *
+        (
+            1 -
+            revealProgress
+        )
+    );
+}
+
 function clearExitState(index) {
     const timer =
-        exitTimers.get(index);
+        exitTimers.get(
+            index
+        );
 
     if (timer) {
         window.clearTimeout(
@@ -440,9 +550,13 @@ function clearExitState(index) {
         nextStates;
 }
 
-function scheduleExitRemoval(index) {
+function scheduleExitRemoval(
+    index
+) {
     const existingTimer =
-        exitTimers.get(index);
+        exitTimers.get(
+            index
+        );
 
     if (existingTimer) {
         window.clearTimeout(
@@ -488,6 +602,7 @@ function commitMovement(
         cardCount.value <= 1
     ) {
         resetDragState();
+
         return;
     }
 
@@ -511,6 +626,7 @@ function commitMovement(
         outgoingIndex
     ) {
         resetDragState();
+
         return;
     }
 
@@ -536,15 +652,19 @@ function commitMovement(
         ...exitingCards.value,
 
         [outgoingIndex]: {
-            x: targetX,
-            y: 8,
+            x:
+                targetX,
+
+            y:
+                8,
 
             rotate:
                 direction > 0
                     ? -5
                     : 5,
 
-            scale: 0.985
+            scale:
+                0.985
         }
     };
 
@@ -607,7 +727,9 @@ function goTo(index) {
     );
 }
 
-function shouldIgnorePointerStart(target) {
+function shouldIgnorePointerStart(
+    target
+) {
     return Boolean(
         target?.closest?.(
             [
@@ -623,7 +745,9 @@ function shouldIgnorePointerStart(target) {
     );
 }
 
-function handlePointerDown(event) {
+function handlePointerDown(
+    event
+) {
     if (
         shouldIgnorePointerStart(
             event.target
@@ -673,7 +797,9 @@ function handlePointerDown(event) {
     }
 }
 
-function handlePointerMove(event) {
+function handlePointerMove(
+    event
+) {
     if (
         !isDragging.value ||
         pointerId.value !==
@@ -722,7 +848,9 @@ function handlePointerMove(event) {
         );
 }
 
-function handlePointerEnd(event) {
+function handlePointerEnd(
+    event
+) {
     if (
         !isDragging.value ||
         pointerId.value !==
@@ -762,13 +890,15 @@ function handlePointerEnd(event) {
 
     if (!shouldChange) {
         resetDragState();
+
         return;
     }
 
     const movementValue =
         Math.abs(
             dragX.value
-        ) > 2
+        ) >
+        2
             ? dragX.value
             : pointerVelocity.value;
 
@@ -783,9 +913,7 @@ function handlePointerEnd(event) {
 }
 
 function handlePointerCancel() {
-    if (
-        !isDragging.value
-    ) {
+    if (!isDragging.value) {
         return;
     }
 
@@ -851,18 +979,21 @@ onBeforeUnmount(() => {
 
 <template>
     <section
+        ref="motionRoot"
         class="
             w-full
             overflow-hidden
         "
-        :aria-label="ariaLabel"
+        :aria-label="
+            ariaLabel
+        "
     >
         <div
             class="
                 mx-auto
                 w-full
                 px-7
-                pb-15
+                pb-10
                 pt-10
             "
         >
@@ -899,8 +1030,11 @@ onBeforeUnmount(() => {
             >
                 <div
                     v-for="
-                        (item, index)
-                        in items
+                        (
+                            item,
+                            index
+                        ) in
+                        items
                     "
                     :key="
                         item.id ??
@@ -935,26 +1069,89 @@ onBeforeUnmount(() => {
                         )
                     "
                 >
+                    <!--
+                        The outer wrapper above still
+                        owns the entire carousel layout.
+
+                        Scroll motion is applied only
+                        to the visual card inside it.
+                    -->
                     <Card
-                        :item="item"
-                        :active="isCardActive(index)"
-                        background-image="/images/humanitas_pozadie.png"
-                        :image-opacity="0.50"
-                        :image-scale="2.8"
+                        :item="
+                            item
+                        "
+                        :active="
+                            isCardActive(
+                                index
+                            )
+                        "
+                        :class="{
+                            'scroll-motion':
+                                scrollMotion
+                        }"
+                        :data-scroll-motion="
+                            scrollMotion
+                                ? ''
+                                : undefined
+                        "
+                        :data-motion-seed="
+                            scrollMotion
+                                ? index + 1
+                                : undefined
+                        "
+                        :data-base-rotation="
+                            scrollMotion
+                                ? getCardBaseRotation(
+                                    index
+                                )
+                                : undefined
+                        "
+                        :data-rotation-mode="
+                            scrollMotion
+                                ? 'offset'
+                                : undefined
+                        "
+                        :data-motion-strength="
+                            scrollMotion
+                                ? 1
+                                : undefined
+                        "
+                        :data-straighten-strength="
+                            scrollMotion
+                                ? 0.96
+                                : undefined
+                        "
+                        :data-max-y="
+                            scrollMotion
+                                ? 12
+                                : undefined
+                        "
+                        :data-max-scale="
+                            scrollMotion
+                                ? 0.004
+                                : undefined
+                        "
                     >
-                        <template #default="slotProps">
+                        <template
+                            #default="slotProps"
+                        >
                             <slot
                                 name="card"
-                                :item="slotProps.item"
-                                :index="index"
-                                :active="slotProps.active"
+                                :item="
+                                    slotProps.item
+                                "
+                                :index="
+                                    index
+                                "
+                                :active="
+                                    slotProps.active
+                                "
                             >
                                 <div
                                     class="
                                         flex
-                                        w-full
                                         flex-col
-                                        gap-4
+                                        gap-6
                                     "
                                 >
                                     <h3
@@ -964,18 +1161,26 @@ onBeforeUnmount(() => {
                                             text-green
                                         "
                                     >
-                                        {{ slotProps.item.question }}
+                                        {{
+                                            slotProps
+                                                .item
+                                                .question
+                                        }}
                                     </h3>
 
                                     <p
                                         class="
                                             text-regular
-                                            mt-8
                                             max-w-[25rem]
+                                            leading-[1.55]
                                             text-green
                                         "
                                     >
-                                        {{ slotProps.item.answer }}
+                                        {{
+                                            slotProps
+                                                .item
+                                                .answer
+                                        }}
                                     </p>
                                 </div>
                             </slot>
@@ -985,7 +1190,6 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
-        <!-- Desktop controls -->
         <div
             v-if="
                 cardCount > 1
@@ -995,6 +1199,7 @@ onBeforeUnmount(() => {
                 w-full
                 items-center
                 justify-center
+
                 md:flex
             "
         >
@@ -1058,10 +1263,15 @@ onBeforeUnmount(() => {
                 >
                     <button
                         v-for="
-                            (_, index)
-                            in items
+                            (
+                                _,
+                                index
+                            ) in
+                            items
                         "
-                        :key="index"
+                        :key="
+                            index
+                        "
                         type="button"
                         class="
                             h-1.5
@@ -1092,7 +1302,9 @@ onBeforeUnmount(() => {
                         "
                         role="tab"
                         @click="
-                            goTo(index)
+                            goTo(
+                                index
+                            )
                         "
                     />
                 </div>

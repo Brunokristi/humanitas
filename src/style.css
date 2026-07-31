@@ -168,3 +168,32 @@ video {
   contain: layout paint style;
   backface-visibility: hidden;
 }
+
+.scroll-motion {
+  --scroll-x: 0px;
+  --scroll-y: 0px;
+  --scroll-rotate: 0deg;
+  --scroll-scale: 1;
+
+  transform:
+    translate3d(var(--scroll-x),
+      var(--scroll-y),
+      0) rotate(var(--scroll-rotate)) scale(var(--scroll-scale));
+
+  transform-origin:
+    center center;
+
+  backface-visibility:
+    hidden;
+
+  will-change:
+    transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-motion {
+    --scroll-x: 0px !important;
+    --scroll-y: 0px !important;
+    --scroll-scale: 1 !important;
+  }
+}

@@ -10,6 +10,10 @@ import { storeToRefs } from 'pinia';
 
 import { usePublicSiteStore } from '../stores/publicSite';
 
+import {
+    useScrollMotion
+} from '../composables/useScrollMotion';
+
 import Button from '../components/Button.vue';
 import Card from '../components/Card.vue';
 import ServiceBottomSheet from '../components/ServiceBottomSheet.vue';
@@ -26,6 +30,36 @@ const {
 } = storeToRefs(
     publicSiteStore
 );
+
+/*
+ * Horizontal card motion.
+ *
+ * Each .services-track acts as its own
+ * independent scroll source.
+ */
+const {
+    motionRoot
+} = useScrollMotion({
+    axis: 'x',
+
+    sourceSelector:
+        '[data-scroll-motion-source]',
+
+    velocityMultiplier:
+        0.105,
+
+    velocityDecay:
+        0.82,
+
+    maxVelocity:
+        9,
+
+    travelMultiplier:
+        1.9,
+
+    straightenVelocity:
+        5.5
+});
 
 const contactUrl =
     '/kontakt';
@@ -85,9 +119,13 @@ const categoryOptions = computed(() => {
 
     return [
         {
-            label: 'Všetky kategórie',
-            value: 'all'
+            label:
+                'Všetky kategórie',
+
+            value:
+                'all'
         },
+
         ...categories.values()
     ];
 });
@@ -123,9 +161,11 @@ const filteredServices = computed(() => {
                 normalizeText(
                     [
                         service?.name,
+
                         rawServiceDescription(
                             service
                         ),
+
                         category.label
                     ]
                         .filter(Boolean)
@@ -159,6 +199,7 @@ const groupedServices = computed(() => {
                     category.value,
                     {
                         ...category,
+
                         services: []
                     }
                 );
@@ -199,7 +240,9 @@ function normalizeText(value) {
         value ?? ''
     )
         .trim()
-        .toLocaleLowerCase('sk')
+        .toLocaleLowerCase(
+            'sk'
+        )
         .normalize('NFD')
         .replace(
             /[\u0300-\u036f]/g,
@@ -248,6 +291,7 @@ function serviceCategory(service) {
 
     return {
         label,
+
         value:
             slug ??
             normalizeText(
@@ -277,7 +321,9 @@ function serviceTitle(service) {
     );
 }
 
-function serviceDescription(service) {
+function serviceDescription(
+    service
+) {
     return trimText(
         rawServiceDescription(
             service
@@ -327,7 +373,9 @@ function hasSelfPayPrice(service) {
     );
 }
 
-function openServiceDetails(service) {
+function openServiceDetails(
+    service
+) {
     selectedService.value =
         service;
 
@@ -342,7 +390,9 @@ function resetFilters() {
     selectedCategory.value =
         'all';
 
-    if (!searchFocused.value) {
+    if (
+        !searchFocused.value
+    ) {
         startSearchPlaceholderAnimation();
     }
 }
@@ -375,34 +425,41 @@ const searchPlaceholders = [
     'Klinická psychológia'
 ];
 
-const showAnimatedSearchPlaceholder = computed(() => {
-    return (
-        !searchTerm.value &&
-        !searchFocused.value
-    );
-});
+const showAnimatedSearchPlaceholder =
+    computed(() => {
+        return (
+            !searchTerm.value &&
+            !searchFocused.value
+        );
+    });
 
-const selectedCategoryLabel = computed(() => {
-    return (
-        categoryOptions.value.find(
-            (category) => {
-                return (
-                    category.value ===
-                    selectedCategory.value
-                );
-            }
-        )?.label ??
-        'Všetky kategórie'
-    );
-});
+const selectedCategoryLabel =
+    computed(() => {
+        return (
+            categoryOptions.value.find(
+                (category) => {
+                    return (
+                        category.value ===
+                        selectedCategory.value
+                    );
+                }
+            )?.label ??
+            'Všetky kategórie'
+        );
+    });
 
-function schedulePlaceholderTick(delay) {
+function schedulePlaceholderTick(
+    delay
+) {
     stopSearchPlaceholderAnimation();
 
     searchPlaceholderTimer =
-        window.setTimeout(() => {
-            animateSearchPlaceholder();
-        }, delay);
+        window.setTimeout(
+            () => {
+                animateSearchPlaceholder();
+            },
+            delay
+        );
 }
 
 function animateSearchPlaceholder() {
@@ -418,10 +475,9 @@ function animateSearchPlaceholder() {
             searchPlaceholderIndex.value
         ];
 
-    /*
-     * Type the current phrase.
-     */
-    if (!searchPlaceholderDeleting.value) {
+    if (
+        !searchPlaceholderDeleting.value
+    ) {
         if (
             searchPlaceholderText.value.length <
             target.length
@@ -429,22 +485,19 @@ function animateSearchPlaceholder() {
             searchPlaceholderText.value =
                 target.slice(
                     0,
-                    searchPlaceholderText.value.length + 1
+                    searchPlaceholderText.value.length +
+                        1
                 );
 
             schedulePlaceholderTick(
                 65 +
                 Math.random() *
-                55
+                    55
             );
 
             return;
         }
 
-        /*
-         * Keep the complete phrase visible
-         * before deleting it.
-         */
         searchPlaceholderDeleting.value =
             true;
 
@@ -455,9 +508,6 @@ function animateSearchPlaceholder() {
         return;
     }
 
-    /*
-     * Delete the current phrase.
-     */
     if (
         searchPlaceholderText.value.length >
         0
@@ -471,15 +521,12 @@ function animateSearchPlaceholder() {
         schedulePlaceholderTick(
             30 +
                 Math.random() *
-                30
+                    30
         );
 
         return;
     }
 
-    /*
-     * Continue with the next phrase.
-     */
     searchPlaceholderDeleting.value =
         false;
 
@@ -536,7 +583,9 @@ function handleSearchBlur() {
     searchFocused.value =
         false;
 
-    if (!searchTerm.value) {
+    if (
+        !searchTerm.value
+    ) {
         startSearchPlaceholderAnimation();
     }
 }
@@ -558,44 +607,120 @@ onBeforeUnmount(() => {
  * Playful cards
  */
 
+const serviceCardPositions = [
+    {
+        class:
+            '-rotate-[2deg] translate-y-4',
+
+        rotation:
+            -2
+    },
+
+    {
+        class:
+            'rotate-[1.5deg] -translate-y-1',
+
+        rotation:
+            1.5
+    },
+
+    {
+        class:
+            '-rotate-[1deg] translate-y-7',
+
+        rotation:
+            -1
+    },
+
+    {
+        class:
+            'rotate-[2deg] translate-y-2',
+
+        rotation:
+            2
+    },
+
+    {
+        class:
+            '-rotate-[1.5deg] -translate-y-2',
+
+        rotation:
+            -1.5
+    },
+
+    {
+        class:
+            'rotate-[1deg] translate-y-6',
+
+        rotation:
+            1
+    }
+];
+
+const serviceCardOffsets = [
+    0,
+    2,
+    5,
+    1,
+    4,
+    3
+];
+
+function serviceCardPositionIndex(
+    index,
+    groupIndex
+) {
+    const offset =
+        serviceCardOffsets[
+            groupIndex %
+            serviceCardOffsets.length
+        ];
+
+    return (
+        index +
+        offset
+    ) %
+        serviceCardPositions.length;
+}
+
 function serviceCardPosition(
     index,
     groupIndex
 ) {
-    const positions = [
-        '-rotate-[2deg] translate-y-4',
-        'rotate-[1.5deg] -translate-y-1',
-        '-rotate-[1deg] translate-y-7',
-        'rotate-[2deg] translate-y-2',
-        '-rotate-[1.5deg] -translate-y-2',
-        'rotate-[1deg] translate-y-6'
-    ];
-
-    const offsets = [
-        0,
-        2,
-        5,
-        1,
-        4,
-        3
-    ];
-
-    const offset =
-        offsets[
-            groupIndex %
-            offsets.length
-        ];
-
-    return positions[
-        (
-            index +
-            offset
-        ) %
-        positions.length
-    ];
+    return serviceCardPositions[
+        serviceCardPositionIndex(
+            index,
+            groupIndex
+        )
+    ].class;
 }
 
-function categoryHeadingPosition(index) {
+function serviceCardBaseRotation(
+    index,
+    groupIndex
+) {
+    return serviceCardPositions[
+        serviceCardPositionIndex(
+            index,
+            groupIndex
+        )
+    ].rotation;
+}
+
+function serviceMotionSeed(
+    serviceIndex,
+    groupIndex
+) {
+    return (
+        groupIndex *
+        10 +
+        serviceIndex
+    );
+}
+
+function categoryHeadingPosition(
+    index
+) {
     const positions = [
         '-rotate-[0.8deg] translate-x-1',
         'rotate-[0.7deg] -translate-x-1',
@@ -608,7 +733,9 @@ function categoryHeadingPosition(index) {
     ];
 }
 
-function serviceBackgroundPosition(service) {
+function serviceBackgroundPosition(
+    service
+) {
     const seed =
         String(
             service?.id ??
@@ -628,7 +755,7 @@ function serviceBackgroundPosition(service) {
         hash =
             (
                 hash *
-                31 +
+                    31 +
                 seed.charCodeAt(
                     index
                 )
@@ -712,7 +839,8 @@ function scrollCategory(
         ) || 0;
 
     const distance =
-        card.getBoundingClientRect()
+        card
+            .getBoundingClientRect()
             .width +
         gap;
 
@@ -720,13 +848,17 @@ function scrollCategory(
         left:
             direction *
             distance,
-        behavior: 'smooth'
+
+        behavior:
+            'smooth'
     });
 }
 </script>
 
 <template>
-    <div>
+    <div
+        ref="motionRoot"
+    >
         <!-- Loading -->
         <div
             v-if="
@@ -795,8 +927,12 @@ function scrollCategory(
                 "
             >
                 <div
-                    v-for="index in 4"
-                    :key="index"
+                    v-for="
+                        index in 4
+                    "
+                    :key="
+                        index
+                    "
                     class="
                         h-[27rem]
                         w-[72vw]
@@ -846,7 +982,11 @@ function scrollCategory(
                 {{ error }}
             </p>
 
-            <div class="mt-8">
+            <div
+                class="
+                    mt-8
+                "
+            >
                 <Button
                     background-image=""
                     background-color="#FBF9F3"
@@ -969,7 +1109,6 @@ function scrollCategory(
                             md:w-[15rem]
                         "
                     >
-                        <!-- Visible category -->
                         <div
                             class="
                                 pointer-events-none
@@ -996,7 +1135,6 @@ function scrollCategory(
                             </span>
                         </div>
 
-                        <!-- Actual select -->
                         <select
                             v-model="
                                 selectedCategory
@@ -1066,7 +1204,6 @@ function scrollCategory(
                             flex-1
                         "
                     >
-                        <!-- Search icon -->
                         <i
                             class="
                                 bi
@@ -1082,7 +1219,6 @@ function scrollCategory(
                             aria-hidden="true"
                         />
 
-                        <!-- Animated placeholder -->
                         <div
                             v-if="
                                 showAnimatedSearchPlaceholder
@@ -1127,7 +1263,6 @@ function scrollCategory(
                             </span>
                         </div>
 
-                        <!-- Actual input -->
                         <input
                             v-model="
                                 searchTerm
@@ -1166,7 +1301,6 @@ function scrollCategory(
                             "
                         >
 
-                        <!-- Clear -->
                         <button
                             v-if="
                                 searchTerm
@@ -1234,7 +1368,6 @@ function scrollCategory(
                         "
                         aria-label="Hľadať"
                     >
-                        <!-- Mobile text -->
                         <span
                             class="
                                 text-regular
@@ -1245,7 +1378,6 @@ function scrollCategory(
                             Hľadať
                         </span>
 
-                        <!-- Desktop icon -->
                         <i
                             class="
                                 bi
@@ -1276,7 +1408,10 @@ function scrollCategory(
             >
                 <section
                     v-for="
-                        (group, groupIndex) in
+                        (
+                            group,
+                            groupIndex
+                        ) in
                         groupedServices
                     "
                     :key="
@@ -1316,6 +1451,7 @@ function scrollCategory(
                                 class="
                                     origin-left
                                     transition-transform
+
                                     lg:translate-x-0
                                 "
                             >
@@ -1346,10 +1482,13 @@ function scrollCategory(
                                     {{
                                         group.services.length
                                     }}
+
                                     {{
-                                        group.services.length === 1
+                                        group.services.length ===
+                                        1
                                             ? 'služba'
-                                            : group.services.length <= 4
+                                            : group.services.length <=
+                                                4
                                                 ? 'služby'
                                                 : 'služieb'
                                     }}
@@ -1462,6 +1601,7 @@ function scrollCategory(
                                     );
                                 }
                             "
+                            data-scroll-motion-source
                             class="
                                 services-track
                                 flex
@@ -1540,200 +1680,231 @@ function scrollCategory(
                                     )
                                 "
                             >
-                                <Card
-                                    :item="
-                                        service
+                                <!--
+                                    The outer element above keeps
+                                    the EXACT existing service-card
+                                    rotation and vertical offset.
+
+                                    This inner wrapper receives only
+                                    the horizontal motion response.
+                                -->
+                                <div
+                                    class="
+                                        scroll-motion
+                                        h-full
+                                        w-full
                                     "
-                                    :equal-height="
-                                        true
-                                    "
-                                    :image-opacity="
-                                        0.5
-                                    "
-                                    :background-position="
-                                        serviceBackgroundPosition(
-                                            service
+                                    data-scroll-motion
+                                    :data-motion-seed="
+                                        serviceMotionSeed(
+                                            serviceIndex,
+                                            groupIndex
                                         )
                                     "
-                                    class="
-                                        group/service
-                                        h-[27rem]
-                                        w-full
-                                        max-w-none
-                                        cursor-pointer
-                                        transition-all
-                                        duration-500
-                                        ease-out
-
-                                        hover:z-20
-                                        hover:-translate-y-2
-                                        hover:rotate-0
-                                        hover:shadow-[var(--shadow-strong)]
-
-                                        lg:h-[29rem]
+                                    :data-base-rotation="
+                                        serviceCardBaseRotation(
+                                            serviceIndex,
+                                            groupIndex
+                                        )
                                     "
+                                    data-rotation-mode="offset"
+                                    data-motion-strength="1"
+                                    data-straighten-strength="0.96"
+                                    data-max-x="16"
+                                    data-max-scale="0.005"
                                 >
-                                    <template
-                                        #default="{ item }"
+                                    <Card
+                                        :item="
+                                            service
+                                        "
+                                        :equal-height="
+                                            true
+                                        "
+                                        :background-position="
+                                            serviceBackgroundPosition(
+                                                service
+                                            )
+                                        "
+                                        class="
+                                            group/service
+                                            h-[27rem]
+                                            w-full
+                                            max-w-none
+                                            cursor-pointer
+                                            transition-all
+                                            duration-500
+                                            ease-out
+
+                                            hover:z-20
+                                            hover:-translate-y-2
+                                            hover:rotate-0
+                                            hover:shadow-[var(--shadow-strong)]
+
+                                            lg:h-[29rem]
+                                        "
                                     >
-                                        <div
-                                            class="
-                                                flex
-                                                h-full
-                                                w-full
-                                                flex-col
-                                            "
+                                        <template
+                                            #default="{ item }"
                                         >
-                                            <!-- Title -->
                                             <div
                                                 class="
-                                                    min-h-[6rem]
-                                                    shrink-0
-                                                "
-                                            >
-                                                <h3
-                                                    class="
-                                                        text-regular
-                                                        line-clamp-3
-                                                        text-xl
-                                                        font-bold
-                                                        leading-[1.25]
-                                                        text-green
-
-                                                        lg:text-[1.35rem]
-                                                    "
-                                                >
-                                                    {{
-                                                        serviceTitle(
-                                                            item
-                                                        )
-                                                    }}
-                                                </h3>
-                                            </div>
-
-                                            <!-- Description -->
-                                            <div
-                                                class="
-                                                    min-h-[4rem]
-                                                    shrink-0
-                                                "
-                                            >
-                                                <p
-                                                    v-if="
-                                                        serviceDescription(
-                                                            item
-                                                        )
-                                                    "
-                                                    class="
-                                                        text-regular
-                                                        line-clamp-3
-                                                        text-sm
-                                                        leading-[1.55]
-                                                        text-green/70
-                                                    "
-                                                >
-                                                    {{
-                                                        serviceDescription(
-                                                            item
-                                                        )
-                                                    }}
-                                                </p>
-                                            </div>
-
-                                            <!-- Metadata -->
-                                            <div
-                                                class="
-                                                    mt-auto
                                                     flex
+                                                    h-full
+                                                    w-full
                                                     flex-col
-                                                    gap-3
-                                                    pt-6
                                                 "
                                             >
+                                                <!-- Title -->
                                                 <div
-                                                    v-if="
-                                                        serviceDurationLabel(
-                                                            item
-                                                        )
-                                                    "
                                                     class="
-                                                        border-l-2
-                                                        border-green
-                                                        pl-3
+                                                        min-h-[6rem]
+                                                        shrink-0
                                                     "
                                                 >
-                                                    <p
+                                                    <h3
                                                         class="
                                                             text-regular
+                                                            line-clamp-3
+                                                            text-xl
                                                             font-bold
-                                                            leading-5
+                                                            leading-[1.25]
                                                             text-green
+
+                                                            lg:text-[1.35rem]
                                                         "
                                                     >
                                                         {{
+                                                            serviceTitle(
+                                                                item
+                                                            )
+                                                        }}
+                                                    </h3>
+                                                </div>
+
+                                                <!-- Description -->
+                                                <div
+                                                    class="
+                                                        min-h-[4rem]
+                                                        shrink-0
+                                                    "
+                                                >
+                                                    <p
+                                                        v-if="
+                                                            serviceDescription(
+                                                                item
+                                                            )
+                                                        "
+                                                        class="
+                                                            text-regular
+                                                            line-clamp-3
+                                                            text-sm
+                                                            leading-[1.55]
+                                                            text-green/70
+                                                        "
+                                                    >
+                                                        {{
+                                                            serviceDescription(
+                                                                item
+                                                            )
+                                                        }}
+                                                    </p>
+                                                </div>
+
+                                                <!-- Metadata -->
+                                                <div
+                                                    class="
+                                                        mt-auto
+                                                        flex
+                                                        flex-col
+                                                        gap-3
+                                                        pt-6
+                                                    "
+                                                >
+                                                    <div
+                                                        v-if="
                                                             serviceDurationLabel(
                                                                 item
                                                             )
-                                                        }}
-                                                    </p>
-                                                </div>
-
-                                                <div
-                                                    v-if="
-                                                        hasSelfPayPrice(
-                                                            item
-                                                        )
-                                                    "
-                                                    class="
-                                                        border-l-2
-                                                        border-green
-                                                        pl-3
-                                                    "
-                                                >
-                                                    <p
+                                                        "
                                                         class="
-                                                            text-regular
-                                                            font-bold
-                                                            leading-5
-                                                            text-green
+                                                            border-l-2
+                                                            border-green
+                                                            pl-3
                                                         "
                                                     >
-                                                        od
-                                                        {{
-                                                            selfPayPrice(
+                                                        <p
+                                                            class="
+                                                                text-regular
+                                                                font-bold
+                                                                leading-5
+                                                                text-green
+                                                            "
+                                                        >
+                                                            {{
+                                                                serviceDurationLabel(
+                                                                    item
+                                                                )
+                                                            }}
+                                                        </p>
+                                                    </div>
+
+                                                    <div
+                                                        v-if="
+                                                            hasSelfPayPrice(
                                                                 item
                                                             )
-                                                        }}
-                                                        €
-                                                    </p>
+                                                        "
+                                                        class="
+                                                            border-l-2
+                                                            border-green
+                                                            pl-3
+                                                        "
+                                                    >
+                                                        <p
+                                                            class="
+                                                                text-regular
+                                                                font-bold
+                                                                leading-5
+                                                                text-green
+                                                            "
+                                                        >
+                                                            od
+                                                            {{
+                                                                selfPayPrice(
+                                                                    item
+                                                                )
+                                                            }}
+                                                            €
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                            </div>
 
-                                            <!-- CTA -->
-                                            <div
-                                                class="
-                                                    flex
-                                                    shrink-0
-                                                    justify-center
-                                                    pt-6
-                                                "
-                                            >
-                                                <Button
-                                                    background-image=""
-                                                    background-color="#335940"
-                                                    text-color="#FBF9F3"
-                                                    @click.stop="
-                                                        openServiceDetails(
-                                                            item
-                                                        )
+                                                <!-- CTA -->
+                                                <div
+                                                    class="
+                                                        flex
+                                                        shrink-0
+                                                        justify-center
+                                                        pt-6
                                                     "
                                                 >
-                                                    Viac o službe
-                                                </Button>
+                                                    <Button
+                                                        background-image=""
+                                                        background-color="#335940"
+                                                        text-color="#FBF9F3"
+                                                        @click.stop="
+                                                            openServiceDetails(
+                                                                item
+                                                            )
+                                                        "
+                                                    >
+                                                        Viac o službe
+                                                    </Button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </template>
-                                </Card>
+                                        </template>
+                                    </Card>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1798,7 +1969,11 @@ function scrollCategory(
                     alebo vyberte inú kategóriu.
                 </p>
 
-                <div class="mt-7">
+                <div
+                    class="
+                        mt-7
+                    "
+                >
                     <Button
                         background-image=""
                         background-color="#FBF9F3"
@@ -1816,6 +1991,7 @@ function scrollCategory(
             <section
                 class="
                     mx-auto
+                    mt-16
                     flex
                     w-full
                     max-w-4xl
@@ -1826,7 +2002,6 @@ function scrollCategory(
                     px-5
                     pb-12
                     text-center
-                    mt-16
 
                     lg:pb-20
                 "
@@ -1897,19 +2072,31 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .services-track {
     scrollbar-width: none;
-    scroll-padding-inline: 8vw;
+
+    scroll-padding-inline:
+        8vw;
 }
 
 .services-track::-webkit-scrollbar {
     display: none;
 }
 
-@media (min-width: 1024px) {
+@media (
+    min-width:
+    1024px
+) {
     .services-track {
-        scroll-padding-inline: max(
-            2.5rem,
-            calc((100vw - 90rem) / 2)
-        );
+        scroll-padding-inline:
+            max(
+                2.5rem,
+                calc(
+                    (
+                        100vw -
+                        90rem
+                    ) /
+                    2
+                )
+            );
     }
 }
 </style>

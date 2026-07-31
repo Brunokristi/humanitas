@@ -299,8 +299,10 @@ const faqItems = computed(() => {
     return [
         {
             id: 'location',
+
             question:
                 'Kde nás nájdete?',
+
             answer:
                 branchAddressLabel.value
                     ? `Nájdete nás na adrese ${branchAddressLabel.value}.`
@@ -309,8 +311,10 @@ const faqItems = computed(() => {
 
         {
             id: 'booking',
+
             question:
                 'Ako sa objednať?',
+
             answer:
                 primaryContact.value
                     ?.value
@@ -320,8 +324,10 @@ const faqItems = computed(() => {
 
         {
             id: 'opening-hours',
+
             question:
                 'Kedy máme otvorené?',
+
             answer:
                 openingHoursTodayLabel.value
         }
@@ -721,6 +727,7 @@ onBeforeUnmount(() => {
             v-else
             class="
                 space-y-20
+
                 lg:space-y-32
             "
         >
@@ -735,10 +742,12 @@ onBeforeUnmount(() => {
                     items-center
                     gap-8
                     pt-5
+
                     lg:min-h-[36rem]
                     lg:grid-cols-2
                     lg:gap-12
                     lg:px-10
+
                     xl:gap-20
                     xl:px-16
                 "
@@ -751,6 +760,7 @@ onBeforeUnmount(() => {
                         items-center
                         gap-3
                         text-center
+
                         lg:items-start
                         lg:text-left
                     "
@@ -804,6 +814,7 @@ onBeforeUnmount(() => {
                             px-5
                             pb-6
                             text-baige/70
+
                             lg:px-0
                         "
                     >
@@ -817,6 +828,7 @@ onBeforeUnmount(() => {
                             max-w-lg
                             px-10
                             text-baige/70
+
                             lg:px-0
                         "
                     >
@@ -835,6 +847,7 @@ onBeforeUnmount(() => {
                         w-full
                         justify-center
                         overflow-x-clip
+
                         lg:overflow-visible
                     "
                 >
@@ -846,7 +859,7 @@ onBeforeUnmount(() => {
                             h-auto
                             shrink-0
                             object-contain
-                            opacity-70
+
                             lg:w-full
                             lg:max-w-[42rem]
                         "
@@ -868,9 +881,11 @@ onBeforeUnmount(() => {
                     grid-cols-1
                     items-center
                     gap-8
+
                     lg:grid-cols-2
                     lg:gap-12
                     lg:px-10
+
                     xl:gap-20
                     xl:px-16
                 "
@@ -884,6 +899,7 @@ onBeforeUnmount(() => {
                         gap-3
                         px-5
                         text-center
+
                         lg:items-start
                         lg:px-0
                         lg:text-left
@@ -921,35 +937,9 @@ onBeforeUnmount(() => {
                         :items="
                             faqItems
                         "
+                        scroll-motion
                     />
                 </div>
-            </section>
-
-            <!-- Illustration -->
-            <section
-                class="
-                    relative
-                    flex
-                    w-full
-                    justify-center
-                    overflow-x-clip
-                    lg:hidden
-                "
-            >
-                <img
-                    src="/images/humanitas_rodina.svg"
-                    alt="Humanitas"
-                    class="
-                        block
-                        h-auto
-                        shrink-0
-                        object-contain
-                    "
-                    style="
-                        width: 180vw;
-                        max-width: none;
-                    "
-                >
             </section>
 
             <!-- Services -->
@@ -962,9 +952,11 @@ onBeforeUnmount(() => {
                     grid-cols-1
                     items-center
                     gap-8
+
                     lg:grid-cols-2
                     lg:gap-12
                     lg:px-10
+
                     xl:gap-20
                     xl:px-16
                 "
@@ -978,6 +970,7 @@ onBeforeUnmount(() => {
                         gap-3
                         px-5
                         text-center
+
                         lg:items-start
                         lg:px-0
                         lg:text-left
@@ -1011,6 +1004,7 @@ onBeforeUnmount(() => {
                             flex-col
                             items-start
                             gap-4
+
                             lg:flex
                         "
                     >
@@ -1262,6 +1256,7 @@ onBeforeUnmount(() => {
                         gap-3
                         px-5
                         text-center
+
                         lg:hidden
                     "
                 >
@@ -1298,6 +1293,38 @@ onBeforeUnmount(() => {
                 </div>
             </section>
 
+                        <!-- Illustration -->
+            <section
+                class="
+                    relative
+                    flex
+                    h-[20rem]
+                    w-full
+                    justify-center
+                    overflow-hidden
+
+                    lg:hidden
+                "
+            >
+                <img
+                    src="/images/humanitas_ruky.svg"
+                    alt="Humanitas"
+                    class="
+                        absolute
+                        left-1/2
+                        top-1/2
+                        h-auto
+                        max-w-none
+                        shrink-0
+                        object-contain
+                        -translate-x-1/2
+                        -translate-y-1/2
+                        rotate-[50deg]
+                        scale-[3]
+                    "
+                >
+            </section>
+
             <!-- Team -->
             <section
                 v-if="
@@ -1312,9 +1339,11 @@ onBeforeUnmount(() => {
                     items-center
                     gap-8
                     overflow-hidden
+
                     lg:grid-cols-2
                     lg:gap-12
                     lg:px-10
+
                     xl:gap-20
                     xl:px-16
                 "
@@ -1328,6 +1357,7 @@ onBeforeUnmount(() => {
                         gap-3
                         px-5
                         text-center
+
                         lg:items-start
                         lg:px-0
                         lg:text-left
@@ -1366,6 +1396,7 @@ onBeforeUnmount(() => {
                             orderedEmployees
                         "
                         aria-label="Náš tím"
+                        scroll-motion
                         @select="
                             openEmployee
                         "
@@ -1387,6 +1418,7 @@ onBeforeUnmount(() => {
                     px-5
                     pb-12
                     text-center
+
                     lg:pb-20
                 "
             >
@@ -1414,7 +1446,8 @@ onBeforeUnmount(() => {
                     class="
                         my-6
                         flex
-                        flex-wrap
+                        flex-col
+                        items-center
                         justify-center
                         gap-3
                     "
@@ -1470,6 +1503,7 @@ onBeforeUnmount(() => {
                     max-w-4xl
                     pb-4
                     pt-4
+
                     sm:pb-12
                     sm:pt-6
                 "
@@ -1479,6 +1513,7 @@ onBeforeUnmount(() => {
                         flex
                         flex-col
                         gap-6
+
                         sm:flex-row
                         sm:items-start
                     "
@@ -1649,48 +1684,70 @@ onBeforeUnmount(() => {
 .hero-phrase-leave-active {
     transition:
         opacity 520ms ease,
-        transform 620ms cubic-bezier(0.16, 1, 0.3, 1),
+        transform 620ms
+            cubic-bezier(
+                0.16,
+                1,
+                0.3,
+                1
+            ),
         filter 520ms ease;
 }
 
 .hero-phrase-enter-from {
     opacity: 0;
-    transform: translate3d(
-        0,
-        0.35em,
-        0
-    );
-    filter: blur(4px);
+
+    transform:
+        translate3d(
+            0,
+            0.35em,
+            0
+        );
+
+    filter:
+        blur(4px);
 }
 
 .hero-phrase-enter-to {
     opacity: 1;
-    transform: translate3d(
-        0,
-        0,
-        0
-    );
-    filter: blur(0);
+
+    transform:
+        translate3d(
+            0,
+            0,
+            0
+        );
+
+    filter:
+        blur(0);
 }
 
 .hero-phrase-leave-from {
     opacity: 1;
-    transform: translate3d(
-        0,
-        0,
-        0
-    );
-    filter: blur(0);
+
+    transform:
+        translate3d(
+            0,
+            0,
+            0
+        );
+
+    filter:
+        blur(0);
 }
 
 .hero-phrase-leave-to {
     opacity: 0;
-    transform: translate3d(
-        0,
-        -0.25em,
-        0
-    );
-    filter: blur(3px);
+
+    transform:
+        translate3d(
+            0,
+            -0.25em,
+            0
+        );
+
+    filter:
+        blur(3px);
 }
 
 @media (
@@ -1707,8 +1764,11 @@ onBeforeUnmount(() => {
     .hero-phrase-enter-to,
     .hero-phrase-leave-from,
     .hero-phrase-leave-to {
-        transform: none;
-        filter: none;
+        transform:
+            none;
+
+        filter:
+            none;
     }
 }
 </style>

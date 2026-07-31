@@ -11,6 +11,10 @@ import {
     useClinviaPublicSite
 } from '../composables/useClinviaPublicSite';
 
+import {
+    useScrollMotion
+} from '../composables/useScrollMotion';
+
 import Button from '../components/Button.vue';
 
 defineProps({
@@ -26,6 +30,11 @@ const {
     error,
     load
 } = useClinviaPublicSite();
+
+const {
+    motionRoot,
+    motionStyle
+} = useScrollMotion();
 
 /*
  * Form
@@ -229,7 +238,8 @@ const contacts = computed(() => {
             result.push({
                 type: 'phone',
                 label: 'Telefón',
-                value: branch.value.phone
+                value:
+                    branch.value.phone
             });
         }
 
@@ -241,9 +251,12 @@ const contacts = computed(() => {
 
         if (bookingPhone) {
             result.push({
-                type: 'booking_phone',
+                type:
+                    'booking_phone',
+
                 label:
                     'Telefón na objednanie',
+
                 value:
                     bookingPhone
             });
@@ -255,7 +268,8 @@ const contacts = computed(() => {
             result.push({
                 type: 'email',
                 label: 'E-mail',
-                value: branch.value.email
+                value:
+                    branch.value.email
             });
         }
     }
@@ -266,7 +280,8 @@ const contacts = computed(() => {
         result.push({
             type: 'address',
             label: 'Adresa',
-            value: branchAddress.value
+            value:
+                branchAddress.value
         });
     }
 
@@ -327,14 +342,21 @@ function contactLabel(contact) {
     }
 
     return {
-        email: 'E-mail',
-        phone: 'Telefón',
+        email:
+            'E-mail',
+
+        phone:
+            'Telefón',
+
         booking_phone:
             'Telefón na objednanie',
+
         address:
             'Adresa',
+
         facebook:
             'Facebook',
+
         instagram:
             'Instagram'
     }[contact.type] ??
@@ -345,14 +367,19 @@ function contactIcon(contact) {
     return {
         email:
             'bi-envelope',
+
         phone:
             'bi-telephone',
+
         booking_phone:
             'bi-calendar-check',
+
         address:
             'bi-geo-alt',
+
         facebook:
             'bi-facebook',
+
         instagram:
             'bi-instagram'
     }[contact.type] ??
@@ -447,32 +474,27 @@ function linkAttrs(url) {
     };
 }
 
+/*
+ * Scroll motion configuration
+ */
+
 function contactCardBaseRotation(index) {
-    const baseRotations = [
-        -2,
-        1.3,
-        -0.7,
-        2.2,
-        -1.4
+    const rotations = [
+        -1.6,
+        1.1,
+        -0.65,
+        1.7,
+        -1.1
     ];
 
-    return baseRotations[
+    return rotations[
         index %
-        baseRotations.length
+        rotations.length
     ];
-}
-
-function physicsCardMotionStyle(
-    baseRotation
-) {
-    return {
-        '--card-rest-rotate': `${baseRotation}deg`,
-        '--physics-x': '0px'
-    };
 }
 
 function contactCardMotionStyle(index) {
-    return physicsCardMotionStyle(
+    return motionStyle(
         contactCardBaseRotation(
             index
         )
@@ -480,8 +502,8 @@ function contactCardMotionStyle(index) {
 }
 
 function formCardMotionStyle() {
-    return physicsCardMotionStyle(
-        -0.6
+    return motionStyle(
+        -0.1
     );
 }
 
@@ -525,13 +547,26 @@ function openingHoursDayLabel(
         6: 'Sobota',
         7: 'Nedeľa',
 
-        monday: 'Pondelok',
-        tuesday: 'Utorok',
-        wednesday: 'Streda',
-        thursday: 'Štvrtok',
-        friday: 'Piatok',
-        saturday: 'Sobota',
-        sunday: 'Nedeľa'
+        monday:
+            'Pondelok',
+
+        tuesday:
+            'Utorok',
+
+        wednesday:
+            'Streda',
+
+        thursday:
+            'Štvrtok',
+
+        friday:
+            'Piatok',
+
+        saturday:
+            'Sobota',
+
+        sunday:
+            'Nedeľa'
     }[day] ??
         day ??
         '';
@@ -782,554 +817,9 @@ function sendAnotherMessage() {
 }
 
 /*
- * Contact card scroll physics
- */
-
-let physicsFrame =
-    null;
-
-let lastScrollY =
-    0;
-
-let lastScrollTime =
-    0;
-
-const cardPhysics =
-    new Map();
-
-const cardMotionVariants = [
-    {
-        offsetImpulse: 0.85,
-        rotationImpulse: 0.1,
-        restRotationImpulse: 0.03,
-        offsetEase: 0.14,
-        rotationEase: 0.1,
-        restRotationEase: 0.055,
-        relaxation: 0.84,
-        rotationRelaxation: 0.9,
-        restRotationReturn: 0.018,
-        maxOffset: 10,
-        offsetSpread: 0.72,
-        maxRotation: 1.2,
-        maxRestRotationDrift: 0.65
-    },
-    {
-        offsetImpulse: 1,
-        rotationImpulse: 0.115,
-        restRotationImpulse: 0.036,
-        offsetEase: 0.12,
-        rotationEase: 0.09,
-        restRotationEase: 0.05,
-        relaxation: 0.82,
-        rotationRelaxation: 0.89,
-        restRotationReturn: 0.016,
-        maxOffset: 12,
-        offsetSpread: 1,
-        maxRotation: 1.42,
-        maxRestRotationDrift: 0.78
-    },
-    {
-        offsetImpulse: 1.12,
-        rotationImpulse: 0.13,
-        restRotationImpulse: 0.04,
-        offsetEase: 0.11,
-        rotationEase: 0.085,
-        restRotationEase: 0.045,
-        relaxation: 0.8,
-        rotationRelaxation: 0.885,
-        restRotationReturn: 0.014,
-        maxOffset: 14,
-        offsetSpread: 1.42,
-        maxRotation: 1.58,
-        maxRestRotationDrift: 0.9
-    },
-    {
-        offsetImpulse: 0.92,
-        rotationImpulse: 0.105,
-        restRotationImpulse: 0.032,
-        offsetEase: 0.145,
-        rotationEase: 0.105,
-        restRotationEase: 0.058,
-        relaxation: 0.85,
-        rotationRelaxation: 0.905,
-        restRotationReturn: 0.02,
-        maxOffset: 11,
-        offsetSpread: 0.84,
-        maxRotation: 1.24,
-        maxRestRotationDrift: 0.7
-    },
-    {
-        offsetImpulse: 1.05,
-        rotationImpulse: 0.12,
-        restRotationImpulse: 0.038,
-        offsetEase: 0.125,
-        rotationEase: 0.095,
-        restRotationEase: 0.048,
-        relaxation: 0.81,
-        rotationRelaxation: 0.89,
-        restRotationReturn: 0.015,
-        maxOffset: 13,
-        offsetSpread: 1.22,
-        maxRotation: 1.48,
-        maxRestRotationDrift: 0.82
-    }
-];
-
-function getPhysicsState(
-    card,
-    index
-) {
-    if (
-        cardPhysics.has(
-            card
-        )
-    ) {
-        return cardPhysics.get(
-            card
-        );
-    }
-
-    const seed =
-        Number.parseInt(
-            card.dataset.physicsSeed ??
-                `${index}`,
-            10
-        );
-
-    const variant =
-        cardMotionVariants[
-            Math.abs(seed) %
-            cardMotionVariants.length
-        ];
-
-    const baseRotation =
-        Number.parseFloat(
-            card.dataset.baseRotate ??
-                `${contactCardBaseRotation(index)}`
-        );
-
-    const state = {
-        baseRotation,
-        restRotation:
-            baseRotation,
-        targetRestRotation:
-            baseRotation,
-        x: 0,
-        targetX: 0,
-        offset: 0,
-        targetOffset: 0,
-        rotation: 0,
-        targetRotation: 0,
-        xDirection:
-            Number.parseFloat(
-                card.dataset.xDirection ??
-                    '0'
-            ),
-        yDirection:
-            Number.parseFloat(
-                card.dataset.yDirection ??
-                    '1'
-            ),
-        rotationDirection:
-            Number.parseFloat(
-                card.dataset.rotationDirection ??
-                    '1'
-            ),
-        motionScale:
-            Number.parseFloat(
-                card.dataset.motionScale ??
-                    '1'
-            ),
-        rotationScale:
-            Number.parseFloat(
-                card.dataset.rotationScale ??
-                    '1'
-            ),
-        ...variant
-    };
-
-    cardPhysics.set(
-        card,
-        state
-    );
-
-    return state;
-}
-
-function applyScrollImpulse(
-    scrollVelocity
-) {
-    const cards =
-        document.querySelectorAll(
-            '[data-physics-card]'
-        );
-
-    cards.forEach(
-        (
-            card,
-            index
-        ) => {
-            const state =
-                getPhysicsState(
-                    card,
-                    index
-                );
-
-            state.targetOffset =
-                Math.max(
-                    -state.maxOffset,
-                    Math.min(
-                        state.maxOffset,
-                        state.targetOffset +
-                            scrollVelocity *
-                                state.offsetImpulse *
-                                state.yDirection *
-                                state.motionScale
-                    )
-                );
-
-            state.targetX =
-                Math.max(
-                    -state.maxOffset,
-                    Math.min(
-                        state.maxOffset,
-                        state.targetX +
-                            scrollVelocity *
-                                state.offsetImpulse *
-                                state.xDirection *
-                                state.motionScale
-                    )
-                );
-
-            state.targetRotation =
-                Math.max(
-                    -state.maxRotation,
-                    Math.min(
-                        state.maxRotation,
-                        state.targetRotation +
-                            scrollVelocity *
-                                state.rotationImpulse *
-                                state.rotationDirection *
-                                state.rotationScale
-                    )
-                );
-            state.targetRestRotation =
-                Math.max(
-                    state.baseRotation -
-                        state.maxRestRotationDrift *
-                            state.rotationScale,
-                    Math.min(
-                        state.baseRotation +
-                            state.maxRestRotationDrift *
-                                state.rotationScale,
-                        state.targetRestRotation +
-                            scrollVelocity *
-                                state.restRotationImpulse *
-                                state.rotationScale
-                    )
-                );
-        }
-    );
-
-    startPhysicsLoop();
-}
-
-function updatePhysics() {
-    let stillMoving =
-        false;
-
-    document
-        .querySelectorAll(
-            '[data-physics-card]'
-        )
-        .forEach(
-            (
-                card,
-                index
-            ) => {
-                const state =
-                    getPhysicsState(
-                        card,
-                        index
-                    );
-
-                state.targetOffset *=
-                    state.relaxation;
-
-                state.targetX *=
-                    state.relaxation;
-
-                state.targetRotation *=
-                    state.rotationRelaxation;
-
-                state.targetRestRotation +=
-                    (
-                        state.baseRotation -
-                        state.targetRestRotation
-                    ) *
-                    state.restRotationReturn;
-
-                state.offset +=
-                    (
-                        state.targetOffset -
-                        state.offset
-                    ) *
-                    state.offsetEase;
-
-                state.x +=
-                    (
-                        state.targetX -
-                        state.x
-                    ) *
-                    state.offsetEase;
-
-                state.rotation +=
-                    (
-                        state.targetRotation -
-                        state.rotation
-                    ) *
-                    state.rotationEase;
-
-                state.restRotation +=
-                    (
-                        state.targetRestRotation -
-                        state.restRotation
-                    ) *
-                    state.restRotationEase;
-
-                card.style.setProperty(
-                    '--physics-y',
-                    `${state.offset * state.offsetSpread}px`
-                );
-
-                card.style.setProperty(
-                    '--physics-x',
-                    `${state.x * state.offsetSpread}px`
-                );
-
-                card.style.setProperty(
-                    '--card-rest-rotate',
-                    `${state.restRotation}deg`
-                );
-
-                card.style.setProperty(
-                    '--physics-rotate',
-                    `${state.rotation}deg`
-                );
-
-                if (
-                    Math.abs(
-                        state.targetOffset
-                    ) >
-                        0.04 ||
-                    Math.abs(
-                        state.targetX
-                    ) >
-                        0.04 ||
-                    Math.abs(
-                        state.rotation
-                    ) >
-                        0.04 ||
-                    Math.abs(
-                        state.x
-                    ) >
-                        0.04 ||
-                    Math.abs(
-                        state.offset
-                    ) >
-                        0.04 ||
-                    Math.abs(
-                        state.restRotation -
-                        state.baseRotation
-                    ) >
-                        0.02 ||
-                    Math.abs(
-                        state.targetRotation
-                    ) >
-                        0.04 ||
-                    Math.abs(
-                        state.targetRestRotation -
-                        state.baseRotation
-                    ) >
-                        0.02
-                ) {
-                    stillMoving =
-                        true;
-                } else {
-                    state.offset =
-                        0;
-
-                    state.targetOffset =
-                        0;
-
-                    state.x =
-                        0;
-
-                    state.targetX =
-                        0;
-
-                    state.rotation =
-                        0;
-
-                    state.targetRotation =
-                        0;
-
-                    state.restRotation =
-                        state.baseRotation;
-
-                    state.targetRestRotation =
-                        state.baseRotation;
-
-                    card.style.setProperty(
-                        '--physics-x',
-                        '0px'
-                    );
-
-                    card.style.setProperty(
-                        '--physics-y',
-                        '0px'
-                    );
-
-                    card.style.setProperty(
-                        '--card-rest-rotate',
-                        `${state.baseRotation}deg`
-                    );
-
-                    card.style.setProperty(
-                        '--physics-rotate',
-                        '0deg'
-                    );
-                }
-            }
-        );
-
-    if (
-        stillMoving
-    ) {
-        physicsFrame =
-            window.requestAnimationFrame(
-                updatePhysics
-            );
-
-        return;
-    }
-
-    physicsFrame =
-        null;
-}
-
-function startPhysicsLoop() {
-    if (
-        physicsFrame !==
-        null
-    ) {
-        return;
-    }
-
-    physicsFrame =
-        window.requestAnimationFrame(
-            updatePhysics
-        );
-}
-
-function handlePhysicsScroll() {
-    const now =
-        performance.now();
-
-    const currentScrollY =
-        window.scrollY;
-
-    const scrollDelta =
-        currentScrollY -
-        lastScrollY;
-
-    const timeDelta =
-        Math.max(
-            now -
-            lastScrollTime,
-            16
-        );
-
-    let scrollVelocity =
-        scrollDelta /
-        timeDelta *
-        16;
-
-    /*
-     * Clamp very fast trackpad
-     * or touch scrolls.
-     */
-    scrollVelocity =
-        Math.max(
-            -8,
-            Math.min(
-                8,
-                scrollVelocity
-            )
-        );
-
-    if (
-        Math.abs(
-            scrollVelocity
-        ) >
-        0.05
-    ) {
-        /*
-         * Opposite direction creates
-         * natural inertia / lag.
-         */
-        applyScrollImpulse(
-            -scrollVelocity
-        );
-    }
-
-    lastScrollY =
-        currentScrollY;
-
-    lastScrollTime =
-        now;
-}
-
-function startCardPhysics() {
-    lastScrollY =
-        window.scrollY;
-
-    lastScrollTime =
-        performance.now();
-
-    window.addEventListener(
-        'scroll',
-        handlePhysicsScroll,
-        {
-            passive: true
-        }
-    );
-}
-
-function stopCardPhysics() {
-    window.removeEventListener(
-        'scroll',
-        handlePhysicsScroll
-    );
-
-    if (
-        physicsFrame !==
-        null
-    ) {
-        window.cancelAnimationFrame(
-            physicsFrame
-        );
-
-        physicsFrame =
-            null;
-    }
-
-    cardPhysics.clear();
-}
-
-/*
  * Form helpers
  */
+
 function resetFormErrors() {
     Object.keys(
         formErrors
@@ -1391,6 +881,7 @@ async function submit() {
         const headers = {
             Accept:
                 'application/json',
+
             'Content-Type':
                 'application/json'
         };
@@ -1408,16 +899,22 @@ async function submit() {
             await fetch(
                 contactMessageUrl.value,
                 {
-                    method: 'POST',
+                    method:
+                        'POST',
+
                     headers,
+
                     body:
                         JSON.stringify({
                             sender_name:
                                 form.sender_name,
+
                             sender_email:
                                 form.sender_email,
+
                             sender_phone:
                                 form.sender_phone,
+
                             body:
                                 form.body
                         })
@@ -1471,19 +968,26 @@ async function submit() {
     }
 }
 
+/*
+ * Lifecycle
+ *
+ * Scroll motion lifecycle is handled
+ * internally by useScrollMotion().
+ */
+
 onMounted(() => {
     startMessageSuggestionAnimation();
-    startCardPhysics();
 });
 
 onBeforeUnmount(() => {
     stopMessageSuggestionAnimation();
-    stopCardPhysics();
 });
 </script>
 
 <template>
-    <div>
+    <div
+        ref="motionRoot"
+    >
         <!-- Loading -->
         <div
             v-if="loading"
@@ -1685,7 +1189,7 @@ onBeforeUnmount(() => {
                 <!-- Contact form -->
                 <div
                     class="
-                        physics-card
+                        scroll-motion
                         overflow-hidden
                         rounded-[2.7rem]
                         bg-baige
@@ -1693,22 +1197,21 @@ onBeforeUnmount(() => {
                         shadow-[var(--shadow-mid)]
 
                         transition-[box-shadow]
-                        duration-200
-                        ease-out
+                        duration-300
+                        ease-[cubic-bezier(0.22,1,0.36,1)]
 
                         hover:shadow-[0_22px_48px_rgba(0,0,0,0.12)]
                     "
                     :style="
                         formCardMotionStyle()
                     "
-                    data-physics-card
-                    data-physics-seed="1"
-                    data-base-rotate="-0.1"
-                    data-x-direction="-0.1"
-                    data-y-direction="0.1"
-                    data-rotation-direction="0"
-                    data-motion-scale="0.18"
-                    data-rotation-scale="0.1"
+                    data-scroll-motion
+                    data-motion-seed="0"
+                    data-base-rotation="-0.1"
+                    data-motion-strength="0.68"
+                    data-straighten-strength="0.8"
+                    data-max-y="9"
+                    data-max-scale="0.003"
                 >
                     <!-- Success -->
                     <div
@@ -1876,6 +1379,7 @@ onBeforeUnmount(() => {
                                             formErrors.sender_name
                                         )
                                     "
+                                    required
                                 >
 
                                 <p
@@ -1948,6 +1452,7 @@ onBeforeUnmount(() => {
                                             formErrors.sender_email
                                         )
                                     "
+                                    required
                                 >
 
                                 <p
@@ -2020,6 +1525,7 @@ onBeforeUnmount(() => {
                                             formErrors.sender_phone
                                         )
                                     "
+                                    required
                                 >
 
                                 <p
@@ -2144,6 +1650,7 @@ onBeforeUnmount(() => {
                                         @blur="
                                             handleMessageBlur
                                         "
+                                        required
                                     />
                                 </div>
 
@@ -2164,7 +1671,7 @@ onBeforeUnmount(() => {
                                 </p>
                             </div>
 
-                            <!-- Error -->
+                            <!-- Submit error -->
                             <div
                                 v-if="
                                     submitError
@@ -2256,7 +1763,7 @@ onBeforeUnmount(() => {
                         </p>
                     </div>
 
-                    <!-- Floating contact cards -->
+                    <!-- Contact cards -->
                     <div
                         v-if="
                             contacts.length
@@ -2265,7 +1772,10 @@ onBeforeUnmount(() => {
                             relative
                             flex
                             flex-col
-                            py-10
+                            gap-4
+                            py-8
+
+                            sm:gap-5
                         "
                     >
                         <component
@@ -2300,7 +1810,7 @@ onBeforeUnmount(() => {
                                 )
                             "
                             class="
-                                physics-card
+                                scroll-motion
                                 group
                                 relative
                                 flex
@@ -2314,17 +1824,11 @@ onBeforeUnmount(() => {
                                 shadow-[var(--shadow-soft)]
 
                                 transition-[box-shadow]
-                                duration-200
-                                ease-out
+                                duration-300
+                                ease-[cubic-bezier(0.22,1,0.36,1)]
 
                                 hover:z-50
                                 hover:shadow-[var(--shadow-mid)]
-
-                                [&+&]:-mt-1
-
-                                sm:[&+&]:-mt-2
-
-                                lg:[&+&]:-mt-3
                             "
                             :class="
                                 contactCardLayout(
@@ -2336,27 +1840,30 @@ onBeforeUnmount(() => {
                                     index
                                 )
                             "
-                            data-physics-card
-                            :data-physics-seed="index"
-                            :data-base-rotate="
+                            data-scroll-motion
+                            :data-motion-seed="
+                                index + 1
+                            "
+                            :data-base-rotation="
                                 contactCardBaseRotation(
                                     index
                                 )
                             "
-                            data-x-direction="0"
-                            data-y-direction="1"
-                            data-rotation-direction="1"
+                            data-motion-strength="1"
+                            data-straighten-strength="0.94"
+                            data-max-y="14"
+                            data-max-scale="0.006"
                         >
                             <div
                                 class="
                                     flex
+                                    size-10
+                                    shrink-0
                                     items-center
                                     justify-center
                                     rounded-full
                                     bg-green
                                     text-baige
-                                    size-10
-                                    shrink-0
                                 "
                             >
                                 <i
@@ -2421,6 +1928,7 @@ onBeforeUnmount(() => {
                                     justify-center
                                     rounded-full
                                     text-green/50
+
                                     transition-all
                                     duration-200
 
@@ -2496,7 +2004,7 @@ onBeforeUnmount(() => {
                     class="
                         overflow-hidden
                         p-6
-                        text-baige
+                        text-baige/60
 
                         sm:p-8
                     "
@@ -2520,7 +2028,7 @@ onBeforeUnmount(() => {
                         <p
                             class="
                                 text-regular
-                                text-baige
+                                text-baige/60
                             "
                         >
                             {{
@@ -2563,35 +2071,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.physics-card {
-    --card-rest-rotate: 0deg;
-    --physics-x: 0px;
-    --physics-y: 0px;
-    --physics-rotate: 0deg;
-
-    transform:
-        translate3d(
-            var(--physics-x),
-            var(--physics-y),
-            0
-        )
-        rotate(
-            calc(
-                var(--card-rest-rotate) +
-                var(--physics-rotate)
-            )
-        );
-
-    will-change:
-        transform;
-
-    transform-origin:
-        center center;
-
-    backface-visibility:
-        hidden;
-}
-
 .success-icon {
     animation:
         success-pop
@@ -2627,11 +2106,6 @@ onBeforeUnmount(() => {
     prefers-reduced-motion:
     reduce
 ) {
-    .physics-card {
-        transform:
-            none !important;
-    }
-
     .success-icon {
         animation:
             none;

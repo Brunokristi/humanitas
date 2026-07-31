@@ -263,7 +263,7 @@ function formatBytes(value) {
                     >
                         <h2
                             class="
-                                font-regular
+                                text-xl
                                 font-bold
                                 leading-[1]
                                 text-green
@@ -357,10 +357,7 @@ function formatBytes(value) {
                             informationItems.length
                         "
                         class="
-                            border-t
-                            border-green/15
                             pt-8
-                            lg:border-t-0
                             lg:pt-0
                         "
                     >
@@ -412,8 +409,6 @@ function formatBytes(value) {
                     <section
                         v-if="steps.length"
                         class="
-                            border-t
-                            border-green/15
                             pt-8
                         "
                     >
@@ -485,8 +480,6 @@ function formatBytes(value) {
                     <section
                         v-if="files.length"
                         class="
-                            border-t
-                            border-green/15
                             pt-8
                         "
                     >

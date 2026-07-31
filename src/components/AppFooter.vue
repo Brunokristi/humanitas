@@ -308,17 +308,52 @@ function openingHoursSchedule(entry) {
 <template>
     <footer
         class="
+            relative
             z-10
+            overflow-hidden
             bg-baige
             px-6
             pb-4
             pt-20
             text-green
+
             sm:pt-10
         "
     >
-        <div class="mx-auto w-full">
+        <!-- Decorative image behind footer content -->
+        <img
+            src="/images/humanitas_mamadieta_zelena.svg"
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+            class="
+                pointer-events-none
+                absolute
+                bottom-[-4rem]
+                right-[-4rem]
+                z-0
+                h-auto
+                w-[150%]
+                max-w-none
+                opacity-[0.2]
 
+                sm:bottom-[-6rem]
+                sm:w-[115%]
+
+                lg:bottom-[-9rem]
+                lg:w-[80%]
+            "
+        >
+
+        <!-- Footer content -->
+        <div
+            class="
+                relative
+                z-10
+                mx-auto
+                w-full
+            "
+        >
             <!-- Main footer sections -->
             <div
                 class="
@@ -761,26 +796,21 @@ function openingHoursSchedule(entry) {
             <!-- Bottom bar -->
             <div
                 class="
+                    relative
+                    z-10
                     mt-14
                     flex
                     flex-col
-                    gap-5
-
-                    md:mt-16
-                    md:items-center
-
-                    lg:flex-row
-                    lg:justify-between
+                    items-center
+                    justify-center
+                    gap-3
                 "
             >
                 <p
                     class="
                         text-regular
-                        text-left
+                        text-center
                         text-green/70
-
-                        md:text-center
-                        lg:text-left
                     "
                 >
                     © {{ currentYear }}
@@ -792,12 +822,9 @@ function openingHoursSchedule(entry) {
                         flex
                         flex-wrap
                         items-center
-                        justify-start
+                        justify-center
                         gap-x-6
                         gap-y-3
-
-                        md:justify-center
-                        lg:justify-end
                     "
                     aria-label="Právne odkazy"
                 >

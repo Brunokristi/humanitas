@@ -6,6 +6,10 @@ import {
     watch
 } from 'vue';
 
+import {
+    useScrollMotion
+} from '../composables/useScrollMotion';
+
 const emit = defineEmits([
     'select'
 ]);
@@ -34,8 +38,17 @@ const props = defineProps({
     nextLabel: {
         type: String,
         default: 'Nasledujúci zamestnanec'
+    },
+
+    scrollMotion: {
+        type: Boolean,
+        default: false
     }
 });
+
+const {
+    motionRoot
+} = useScrollMotion();
 
 const currentIndex = ref(
     Math.min(
@@ -50,23 +63,41 @@ const currentIndex = ref(
     )
 );
 
-const stageElement = ref(null);
+const stageElement =
+    ref(null);
 
-const dragX = ref(0);
-const cardWidth = ref(1);
+const dragX =
+    ref(0);
 
-const isDragging = ref(false);
-const lastDirection = ref(1);
+const cardWidth =
+    ref(1);
 
-const pointerId = ref(null);
-const pointerStartX = ref(0);
-const previousPointerX = ref(0);
-const previousPointerTime = ref(0);
-const pointerVelocity = ref(0);
+const isDragging =
+    ref(false);
 
-const pointerMoved = ref(false);
+const lastDirection =
+    ref(1);
 
-const exitingCards = ref({});
+const pointerId =
+    ref(null);
+
+const pointerStartX =
+    ref(0);
+
+const previousPointerX =
+    ref(0);
+
+const previousPointerTime =
+    ref(0);
+
+const pointerVelocity =
+    ref(0);
+
+const pointerMoved =
+    ref(false);
+
+const exitingCards =
+    ref({});
 
 const exitTimers =
     new Map();
@@ -80,10 +111,10 @@ const dragProgress = computed(() => {
         Math.abs(
             dragX.value
         ) /
-        Math.max(
-            cardWidth.value,
-            1
-        ),
+            Math.max(
+                cardWidth.value,
+                1
+            ),
         1
     );
 });
@@ -92,7 +123,8 @@ const deckDirection = computed(() => {
     if (
         Math.abs(
             dragX.value
-        ) > 2
+        ) >
+        2
     ) {
         return dragX.value < 0
             ? 1
@@ -124,6 +156,11 @@ const totalNumber = computed(() => {
     );
 });
 
+/*
+ * Original employee layout.
+ *
+ * These values remain unchanged.
+ */
 const stackPositions = [
     {
         x: -25,
@@ -175,50 +212,6 @@ const stackPositions = [
     }
 ];
 
-const stackTopSpace = computed(() => {
-    if (cardCount.value <= 1) {
-        return 24;
-    }
-
-    const backgroundCardCount =
-        Math.min(
-            cardCount.value - 1,
-            stackPositions.length
-        );
-
-    let highestOffset = 0;
-
-    for (
-        let depth = 1;
-        depth <= backgroundCardCount;
-        depth++
-    ) {
-        const stack =
-            getStackTransform(
-                depth
-            );
-
-        highestOffset =
-            Math.max(
-                highestOffset,
-                Math.abs(
-                    Math.min(
-                        stack.y,
-                        0
-                    )
-                )
-            );
-    }
-
-    const breathingRoom =
-        28;
-
-    return (
-        highestOffset +
-        breathingRoom
-    );
-});
-
 function clamp(
     value,
     minimum,
@@ -246,7 +239,9 @@ function circularIndex(index) {
         cardCount.value;
 }
 
-function buildPublicAssetUrl(path) {
+function buildPublicAssetUrl(
+    path
+) {
     if (!path) {
         return null;
     }
@@ -263,7 +258,8 @@ function buildPublicAssetUrl(path) {
     }
 
     const apiBaseUrl =
-        import.meta.env.VITE_CLINVIA_API_URL ??
+        import.meta.env
+            .VITE_CLINVIA_API_URL ??
         'https://clinvia.studiokristian.com';
 
     const normalizedPath =
@@ -274,7 +270,9 @@ function buildPublicAssetUrl(path) {
     return `${apiBaseUrl}${normalizedPath}`;
 }
 
-function employeePhotoUrl(employee) {
+function employeePhotoUrl(
+    employee
+) {
     return buildPublicAssetUrl(
         employee?.photoUrl ??
         employee?.photoPath ??
@@ -294,10 +292,13 @@ function employeeName(employee) {
         .join(' ');
 }
 
-function employeeInitials(employee) {
+function employeeInitials(
+    employee
+) {
     return [
         employee?.firstName
             ?.charAt(0),
+
         employee?.lastName
             ?.charAt(0)
     ]
@@ -317,7 +318,8 @@ function updateCardWidth() {
             ?.getBoundingClientRect();
 
     cardWidth.value =
-        rect?.width || 1;
+        rect?.width ||
+        1;
 }
 
 function getDeckDepth(index) {
@@ -380,7 +382,9 @@ function isCardActive(index) {
     return (
         index ===
             currentIndex.value &&
-        !isCardExiting(index)
+        !isCardExiting(
+            index
+        )
     );
 }
 
@@ -388,10 +392,14 @@ function getCardWrapperClasses(
     index
 ) {
     const active =
-        isCardActive(index);
+        isCardActive(
+            index
+        );
 
     return [
-        'pointer-events-auto cursor-pointer',
+        active
+            ? 'pointer-events-auto'
+            : 'pointer-events-none',
 
         active &&
         isDragging.value
@@ -402,7 +410,9 @@ function getCardWrapperClasses(
                 'ease-[cubic-bezier(0.2,0.85,0.25,1)]'
             ].join(' '),
 
-        isCardExiting(index)
+        isCardExiting(
+            index
+        )
             ? 'pointer-events-none'
             : ''
     ];
@@ -424,7 +434,8 @@ function getCardWrapperStyle(
                 `scale(${exitState.scale})`
             ].join(' '),
 
-            zIndex: 60
+            zIndex:
+                60
         };
     }
 
@@ -446,10 +457,12 @@ function getCardWrapperStyle(
             );
 
         const verticalMovement =
-            absoluteProgress * 7;
+            absoluteProgress *
+            7;
 
         const rotation =
-            normalizedDrag * 5;
+            normalizedDrag *
+            5;
 
         const scale =
             1 -
@@ -463,12 +476,15 @@ function getCardWrapperStyle(
                 `scale(${scale})`
             ].join(' '),
 
-            zIndex: 40
+            zIndex:
+                40
         };
     }
 
     const depth =
-        getDeckDepth(index);
+        getDeckDepth(
+            index
+        );
 
     const stack =
         getStackTransform(
@@ -524,9 +540,72 @@ function getCardWrapperStyle(
     };
 }
 
+/*
+ * Current rotation owned by the
+ * employee-card wrapper.
+ */
+function getCardBaseRotation(
+    index
+) {
+    const exitState =
+        exitingCards.value[
+            index
+        ];
+
+    if (exitState) {
+        return (
+            exitState.rotate ??
+            0
+        );
+    }
+
+    const active =
+        index ===
+        currentIndex.value;
+
+    if (active) {
+        const normalizedDrag =
+            dragX.value /
+            Math.max(
+                cardWidth.value,
+                1
+            );
+
+        return (
+            normalizedDrag *
+            5
+        );
+    }
+
+    const depth =
+        getDeckDepth(
+            index
+        );
+
+    const stack =
+        getStackTransform(
+            depth
+        );
+
+    const revealProgress =
+        depth === 1
+            ? dragProgress.value
+            : 0;
+
+    return (
+        stack.rotate *
+        (
+            1 -
+            revealProgress
+        )
+    );
+}
+
 function clearExitState(index) {
     const timer =
-        exitTimers.get(index);
+        exitTimers.get(
+            index
+        );
 
     if (timer) {
         window.clearTimeout(
@@ -550,7 +629,9 @@ function clearExitState(index) {
         ...exitingCards.value
     };
 
-    delete nextStates[index];
+    delete nextStates[
+        index
+    ];
 
     exitingCards.value =
         nextStates;
@@ -560,7 +641,9 @@ function scheduleExitRemoval(
     index
 ) {
     const existingTimer =
-        exitTimers.get(index);
+        exitTimers.get(
+            index
+        );
 
     if (existingTimer) {
         window.clearTimeout(
@@ -606,6 +689,7 @@ function commitMovement(
         cardCount.value <= 1
     ) {
         resetDragState();
+
         return;
     }
 
@@ -629,6 +713,7 @@ function commitMovement(
         outgoingIndex
     ) {
         resetDragState();
+
         return;
     }
 
@@ -654,16 +739,19 @@ function commitMovement(
         ...exitingCards.value,
 
         [outgoingIndex]: {
-            x: targetX,
+            x:
+                targetX,
 
-            y: 18,
+            y:
+                18,
 
             rotate:
                 direction > 0
                     ? -8
                     : 8,
 
-            scale: 0.97
+            scale:
+                0.97
         }
     };
 
@@ -678,11 +766,15 @@ function commitMovement(
 }
 
 function goNext() {
-    commitMovement(1);
+    commitMovement(
+        1
+    );
 }
 
 function goPrevious() {
-    commitMovement(-1);
+    commitMovement(
+        -1
+    );
 }
 
 function goTo(index) {
@@ -752,23 +844,9 @@ function handlePointerDown(
     }
 
     if (
+        cardCount.value <= 1 ||
         event.button !== 0 ||
         isDragging.value
-    ) {
-        return;
-    }
-
-    pointerMoved.value =
-        false;
-
-    /*
-     * We only need drag handling when there
-     * is more than one card.
-     *
-     * A single card still remains clickable.
-     */
-    if (
-        cardCount.value <= 1
     ) {
         return;
     }
@@ -792,6 +870,9 @@ function handlePointerDown(
 
     dragX.value =
         0;
+
+    pointerMoved.value =
+        false;
 
     isDragging.value =
         true;
@@ -846,7 +927,9 @@ function handlePointerMove(
         pointerStartX.value;
 
     if (
-        Math.abs(distance) >
+        Math.abs(
+            distance
+        ) >
         6
     ) {
         pointerMoved.value =
@@ -906,7 +989,14 @@ function handlePointerEnd(
             velocityThreshold;
 
     if (!shouldChange) {
+        const wasClick =
+            !pointerMoved.value;
+
         resetDragState();
+
+        if (wasClick) {
+            selectCurrent();
+        }
 
         return;
     }
@@ -914,7 +1004,8 @@ function handlePointerEnd(
     const movementValue =
         Math.abs(
             dragX.value
-        ) > 2
+        ) >
+        2
             ? dragX.value
             : pointerVelocity.value;
 
@@ -932,9 +1023,6 @@ function handlePointerCancel() {
     if (!isDragging.value) {
         return;
     }
-
-    pointerMoved.value =
-        true;
 
     resetDragState();
 }
@@ -970,9 +1058,12 @@ function handleKeydown(event) {
     }
 }
 
-function selectEmployee(
-    employee
-) {
+function selectCurrent() {
+    const employee =
+        props.items[
+            currentIndex.value
+        ];
+
     if (!employee) {
         return;
     }
@@ -980,36 +1071,6 @@ function selectEmployee(
     emit(
         'select',
         employee
-    );
-}
-
-function selectCurrent() {
-    selectEmployee(
-        props.items[
-            currentIndex.value
-        ]
-    );
-}
-
-function handleCardClick(
-    item
-) {
-    /*
-     * Ignore the synthetic click emitted
-     * by the browser immediately after
-     * a swipe gesture.
-     */
-    if (
-        pointerMoved.value
-    ) {
-        pointerMoved.value =
-            false;
-
-        return;
-    }
-
-    selectEmployee(
-        item
     );
 }
 
@@ -1052,12 +1113,15 @@ onBeforeUnmount(() => {
 
 <template>
     <section
+        ref="motionRoot"
         class="
             w-full
             overflow-x-clip
             overflow-y-visible
         "
-        :aria-label="ariaLabel"
+        :aria-label="
+            ariaLabel
+        "
     >
         <div
             class="
@@ -1067,11 +1131,12 @@ onBeforeUnmount(() => {
                 overflow-y-visible
                 px-5
                 pb-8
+                pt-36
+
+                sm:pt-40
+
+                md:pt-44
             "
-            :style="{
-                paddingTop:
-                    `${stackTopSpace}px`
-            }"
         >
             <div
                 ref="stageElement"
@@ -1082,14 +1147,11 @@ onBeforeUnmount(() => {
                     grid
                     w-full
                     place-items-center
-
                     overflow-visible
-
                     cursor-grab
                     touch-pan-y
                     select-none
                     outline-none
-
                     active:cursor-grabbing
                 "
                 @keydown="
@@ -1110,8 +1172,11 @@ onBeforeUnmount(() => {
             >
                 <div
                     v-for="
-                        (item, index)
-                        in items
+                        (
+                            item,
+                            index
+                        ) in
+                        items
                     "
                     :key="
                         item.id ??
@@ -1122,18 +1187,15 @@ onBeforeUnmount(() => {
                         relative
                         col-start-1
                         row-start-1
-
                         w-[62vw]
                         max-w-[15.5rem]
-
                         justify-self-center
-
                         origin-[50%_92%]
-
                         [backface-visibility:hidden]
                         [will-change:transform]
 
                         sm:w-[16rem]
+
                         md:w-[17rem]
                     "
                     :class="
@@ -1146,12 +1208,19 @@ onBeforeUnmount(() => {
                             index
                         )
                     "
-                    @click="
-                        handleCardClick(
-                            item
+                    :aria-hidden="
+                        !isCardActive(
+                            index
                         )
                     "
                 >
+                    <!--
+                        Wrapper owns carousel position
+                        and original rotation.
+
+                        Article owns only additional
+                        scroll-motion response.
+                    -->
                     <article
                         class="
                             relative
@@ -1161,13 +1230,55 @@ onBeforeUnmount(() => {
                             rounded-[2.1rem]
                             bg-baige
                             shadow-[var(--shadow-mid)]
-                            transition-transform
-                            duration-200
-                            hover:scale-[1.015]
-                            active:scale-[0.99]
+                        "
+                        :class="{
+                            'scroll-motion':
+                                scrollMotion
+                        }"
+                        :data-scroll-motion="
+                            scrollMotion
+                                ? ''
+                                : undefined
+                        "
+                        :data-motion-seed="
+                            scrollMotion
+                                ? index + 1
+                                : undefined
+                        "
+                        :data-base-rotation="
+                            scrollMotion
+                                ? getCardBaseRotation(
+                                    index
+                                )
+                                : undefined
+                        "
+                        :data-rotation-mode="
+                            scrollMotion
+                                ? 'offset'
+                                : undefined
+                        "
+                        :data-motion-strength="
+                            scrollMotion
+                                ? 1
+                                : undefined
+                        "
+                        :data-straighten-strength="
+                            scrollMotion
+                                ? 0.97
+                                : undefined
+                        "
+                        :data-max-y="
+                            scrollMotion
+                                ? 14
+                                : undefined
+                        "
+                        :data-max-scale="
+                            scrollMotion
+                                ? 0.005
+                                : undefined
                         "
                     >
-                        <!-- Photo -->
+                        <!-- Employee photo -->
                         <img
                             v-if="
                                 employeePhotoUrl(
@@ -1196,7 +1307,7 @@ onBeforeUnmount(() => {
                             "
                         >
 
-                        <!-- Fallback -->
+                        <!-- Photo fallback -->
                         <div
                             v-else
                             class="
@@ -1242,7 +1353,6 @@ onBeforeUnmount(() => {
                         <!-- Content -->
                         <div
                             class="
-                                pointer-events-none
                                 absolute
                                 inset-x-0
                                 bottom-0
@@ -1298,6 +1408,7 @@ onBeforeUnmount(() => {
                 w-full
                 items-center
                 justify-center
+
                 md:flex
             "
         >
@@ -1350,10 +1461,15 @@ onBeforeUnmount(() => {
                 >
                     <button
                         v-for="
-                            (_, index)
-                            in items
+                            (
+                                _,
+                                index
+                            ) in
+                            items
                         "
-                        :key="index"
+                        :key="
+                            index
+                        "
                         type="button"
                         class="
                             h-1.5
@@ -1373,7 +1489,9 @@ onBeforeUnmount(() => {
                             `Zobraziť zamestnanca ${index + 1}`
                         "
                         @click="
-                            goTo(index)
+                            goTo(
+                                index
+                            )
                         "
                     />
                 </div>
@@ -1411,7 +1529,9 @@ onBeforeUnmount(() => {
         </div>
 
         <p
-            class="sr-only"
+            class="
+                sr-only
+            "
             aria-live="polite"
         >
             Zamestnanec

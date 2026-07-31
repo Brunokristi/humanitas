@@ -825,9 +825,6 @@ onBeforeUnmount(() => {
                         :background-color="
                             backgroundColor
                         "
-                        :image-opacity="
-                            imageOpacity
-                        "
                         :image-scale="
                             imageScale
                         "
