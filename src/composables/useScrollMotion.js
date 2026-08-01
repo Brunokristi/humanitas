@@ -2,7 +2,7 @@ import {
     onBeforeUnmount,
     onMounted,
     ref
-} from 'vue';
+} from 'vue'
 
 const DEFAULT_VARIANTS = [
     {
@@ -10,31 +10,27 @@ const DEFAULT_VARIANTS = [
         rotationResponse: 0.13,
         scaleResponse: 0.15
     },
-
     {
         positionResponse: 0.145,
         rotationResponse: 0.12,
         scaleResponse: 0.14
     },
-
     {
         positionResponse: 0.17,
         rotationResponse: 0.14,
         scaleResponse: 0.16
     },
-
     {
         positionResponse: 0.15,
         rotationResponse: 0.125,
         scaleResponse: 0.145
     },
-
     {
         positionResponse: 0.165,
         rotationResponse: 0.135,
         scaleResponse: 0.155
     }
-];
+]
 
 function clamp(
     value,
@@ -47,7 +43,7 @@ function clamp(
             maximum,
             value
         )
-    );
+    )
 }
 
 function readNumber(
@@ -57,101 +53,92 @@ function readNumber(
     const parsed =
         Number.parseFloat(
             value
-        );
+        )
 
     return Number.isFinite(
         parsed
     )
         ? parsed
-        : fallback;
+        : fallback
 }
 
 export function useScrollMotion(
     options = {}
 ) {
     const motionRoot =
-        ref(null);
+        ref(null)
 
     /*
-     * y:
-     * vertical page scrolling
-     *
-     * x:
-     * horizontal carousel scrolling
+     * y = vertical movement
+     * x = horizontal movement
      */
     const axis =
         options.axis === 'x'
             ? 'x'
-            : 'y';
+            : 'y'
 
     /*
-     * Default:
-     * listen to window.
+     * When this is null we listen
+     * to the window.
      *
-     * With sourceSelector:
-     * listen to individual scrollable
-     * descendants instead.
+     * When provided, every matching
+     * descendant becomes its own
+     * independent scroll source.
      */
     const sourceSelector =
         options.sourceSelector ??
-        null;
+        null
 
     const selector =
         options.selector ??
-        '[data-scroll-motion]';
+        '[data-scroll-motion]'
+
+    /*
+     * Allows the root element itself
+     * to participate.
+     *
+     * This is useful for PageCard.vue.
+     */
+    const includeRoot =
+        options.includeRoot ??
+        false
 
     const velocityMultiplier =
         options.velocityMultiplier ??
-        0.115;
+        0.115
 
     const velocityDecay =
         options.velocityDecay ??
-        0.82;
+        0.82
 
     const maxVelocity =
         options.maxVelocity ??
-        8;
+        8
 
     const travelMultiplier =
         options.travelMultiplier ??
-        1.75;
+        1.75
 
     const straightenVelocity =
         options.straightenVelocity ??
-        5;
+        5
 
     const variants =
         options.variants ??
-        DEFAULT_VARIANTS;
+        DEFAULT_VARIANTS
 
     let motionFrame =
-        null;
+        null
 
     let reducedMotionQuery =
-        null;
+        null
 
-    /*
-     * Every source gets its own shared
-     * velocity.
-     *
-     * Contact page:
-     * window -> one velocity
-     *
-     * Services page:
-     * category A -> velocity A
-     * category B -> velocity B
-     * category C -> velocity C
-     */
     const sourceStates =
-        new Map();
+        new Map()
 
     const elementStates =
-        new Map();
+        new Map()
 
-    /*
-     * Useful for standalone elements where
-     * the engine owns the full rotation.
-     */
     function motionStyle(
         baseRotation = 0
     ) {
@@ -167,14 +154,14 @@ export function useScrollMotion(
 
             '--scroll-scale':
                 '1'
-        };
+        }
     }
 
     function prefersReducedMotion() {
         return Boolean(
             reducedMotionQuery
                 ?.matches
-        );
+        )
     }
 
     function getPosition(
@@ -186,12 +173,12 @@ export function useScrollMotion(
         ) {
             return axis === 'x'
                 ? window.scrollX
-                : window.scrollY;
+                : window.scrollY
         }
 
         return axis === 'x'
             ? source.scrollLeft
-            : source.scrollTop;
+            : source.scrollTop
     }
 
     function getSourceState(
@@ -204,7 +191,7 @@ export function useScrollMotion(
         ) {
             return sourceStates.get(
                 source
-            );
+            )
         }
 
         const state = {
@@ -214,46 +201,66 @@ export function useScrollMotion(
                 getPosition(
                     source
                 )
-        };
+        }
 
         sourceStates.set(
             source,
             state
-        );
+        )
 
-        return state;
+        return state
+    }
+
+    function getRootElements() {
+        const root =
+            motionRoot.value
+
+        if (!root) {
+            return []
+        }
+
+        const elements =
+            []
+
+        if (
+            includeRoot &&
+            root.matches?.(
+                selector
+            )
+        ) {
+            elements.push(
+                root
+            )
+        }
+
+        elements.push(
+            ...root.querySelectorAll(
+                selector
+            )
+        )
+
+        return elements
     }
 
     function getElementsForSource(
         source
     ) {
-        const root =
-            motionRoot.value;
-
-        if (!root) {
-            return [];
-        }
-
         /*
-         * Window mode:
-         * every motion element inside
-         * this composable root.
+         * Window scroll:
+         * use everything inside this
+         * composable root.
          */
         if (
             source ===
             window
         ) {
-            return Array.from(
-                root.querySelectorAll(
-                    selector
-                )
-            );
+            return getRootElements()
         }
 
         /*
-         * Container mode:
-         * only animate elements inside
-         * the actual scrollable source.
+         * Container scroll:
+         * animate only descendants
+         * belonging to this source.
          */
         return Array.from(
             source.querySelectorAll(
@@ -264,7 +271,7 @@ export function useScrollMotion(
                 if (
                     !sourceSelector
                 ) {
-                    return true;
+                    return true
                 }
 
                 return (
@@ -272,9 +279,9 @@ export function useScrollMotion(
                         sourceSelector
                     ) ===
                     source
-                );
+                )
             }
-        );
+        )
     }
 
     function getRestRotation(
@@ -284,10 +291,10 @@ export function useScrollMotion(
             state.rotationMode ===
             'offset'
         ) {
-            return 0;
+            return 0
         }
 
-        return state.baseRotation;
+        return state.baseRotation
     }
 
     function getMotionState(
@@ -301,7 +308,7 @@ export function useScrollMotion(
         ) {
             return elementStates.get(
                 element
-            );
+            )
         }
 
         const seed =
@@ -309,36 +316,36 @@ export function useScrollMotion(
                 element.dataset.motionSeed ??
                 `${index}`,
                 10
-            );
+            )
 
         const normalizedSeed =
             Number.isFinite(
                 seed
             )
                 ? Math.abs(seed)
-                : index;
+                : index
 
         const variant =
             variants[
             normalizedSeed %
             variants.length
-            ];
+            ]
 
         const baseRotation =
             readNumber(
                 element.dataset.baseRotation,
                 0
-            );
+            )
 
         const rotationMode =
             element.dataset.rotationMode ??
-            'absolute';
+            'absolute'
 
         const restingRotation =
             rotationMode ===
                 'offset'
                 ? 0
-                : baseRotation;
+                : baseRotation
 
         const maxDistance =
             axis === 'x'
@@ -355,7 +362,7 @@ export function useScrollMotion(
                         element.dataset.maxDistance,
                         14
                     )
-                );
+                )
 
         const state = {
             position: 0,
@@ -409,23 +416,16 @@ export function useScrollMotion(
                     element.dataset.scaleResponse,
                     variant.scaleResponse
                 )
-        };
+        }
 
         elementStates.set(
             element,
             state
-        );
+        )
 
-        return state;
+        return state
     }
 
-    /*
-     * Some rotations can change dynamically.
-     *
-     * For example:
-     * carousel cards can change their stack
-     * position after being moved.
-     */
     function refreshMotionState(
         element,
         state
@@ -434,29 +434,47 @@ export function useScrollMotion(
             readNumber(
                 element.dataset.baseRotation,
                 state.baseRotation
-            );
+            )
 
         state.rotationMode =
             element.dataset.rotationMode ??
-            state.rotationMode;
+            state.rotationMode
 
         state.motionStrength =
             readNumber(
                 element.dataset.motionStrength,
                 state.motionStrength
-            );
+            )
 
         state.straightenStrength =
             readNumber(
                 element.dataset.straightenStrength,
                 state.straightenStrength
-            );
+            )
 
         state.maxScale =
             readNumber(
                 element.dataset.maxScale,
                 state.maxScale
-            );
+            )
+
+        state.positionResponse =
+            readNumber(
+                element.dataset.positionResponse,
+                state.positionResponse
+            )
+
+        state.rotationResponse =
+            readNumber(
+                element.dataset.rotationResponse,
+                state.rotationResponse
+            )
+
+        state.scaleResponse =
+            readNumber(
+                element.dataset.scaleResponse,
+                state.scaleResponse
+            )
 
         if (
             axis ===
@@ -466,32 +484,14 @@ export function useScrollMotion(
                 readNumber(
                     element.dataset.maxX,
                     state.maxDistance
-                );
+                )
         } else {
             state.maxDistance =
                 readNumber(
                     element.dataset.maxY,
                     state.maxDistance
-                );
+                )
         }
-
-        state.positionResponse =
-            readNumber(
-                element.dataset.positionResponse,
-                state.positionResponse
-            );
-
-        state.rotationResponse =
-            readNumber(
-                element.dataset.rotationResponse,
-                state.rotationResponse
-            );
-
-        state.scaleResponse =
-            readNumber(
-                element.dataset.scaleResponse,
-                state.scaleResponse
-            );
     }
 
     function applyTransform(
@@ -505,33 +505,33 @@ export function useScrollMotion(
             element.style.setProperty(
                 '--scroll-x',
                 `${state.position}px`
-            );
+            )
 
             element.style.setProperty(
                 '--scroll-y',
                 '0px'
-            );
+            )
         } else {
             element.style.setProperty(
                 '--scroll-x',
                 '0px'
-            );
+            )
 
             element.style.setProperty(
                 '--scroll-y',
                 `${state.position}px`
-            );
+            )
         }
 
         element.style.setProperty(
             '--scroll-rotate',
             `${state.rotate}deg`
-        );
+        )
 
         element.style.setProperty(
             '--scroll-scale',
             `${state.scale}`
-        );
+        )
     }
 
     function resetElement(
@@ -541,45 +541,45 @@ export function useScrollMotion(
         const restingRotation =
             getRestRotation(
                 state
-            );
+            )
 
         state.position =
-            0;
+            0
 
         state.targetPosition =
-            0;
+            0
 
         state.rotate =
-            restingRotation;
+            restingRotation
 
         state.targetRotate =
-            restingRotation;
+            restingRotation
 
         state.scale =
-            1;
+            1
 
         state.targetScale =
-            1;
+            1
 
         element.style.setProperty(
             '--scroll-x',
             '0px'
-        );
+        )
 
         element.style.setProperty(
             '--scroll-y',
             '0px'
-        );
+        )
 
         element.style.setProperty(
             '--scroll-rotate',
             `${restingRotation}deg`
-        );
+        )
 
         element.style.setProperty(
             '--scroll-scale',
             '1'
-        );
+        )
     }
 
     function resetSourceElements(
@@ -596,19 +596,19 @@ export function useScrollMotion(
                     getMotionState(
                         element,
                         index
-                    );
+                    )
 
                 refreshMotionState(
                     element,
                     state
-                );
+                )
 
                 resetElement(
                     element,
                     state
-                );
+                )
             }
-        );
+        )
     }
 
     function resetAllElements() {
@@ -622,22 +622,18 @@ export function useScrollMotion(
                 ) => {
                     resetSourceElements(
                         source
-                    );
+                    )
                 }
-            );
+            )
 
-            return;
+            return
         }
 
         resetSourceElements(
             window
-        );
+        )
     }
 
-    /*
-     * Add energy to one particular
-     * scroll source.
-     */
     function applyScrollMotion(
         source,
         scrollDelta
@@ -645,26 +641,26 @@ export function useScrollMotion(
         if (
             prefersReducedMotion()
         ) {
-            return;
+            return
         }
 
         const sourceState =
             getSourceState(
                 source
-            );
+            )
 
         sourceState.velocity +=
             scrollDelta *
-            velocityMultiplier;
+            velocityMultiplier
 
         sourceState.velocity =
             clamp(
                 sourceState.velocity,
                 -maxVelocity,
                 maxVelocity
-            );
+            )
 
-        startMotionLoop();
+        startMotionLoop()
     }
 
     function updateSourceMotion(
@@ -678,17 +674,23 @@ export function useScrollMotion(
         ) {
             sourceStates.delete(
                 source
-            );
+            )
 
-            return false;
+            return false
         }
 
         let sourceStillMoving =
-            false;
+            false
 
+        /*
+         * Shared velocity loses energy.
+         */
         sourceState.velocity *=
-            velocityDecay;
+            velocityDecay
 
+        /*
+         * Convert velocity to 0 → 1.
+         */
         const velocityAmount =
             Math.min(
                 1,
@@ -696,12 +698,12 @@ export function useScrollMotion(
                     sourceState.velocity
                 ) /
                 straightenVelocity
-            );
+            )
 
         const elements =
             getElementsForSource(
                 source
-            );
+            )
 
         elements.forEach(
             (
@@ -712,25 +714,17 @@ export function useScrollMotion(
                     getMotionState(
                         element,
                         index
-                    );
+                    )
 
                 refreshMotionState(
                     element,
                     state
-                );
+                )
 
                 /*
-                 * Shared movement.
-                 *
-                 * Positive horizontal scrollLeft:
-                 * content moves visually left.
-                 *
-                 * Positive translateX:
-                 * card lags slightly behind
-                 * toward the right.
-                 *
-                 * That gives us the physical
-                 * loose-card feeling.
+                 * Every element receives
+                 * the SAME underlying
+                 * source velocity.
                  */
                 state.targetPosition =
                     clamp(
@@ -739,13 +733,11 @@ export function useScrollMotion(
                         state.motionStrength,
                         -state.maxDistance,
                         state.maxDistance
-                    );
+                    )
 
                 /*
-                 * ABSOLUTE:
-                 * engine owns the entire angle.
-                 *
-                 * Used by contact cards.
+                 * Engine owns the complete
+                 * resting angle.
                  */
                 if (
                     state.rotationMode ===
@@ -757,23 +749,15 @@ export function useScrollMotion(
                             1 -
                             velocityAmount *
                             state.straightenStrength
-                        );
+                        )
                 }
 
                 /*
-                 * OFFSET:
-                 * parent already owns the
-                 * resting rotation.
+                 * The parent already owns
+                 * the resting angle.
                  *
-                 * The engine applies the
-                 * opposite rotation.
-                 *
-                 * Example:
-                 *
-                 * parent = -2deg
-                 * engine = +1.8deg
-                 *
-                 * visual result approaches 0deg.
+                 * Apply the opposite angle
+                 * while moving.
                  */
                 if (
                     state.rotationMode ===
@@ -782,51 +766,44 @@ export function useScrollMotion(
                     state.targetRotate =
                         -state.baseRotation *
                         velocityAmount *
-                        state.straightenStrength;
+                        state.straightenStrength
                 }
 
-                /*
-                 * Tiny compression while moving.
-                 */
                 state.targetScale =
                     1 -
                     state.maxScale *
-                    velocityAmount;
+                    velocityAmount
 
-                /*
-                 * Slight response differences
-                 * create apparent mass.
-                 */
                 state.position +=
                     (
                         state.targetPosition -
                         state.position
                     ) *
-                    state.positionResponse;
+                    state.positionResponse
 
                 state.rotate +=
                     (
                         state.targetRotate -
                         state.rotate
                     ) *
-                    state.rotationResponse;
+                    state.rotationResponse
 
                 state.scale +=
                     (
                         state.targetScale -
                         state.scale
                     ) *
-                    state.scaleResponse;
+                    state.scaleResponse
 
                 applyTransform(
                     element,
                     state
-                );
+                )
 
                 const restingRotation =
                     getRestRotation(
                         state
-                    );
+                    )
 
                 const moving =
                     Math.abs(
@@ -846,30 +823,30 @@ export function useScrollMotion(
                         state.scale -
                         1
                     ) >
-                    0.0001;
+                    0.0001
 
                 if (moving) {
                     sourceStillMoving =
-                        true;
+                        true
 
-                    return;
+                    return
                 }
 
                 resetElement(
                     element,
                     state
-                );
+                )
             }
-        );
+        )
 
         if (
             !sourceStillMoving
         ) {
             sourceState.velocity =
-                0;
+                0
         }
 
-        return sourceStillMoving;
+        return sourceStillMoving
     }
 
     function updateMotion() {
@@ -879,20 +856,20 @@ export function useScrollMotion(
             sourceStates.forEach(
                 (state) => {
                     state.velocity =
-                        0;
+                        0
                 }
-            );
+            )
 
-            resetAllElements();
+            resetAllElements()
 
             motionFrame =
-                null;
+                null
 
-            return;
+            return
         }
 
         let stillMoving =
-            false;
+            false
 
         sourceStates.forEach(
             (
@@ -903,16 +880,16 @@ export function useScrollMotion(
                     updateSourceMotion(
                         source,
                         sourceState
-                    );
+                    )
 
                 if (
                     sourceMoving
                 ) {
                     stillMoving =
-                        true;
+                        true
                 }
             }
-        );
+        )
 
         if (
             stillMoving
@@ -920,13 +897,13 @@ export function useScrollMotion(
             motionFrame =
                 window.requestAnimationFrame(
                     updateMotion
-                );
+                )
 
-            return;
+            return
         }
 
         motionFrame =
-            null;
+            null
     }
 
     function startMotionLoop() {
@@ -934,35 +911,32 @@ export function useScrollMotion(
             motionFrame !==
             null
         ) {
-            return;
+            return
         }
 
         motionFrame =
             window.requestAnimationFrame(
                 updateMotion
-            );
+            )
     }
 
-    /*
-     * Window vertical/horizontal scrolling.
-     */
     function handleWindowScroll() {
         const sourceState =
             getSourceState(
                 window
-            );
+            )
 
         const currentPosition =
             getPosition(
                 window
-            );
+            )
 
         const scrollDelta =
             currentPosition -
-            sourceState.lastPosition;
+            sourceState.lastPosition
 
         sourceState.lastPosition =
-            currentPosition;
+            currentPosition
 
         if (
             Math.abs(
@@ -973,30 +947,21 @@ export function useScrollMotion(
             applyScrollMotion(
                 window,
                 scrollDelta
-            );
+            )
         }
     }
 
-    /*
-     * Captured descendant scroll.
-     *
-     * Scroll doesn't normally bubble, so
-     * we listen in capture mode on the root.
-     *
-     * This also means dynamically rendered
-     * category tracks work automatically.
-     */
     function handleSourceScroll(
         event
     ) {
         const source =
-            event.target;
+            event.target
 
         if (
             !source ||
             !(source instanceof Element)
         ) {
-            return;
+            return
         }
 
         if (
@@ -1004,47 +969,41 @@ export function useScrollMotion(
                 sourceSelector
             )
         ) {
-            return;
+            return
         }
 
         const currentPosition =
             getPosition(
                 source
-            );
+            )
 
         let sourceState =
             sourceStates.get(
                 source
-            );
+            )
 
-        /*
-         * A dynamically created source may
-         * fire before we have seen it.
-         *
-         * Initialise it here. The next scroll
-         * event will provide the first delta.
-         */
         if (!sourceState) {
             sourceState = {
                 velocity: 0,
+
                 lastPosition:
                     currentPosition
-            };
+            }
 
             sourceStates.set(
                 source,
                 sourceState
-            );
+            )
 
-            return;
+            return
         }
 
         const scrollDelta =
             currentPosition -
-            sourceState.lastPosition;
+            sourceState.lastPosition
 
         sourceState.lastPosition =
-            currentPosition;
+            currentPosition
 
         if (
             Math.abs(
@@ -1055,7 +1014,7 @@ export function useScrollMotion(
             applyScrollMotion(
                 source,
                 scrollDelta
-            );
+            )
         }
     }
 
@@ -1064,7 +1023,7 @@ export function useScrollMotion(
             !sourceSelector ||
             !motionRoot.value
         ) {
-            return;
+            return
         }
 
         motionRoot.value
@@ -1078,7 +1037,7 @@ export function useScrollMotion(
                             source
                         )
                     ) {
-                        return;
+                        return
                     }
 
                     sourceStates.set(
@@ -1091,24 +1050,24 @@ export function useScrollMotion(
                                     source
                                 )
                         }
-                    );
+                    )
                 }
-            );
+            )
     }
 
     function handleReducedMotionChange() {
         if (
             !prefersReducedMotion()
         ) {
-            return;
+            return
         }
 
         sourceStates.forEach(
             (state) => {
                 state.velocity =
-                    0;
+                    0
             }
-        );
+        )
 
         if (
             motionFrame !==
@@ -1116,13 +1075,13 @@ export function useScrollMotion(
         ) {
             window.cancelAnimationFrame(
                 motionFrame
-            );
+            )
 
             motionFrame =
-                null;
+                null
         }
 
-        resetAllElements();
+        resetAllElements()
     }
 
     function start() {
@@ -1130,27 +1089,27 @@ export function useScrollMotion(
             typeof window ===
             'undefined'
         ) {
-            return;
+            return
         }
 
         reducedMotionQuery =
             window.matchMedia(
                 '(prefers-reduced-motion: reduce)'
-            );
+            )
 
         reducedMotionQuery
             .addEventListener?.(
                 'change',
                 handleReducedMotionChange
-            );
+            )
 
         /*
-         * Container mode.
+         * Individual scroll-container mode.
          */
         if (
             sourceSelector
         ) {
-            initialiseSources();
+            initialiseSources()
 
             motionRoot.value
                 ?.addEventListener(
@@ -1160,9 +1119,9 @@ export function useScrollMotion(
                         capture: true,
                         passive: true
                     }
-                );
+                )
 
-            return;
+            return
         }
 
         /*
@@ -1178,7 +1137,7 @@ export function useScrollMotion(
                         window
                     )
             }
-        );
+        )
 
         window.addEventListener(
             'scroll',
@@ -1186,7 +1145,7 @@ export function useScrollMotion(
             {
                 passive: true
             }
-        );
+        )
     }
 
     function stop() {
@@ -1194,28 +1153,26 @@ export function useScrollMotion(
             typeof window ===
             'undefined'
         ) {
-            return;
+            return
         }
 
         window.removeEventListener(
             'scroll',
             handleWindowScroll
-        );
+        )
 
         motionRoot.value
             ?.removeEventListener(
                 'scroll',
                 handleSourceScroll,
-                {
-                    capture: true
-                }
-            );
+                true
+            )
 
         reducedMotionQuery
             ?.removeEventListener?.(
                 'change',
                 handleReducedMotionChange
-            );
+            )
 
         if (
             motionFrame !==
@@ -1223,27 +1180,26 @@ export function useScrollMotion(
         ) {
             window.cancelAnimationFrame(
                 motionFrame
-            );
+            )
 
             motionFrame =
-                null;
+                null
         }
 
-        sourceStates.clear();
-
-        elementStates.clear();
+        sourceStates.clear()
+        elementStates.clear()
 
         reducedMotionQuery =
-            null;
+            null
     }
 
     onMounted(() => {
-        start();
-    });
+        start()
+    })
 
     onBeforeUnmount(() => {
-        stop();
-    });
+        stop()
+    })
 
     return {
         motionRoot,
@@ -1252,5 +1208,5 @@ export function useScrollMotion(
         stop,
         resetAllElements,
         initialiseSources
-    };
+    }
 }

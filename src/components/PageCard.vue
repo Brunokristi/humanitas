@@ -1,11 +1,13 @@
 <script setup>
 import {
     computed,
-    onMounted,
-    onUnmounted,
     ref,
     watch
 } from 'vue'
+
+import {
+    useScrollMotion
+} from '../composables/useScrollMotion'
 
 const props = defineProps({
     card: {
@@ -40,302 +42,573 @@ const emit = defineEmits([
     'card-element-change'
 ])
 
-const rootElementRef = ref(null)
+const rootElementRef =
+    ref(null)
 
-const isHovered = ref(false)
-const isStackDragActive = ref(false)
+const {
+    motionRoot
+} = useScrollMotion({
+    axis:
+        'y',
 
-const stackDragX = ref(0)
-const stackDragY = ref(0)
-const stackDragRotate = ref(0)
+    selector:
+        '[data-page-card-scroll-motion="true"]',
 
-const suppressPreviewActivate = ref(false)
+    includeRoot:
+        true,
 
-const topBarPointerId = ref(null)
-const topBarPointerStartX = ref(0)
-const topBarPointerStartY = ref(0)
-const topBarPointerMoved = ref(false)
+    /*
+     * Stronger vertical movement.
+     *
+     * No horizontal movement and no
+     * resting rotation.
+     */
+    velocityMultiplier:
+        0.14,
 
-const CARD_SHADOW = 'var(--shadow-strong)'
+    velocityDecay:
+        0.83,
 
-let stackDragPointerId = null
-let stackDragStartX = 0
-let stackDragStartY = 0
+    maxVelocity:
+        10,
 
-const isPreviewMode = computed(() => {
-    return !props.visual.isOpen
+    travelMultiplier:
+        3,
+
+    straightenVelocity:
+        5
 })
 
-const isMenuMorphOpen = computed(() => {
-    return Boolean(
-        props.visual.isOpen &&
-        props.visual.showExpandedControls
-    )
-})
+const isStackDragActive =
+    ref(false)
 
-const isMenuActionReady = computed(() => {
-    return isMenuMorphOpen.value
-})
+const stackDragX =
+    ref(0)
 
-const cardLabel = computed(() => {
-    return (
-        props.card.menuLabel ??
-        props.card.label ??
-        props.card.title ??
-        props.card.name ??
-        ''
-    )
-})
+const stackDragY =
+    ref(0)
 
-const transitionDuration = computed(() => {
-    return props.reducedMotion
-        ? 0
-        : props.visual.transitionMs ?? 0
-})
+const stackDragRotate =
+    ref(0)
 
-const usesFixedTransitionBox = computed(() => {
-    return Boolean(props.visual.fixedBox)
-})
+const suppressPreviewActivate =
+    ref(false)
 
-const previewEffectsReady = computed(() => {
-    return props.visual.previewEffectsReady ?? true
-})
+const topBarPointerId =
+    ref(null)
 
-const contentContainerClass = computed(() => {
-    return 'flex min-h-full flex-col'
-})
+const topBarPointerStartX =
+    ref(0)
 
-const menuControlStyle = computed(() => {
-    const dragProgress =
-        props.visual.dragProgress ?? 0
+const topBarPointerStartY =
+    ref(0)
 
-    return {
-        transform: [
-            `translate3d(0, ${dragProgress * 3}px, 0)`,
-            `scale(${1 - dragProgress * 0.025})`
-        ].join(' ')
-    }
-})
+const topBarPointerMoved =
+    ref(false)
 
-const cardStyle = computed(() => {
-    if (usesFixedTransitionBox.value) {
-        const box = props.visual.fixedBox
+const CARD_SHADOW =
+    'var(--shadow-strong)'
 
-        const fixedAnchor =
-            props.visual.fixedAnchor ?? 'left'
+let stackDragPointerId =
+    null
 
-        const fixedTimingFunction =
-            props.visual.fixedTimingFunction ??
-            'cubic-bezier(0.22, 1, 0.36, 1)'
+let stackDragStartX =
+    0
 
-        const fixedTransitionProperty =
-            props.visual.fixedTransitionProperty ??
-            [
-                'top',
-                'left',
-                'width',
-                'height',
-                'border-radius',
-                'box-shadow'
-            ].join(', ')
+let stackDragStartY =
+    0
 
-        const fixedWillChange =
-            props.visual.fixedWillChange ??
-            'top, left, width, height, border-radius, box-shadow'
+const isPreviewMode =
+    computed(() => {
+        return !props.visual.isOpen
+    })
 
-        const fixedTransformOrigin =
-            props.visual.fixedTransformOrigin ??
-            'center top'
+const previewEffectsReady =
+    computed(() => {
+        return (
+            props.visual
+                .previewEffectsReady ??
+            true
+        )
+    })
 
-        const usesCenterAnchor =
-            fixedAnchor === 'center'
+const usesScrollMotion =
+    computed(() => {
+        return Boolean(
+            isPreviewMode.value &&
+            props.visual.interactive &&
+            previewEffectsReady.value &&
+            !props.reducedMotion
+        )
+    })
 
-        const fixedLeft = usesCenterAnchor
-            ? `${box.left + box.width / 2}px`
-            : `${box.left}px`
+/*
+ * Page cards always rest straight.
+ */
+const scrollMotionBaseRotation =
+    computed(() => {
+        return 0
+    })
 
-        const fixedTransform = usesCenterAnchor
-            ? 'translate3d(-50%, 0, 0)'
-            : 'translate3d(0, 0, 0)'
+const scrollMotionSeed =
+    computed(() => {
+        return (
+            props.visual
+                .motionSeed ??
+            0
+        )
+    })
 
-        const transform =
-            props.visual.fixedTransform ??
-            fixedTransform
+const isMenuMorphOpen =
+    computed(() => {
+        return Boolean(
+            props.visual.isOpen &&
+            props.visual
+                .showExpandedControls
+        )
+    })
+
+const isMenuActionReady =
+    computed(() => {
+        return isMenuMorphOpen.value
+    })
+
+const cardLabel =
+    computed(() => {
+        return (
+            props.card.menuLabel ??
+            props.card.label ??
+            props.card.title ??
+            props.card.name ??
+            ''
+        )
+    })
+
+const transitionDuration =
+    computed(() => {
+        return props.reducedMotion
+            ? 0
+            : props.visual
+                .transitionMs ??
+                0
+    })
+
+const usesFixedTransitionBox =
+    computed(() => {
+        return Boolean(
+            props.visual.fixedBox
+        )
+    })
+
+const contentContainerClass =
+    computed(() => {
+        return (
+            'flex min-h-full flex-col'
+        )
+    })
+
+const menuControlStyle =
+    computed(() => {
+        const dragProgress =
+            props.visual
+                .dragProgress ??
+            0
 
         return {
-            position: 'fixed',
-            top: `${box.top}px`,
-            left: fixedLeft,
-            width: `${box.width}px`,
-            height: `${box.height}px`,
-            maxWidth: 'none',
-            minHeight: '0',
-            margin: '0',
-            transform,
-            transformOrigin: fixedTransformOrigin,
-            opacity: props.visual.opacity,
-            visibility:
-                props.visual.visibility ??
-                'visible',
-            zIndex: props.visual.zIndex,
-            boxShadow: CARD_SHADOW,
-            borderRadius:
-                `${props.visual.borderRadius}px`,
-            overflow: 'hidden',
-            transitionProperty:
-                fixedTransitionProperty,
-            transitionDuration:
-                `${transitionDuration.value}ms`,
-            transitionTimingFunction:
-                fixedTimingFunction,
-            willChange:
-                fixedWillChange
-        }
-    }
-
-    if (props.visual.isOpen) {
-        return {
-            position: 'relative',
-            width: props.visual.width,
-            height: props.visual.height,
-            minHeight:
-                props.visual.minHeight ??
-                props.visual.height,
-            maxWidth: 'none',
-            marginInline: 'auto',
             transform: [
+                `translate3d(0, ${dragProgress * 3}px, 0)`,
+
+                `scale(${1 - dragProgress * 0.025})`
+            ].join(' ')
+        }
+    })
+
+const cardStyle =
+    computed(() => {
+        /*
+         * Fixed opening / closing transition.
+         */
+        if (
+            usesFixedTransitionBox.value
+        ) {
+            const box =
+                props.visual.fixedBox
+
+            const fixedAnchor =
+                props.visual
+                    .fixedAnchor ??
+                'left'
+
+            const fixedTimingFunction =
+                props.visual
+                    .fixedTimingFunction ??
+                'cubic-bezier(0.22, 1, 0.36, 1)'
+
+            const fixedTransitionProperty =
+                props.visual
+                    .fixedTransitionProperty ??
+                [
+                    'top',
+                    'left',
+                    'width',
+                    'height',
+                    'border-radius',
+                    'box-shadow'
+                ].join(', ')
+
+            const fixedWillChange =
+                props.visual
+                    .fixedWillChange ??
+                [
+                    'top',
+                    'left',
+                    'width',
+                    'height',
+                    'border-radius',
+                    'box-shadow'
+                ].join(', ')
+
+            const fixedTransformOrigin =
+                props.visual
+                    .fixedTransformOrigin ??
+                'center top'
+
+            const usesCenterAnchor =
+                fixedAnchor ===
+                'center'
+
+            const fixedLeft =
+                usesCenterAnchor
+                    ? `${box.left + box.width / 2}px`
+                    : `${box.left}px`
+
+            const fixedTransform =
+                usesCenterAnchor
+                    ? 'translate3d(-50%, 0, 0)'
+                    : 'translate3d(0, 0, 0)'
+
+            const transform =
+                props.visual
+                    .fixedTransform ??
+                fixedTransform
+
+            return {
+                position:
+                    'fixed',
+
+                top:
+                    `${box.top}px`,
+
+                left:
+                    fixedLeft,
+
+                width:
+                    `${box.width}px`,
+
+                height:
+                    `${box.height}px`,
+
+                maxWidth:
+                    'none',
+
+                minHeight:
+                    '0',
+
+                margin:
+                    '0',
+
+                transform,
+
+                transformOrigin:
+                    fixedTransformOrigin,
+
+                opacity:
+                    props.visual.opacity,
+
+                visibility:
+                    props.visual
+                        .visibility ??
+                    'visible',
+
+                zIndex:
+                    props.visual.zIndex,
+
+                boxShadow:
+                    CARD_SHADOW,
+
+                borderRadius:
+                    `${props.visual.borderRadius}px`,
+
+                overflow:
+                    'hidden',
+
+                transitionProperty:
+                    fixedTransitionProperty,
+
+                transitionDuration:
+                    `${transitionDuration.value}ms`,
+
+                transitionTimingFunction:
+                    fixedTimingFunction,
+
+                willChange:
+                    fixedWillChange
+            }
+        }
+
+        /*
+         * Expanded page.
+         */
+        if (
+            props.visual.isOpen
+        ) {
+            return {
+                position:
+                    'relative',
+
+                width:
+                    props.visual.width,
+
+                height:
+                    props.visual.height,
+
+                minHeight:
+                    props.visual
+                        .minHeight ??
+                    props.visual.height,
+
+                maxWidth:
+                    'none',
+
+                marginInline:
+                    'auto',
+
+                transform: [
+                    `translate3d(0, ${props.visual.y}px, 0)`,
+
+                    `rotate(${props.visual.rotateDeg ?? 0}deg)`,
+
+                    `scale(${props.visual.scale})`
+                ].join(' '),
+
+                transformOrigin:
+                    'center top',
+
+                opacity:
+                    props.visual.opacity,
+
+                visibility:
+                    props.visual
+                        .visibility ??
+                    'visible',
+
+                zIndex:
+                    props.visual.zIndex,
+
+                boxShadow:
+                    CARD_SHADOW,
+
+                borderRadius:
+                    `${props.visual.borderRadius}px`,
+
+                overflow:
+                    'visible',
+
+                transitionProperty: [
+                    'transform',
+                    'border-radius',
+                    'box-shadow'
+                ].join(', '),
+
+                transitionDuration:
+                    `${transitionDuration.value}ms`,
+
+                transitionTimingFunction:
+                    'cubic-bezier(0.22, 1, 0.36, 1)'
+            }
+        }
+
+        /*
+         * Stack / preview mode.
+         */
+
+        const stackPlayX =
+            isPreviewMode.value &&
+            props.visual.interactive
+                ? stackDragX.value
+                : 0
+
+        const stackPlayY =
+            isPreviewMode.value &&
+            props.visual.interactive
+                ? stackDragY.value
+                : 0
+
+        /*
+         * Rotation exists ONLY while the
+         * user is physically dragging
+         * the card sideways.
+         *
+         * Resting cards always have 0deg.
+         */
+        const stackPlayRotate =
+            isPreviewMode.value &&
+            props.visual.interactive
+                ? stackDragRotate.value
+                : 0
+
+        return {
+            '--scroll-x':
+                '0px',
+
+            '--scroll-y':
+                '0px',
+
+            '--scroll-rotate':
+                '0deg',
+
+            '--scroll-scale':
+                '1',
+
+            position:
+                'absolute',
+
+            top:
+                '0',
+
+            left:
+                '50%',
+
+            width:
+                props.visual.width,
+
+            height:
+                props.visual.height,
+
+            transform: [
+                /*
+                 * Existing horizontal centering.
+                 */
+                'translate3d(-50%, 0, 0)',
+
+                /*
+                 * Direct user card drag.
+                 */
+                `translate3d(${stackPlayX}px, ${stackPlayY}px, 0)`,
+
+                /*
+                 * Existing stack layout.
+                 */
                 `translate3d(0, ${props.visual.y}px, 0)`,
-                `rotate(${props.visual.rotateDeg ?? 0}deg)`,
-                `scale(${props.visual.scale})`
+
+                /*
+                 * Shared vertical scroll inertia.
+                 */
+                'translate3d(0, var(--scroll-y, 0px), 0)',
+
+                /*
+                 * Only direct pointer drag can
+                 * rotate a PageCard.
+                 */
+                `rotate(${stackPlayRotate}deg)`,
+
+                /*
+                 * Existing stack depth scale.
+                 */
+                `scale(${props.visual.scale ?? 1})`,
+
+                /*
+                 * Very subtle physical compression.
+                 */
+                'scale(var(--scroll-scale, 1))'
             ].join(' '),
-            transformOrigin: 'center top',
-            opacity: props.visual.opacity,
+
+            transformOrigin:
+                'center top',
+
+            opacity:
+                props.visual.opacity,
+
             visibility:
-                props.visual.visibility ??
+                props.visual
+                    .visibility ??
                 'visible',
-            zIndex: props.visual.zIndex,
-            boxShadow: CARD_SHADOW,
+
+            zIndex:
+                props.visual.zIndex,
+
+            boxShadow:
+                CARD_SHADOW,
+
             borderRadius:
                 `${props.visual.borderRadius}px`,
-            overflow: 'visible',
+
+            overflow:
+                'hidden',
+
             transitionProperty: [
                 'transform',
-                'border-radius',
-                'box-shadow'
+                'opacity',
+                'box-shadow',
+                'border-radius'
             ].join(', '),
+
             transitionDuration:
                 `${transitionDuration.value}ms`,
+
             transitionTimingFunction:
                 'cubic-bezier(0.22, 1, 0.36, 1)'
         }
-    }
-
-    const hoverTiltDeg =
-        isPreviewMode.value &&
-        previewEffectsReady.value &&
-        isHovered.value
-            ? -0.7
-            : 0
-
-    const stackPlayX =
-        isPreviewMode.value &&
-        props.visual.interactive
-            ? stackDragX.value
-            : 0
-
-    const stackPlayY =
-        isPreviewMode.value &&
-        props.visual.interactive
-            ? stackDragY.value
-            : 0
-
-    const stackPlayRotate =
-        isPreviewMode.value &&
-        props.visual.interactive
-            ? stackDragRotate.value
-            : 0
-
-    const stackedRotate =
-        stackPlayRotate + hoverTiltDeg
-
-    return {
-        position: 'absolute',
-        top: '0',
-        left: '50%',
-        width: props.visual.width,
-        height: props.visual.height,
-        transform: [
-            'translate3d(-50%, 0, 0)',
-            `translate3d(${stackPlayX}px, ${stackPlayY}px, 0)`,
-            `translate3d(0, ${props.visual.y}px, 0)`,
-            `rotate(${stackedRotate}deg)`,
-            `scale(${props.visual.scale ?? 1})`
-        ].join(' '),
-        transformOrigin: 'center top',
-        opacity: props.visual.opacity,
-        visibility:
-            props.visual.visibility ??
-            'visible',
-        zIndex: props.visual.zIndex,
-        boxShadow: CARD_SHADOW,
-        borderRadius:
-            `${props.visual.borderRadius}px`,
-        overflow: 'hidden',
-        transitionProperty: [
-            'transform',
-            'opacity',
-            'box-shadow',
-            'border-radius'
-        ].join(', '),
-        transitionDuration:
-            `${transitionDuration.value}ms`,
-        transitionTimingFunction:
-            'cubic-bezier(0.22, 1, 0.36, 1)'
-    }
-})
-
-const cardClass = computed(() => {
-    return {
-        'pointer-events-none':
-            !props.visual.interactive,
-
-        'is-expanded':
-            props.visual.isOpen,
-
-        'will-change-transform': true,
-
-        'rounded-[2rem]': true,
-
-        'touch-none':
-            isPreviewMode.value &&
-            props.visual.interactive,
-
-        'cursor-grab':
-            isPreviewMode.value &&
-            props.visual.interactive,
-
-        'cursor-grabbing':
-            props.visual.isDragging ||
-            isStackDragActive.value
-    }
-})
-
-function emitCardElementChange(element) {
-    emit('card-element-change', {
-        cardId: props.card.id,
-        element
     })
-}
 
-onMounted(() => {
-    emitCardElementChange(
-        rootElementRef.value
+const cardClass =
+    computed(() => {
+        return {
+            'pointer-events-none':
+                !props.visual.interactive,
+
+            'is-expanded':
+                props.visual.isOpen,
+
+            'will-change-transform':
+                true,
+
+            'rounded-[2rem]':
+                true,
+
+            'touch-none':
+                isPreviewMode.value &&
+                props.visual.interactive,
+
+            'cursor-grab':
+                isPreviewMode.value &&
+                props.visual.interactive,
+
+            'cursor-grabbing':
+                props.visual.isDragging ||
+                isStackDragActive.value
+        }
+    })
+
+function setRootElement(
+    element
+) {
+    rootElementRef.value =
+        element
+
+    motionRoot.value =
+        element
+
+    emit(
+        'card-element-change',
+        {
+            cardId:
+                props.card.id,
+
+            element
+        }
     )
-})
-
-onUnmounted(() => {
-    emitCardElementChange(null)
-})
+}
 
 watch(
     () => [
@@ -343,6 +616,7 @@ watch(
         usesFixedTransitionBox.value,
         previewEffectsReady.value
     ],
+
     (
         [
             isPreview,
@@ -355,7 +629,22 @@ watch(
             isFixedTransition ||
             !effectsReady
         ) {
-            isHovered.value = false
+            /*
+             * If state changes during a
+             * manual drag, remove the
+             * temporary pointer transform.
+             */
+            stackDragX.value =
+                0
+
+            stackDragY.value =
+                0
+
+            stackDragRotate.value =
+                0
+
+            isStackDragActive.value =
+                false
         }
     }
 )
@@ -368,50 +657,78 @@ function activateCard() {
 }
 
 function handleClick() {
-    if (suppressPreviewActivate.value) {
-        suppressPreviewActivate.value = false
+    if (
+        suppressPreviewActivate.value
+    ) {
+        suppressPreviewActivate.value =
+            false
+
         return
     }
 
-    if (!isPreviewMode.value) {
+    if (
+        !isPreviewMode.value
+    ) {
         return
     }
 
     activateCard()
 }
 
-function onKeydown(event) {
-    if (!isPreviewMode.value) {
+function onKeydown(
+    event
+) {
+    if (
+        !isPreviewMode.value
+    ) {
         return
     }
 
     if (
-        event.key === 'Enter' ||
-        event.key === ' '
+        event.key ===
+            'Enter' ||
+        event.key ===
+            ' '
     ) {
         event.preventDefault()
+
         activateCard()
     }
 }
 
 function onMenuControlClick() {
-    if (topBarPointerMoved.value) {
-        topBarPointerMoved.value = false
+    if (
+        topBarPointerMoved.value
+    ) {
+        topBarPointerMoved.value =
+            false
+
         return
     }
 
-    if (isPreviewMode.value) {
+    if (
+        isPreviewMode.value
+    ) {
         activateCard()
+
         return
     }
 
-    if (isMenuActionReady.value) {
-        emit('minimize')
+    if (
+        isMenuActionReady.value
+    ) {
+        emit(
+            'minimize'
+        )
     }
 }
 
-function onTopBarPointerDown(event) {
-    if (!props.visual.isOpen) {
+function onTopBarPointerDown(
+    event
+) {
+    if (
+        !props.visual.isOpen
+    ) {
         return
     }
 
@@ -424,14 +741,16 @@ function onTopBarPointerDown(event) {
     topBarPointerStartY.value =
         event.clientY
 
-    topBarPointerMoved.value = false
+    topBarPointerMoved.value =
+        false
 
     try {
-        event.currentTarget?.setPointerCapture?.(
-            event.pointerId
-        )
+        event.currentTarget
+            ?.setPointerCapture?.(
+                event.pointerId
+            )
     } catch {
-        // Pointer capture is optional.
+        //
     }
 
     emit(
@@ -440,7 +759,9 @@ function onTopBarPointerDown(event) {
     )
 }
 
-function onTopBarPointerMove(event) {
+function onTopBarPointerMove(
+    event
+) {
     if (
         !props.visual.isOpen ||
         topBarPointerId.value !==
@@ -458,10 +779,17 @@ function onTopBarPointerMove(event) {
         topBarPointerStartY.value
 
     if (
-        Math.abs(distanceX) > 5 ||
-        Math.abs(distanceY) > 5
+        Math.abs(
+            distanceX
+        ) >
+            5 ||
+        Math.abs(
+            distanceY
+        ) >
+            5
     ) {
-        topBarPointerMoved.value = true
+        topBarPointerMoved.value =
+            true
     }
 
     emit(
@@ -470,7 +798,9 @@ function onTopBarPointerMove(event) {
     )
 }
 
-function onTopBarPointerUp(event) {
+function onTopBarPointerUp(
+    event
+) {
     if (
         !props.visual.isOpen ||
         topBarPointerId.value !==
@@ -480,11 +810,12 @@ function onTopBarPointerUp(event) {
     }
 
     try {
-        event.currentTarget?.releasePointerCapture?.(
-            event.pointerId
-        )
+        event.currentTarget
+            ?.releasePointerCapture?.(
+                event.pointerId
+            )
     } catch {
-        // Pointer capture might not exist.
+        //
     }
 
     emit(
@@ -492,10 +823,13 @@ function onTopBarPointerUp(event) {
         event
     )
 
-    topBarPointerId.value = null
+    topBarPointerId.value =
+        null
 }
 
-function onTopBarPointerCancel(event) {
+function onTopBarPointerCancel(
+    event
+) {
     if (
         !props.visual.isOpen ||
         topBarPointerId.value !==
@@ -509,11 +843,16 @@ function onTopBarPointerCancel(event) {
         event
     )
 
-    topBarPointerId.value = null
-    topBarPointerMoved.value = false
+    topBarPointerId.value =
+        null
+
+    topBarPointerMoved.value =
+        false
 }
 
-function shouldIgnoreCardDragStart(target) {
+function shouldIgnoreCardDragStart(
+    target
+) {
     return Boolean(
         target?.closest?.(
             [
@@ -529,9 +868,14 @@ function shouldIgnoreCardDragStart(target) {
     )
 }
 
-function beginStackDrag(event) {
-    isStackDragActive.value = true
-    suppressPreviewActivate.value = false
+function beginStackDrag(
+    event
+) {
+    isStackDragActive.value =
+        true
+
+    suppressPreviewActivate.value =
+        false
 
     stackDragPointerId =
         event.pointerId
@@ -548,11 +892,13 @@ function beginStackDrag(event) {
                 event.pointerId
             )
     } catch {
-        // Pointer capture is optional.
+        //
     }
 }
 
-function updateStackDrag(event) {
+function updateStackDrag(
+    event
+) {
     if (
         !isStackDragActive.value ||
         event.pointerId !==
@@ -569,15 +915,23 @@ function updateStackDrag(event) {
         event.clientY -
         stackDragStartY
 
-    const clampedX = Math.max(
-        -34,
-        Math.min(34, rawX)
-    )
+    const clampedX =
+        Math.max(
+            -34,
+            Math.min(
+                34,
+                rawX
+            )
+        )
 
-    const clampedY = Math.max(
-        -24,
-        Math.min(24, rawY)
-    )
+    const clampedY =
+        Math.max(
+            -24,
+            Math.min(
+                24,
+                rawY
+            )
+        )
 
     stackDragX.value =
         clampedX
@@ -585,18 +939,32 @@ function updateStackDrag(event) {
     stackDragY.value =
         clampedY
 
+    /*
+     * Rotation only happens while the
+     * user directly pulls sideways.
+     */
     stackDragRotate.value =
-        clampedX * 0.08
+        clampedX *
+        0.08
 
     if (
-        Math.abs(clampedX) > 4 ||
-        Math.abs(clampedY) > 4
+        Math.abs(
+            clampedX
+        ) >
+            4 ||
+        Math.abs(
+            clampedY
+        ) >
+            4
     ) {
-        suppressPreviewActivate.value = true
+        suppressPreviewActivate.value =
+            true
     }
 }
 
-function endStackDrag(event) {
+function endStackDrag(
+    event
+) {
     if (
         !isStackDragActive.value ||
         event.pointerId !==
@@ -611,19 +979,28 @@ function endStackDrag(event) {
                 event.pointerId
             )
     } catch {
-        // Pointer capture might not exist.
+        //
     }
 
-    isStackDragActive.value = false
+    isStackDragActive.value =
+        false
 
-    stackDragX.value = 0
-    stackDragY.value = 0
-    stackDragRotate.value = 0
+    stackDragX.value =
+        0
 
-    stackDragPointerId = null
+    stackDragY.value =
+        0
+
+    stackDragRotate.value =
+        0
+
+    stackDragPointerId =
+        null
 }
 
-function onCardPointerDown(event) {
+function onCardPointerDown(
+    event
+) {
     if (
         shouldIgnoreCardDragStart(
             event.target
@@ -636,29 +1013,51 @@ function onCardPointerDown(event) {
         isPreviewMode.value &&
         props.visual.interactive
     ) {
-        beginStackDrag(event)
+        beginStackDrag(
+            event
+        )
     }
 }
 
-function onCardPointerMove(event) {
-    if (isStackDragActive.value) {
-        updateStackDrag(event)
+function onCardPointerMove(
+    event
+) {
+    if (
+        isStackDragActive.value
+    ) {
+        updateStackDrag(
+            event
+        )
     }
 }
 
-function onCardPointerUp(event) {
-    if (isStackDragActive.value) {
-        endStackDrag(event)
+function onCardPointerUp(
+    event
+) {
+    if (
+        isStackDragActive.value
+    ) {
+        endStackDrag(
+            event
+        )
     }
 }
 
-function onCardPointerCancel(event) {
-    if (isStackDragActive.value) {
-        endStackDrag(event)
+function onCardPointerCancel(
+    event
+) {
+    if (
+        isStackDragActive.value
+    ) {
+        endStackDrag(
+            event
+        )
     }
 }
 
-function onTransitionEnd(event) {
+function onTransitionEnd(
+    event
+) {
     if (
         event.target !==
         event.currentTarget
@@ -671,33 +1070,79 @@ function onTransitionEnd(event) {
         event
     )
 }
-
-function onMouseEnter() {
-    if (
-        !isPreviewMode.value ||
-        !previewEffectsReady.value
-    ) {
-        return
-    }
-
-    isHovered.value = true
-}
-
-function onMouseLeave() {
-    isHovered.value = false
-}
 </script>
 
 <template>
     <article
-        ref="rootElementRef"
+        :ref="
+            setRootElement
+        "
         class="
             page-card
             bg-green
             text-baige
         "
-        :class="cardClass"
-        :style="cardStyle"
+        :class="
+            cardClass
+        "
+        :style="
+            cardStyle
+        "
+        :data-page-card-scroll-motion="
+            usesScrollMotion
+                ? 'true'
+                : undefined
+        "
+        :data-motion-seed="
+            usesScrollMotion
+                ? scrollMotionSeed
+                : undefined
+        "
+        :data-base-rotation="
+            usesScrollMotion
+                ? 0
+                : undefined
+        "
+        :data-rotation-mode="
+            usesScrollMotion
+                ? 'absolute'
+                : undefined
+        "
+        :data-motion-strength="
+            usesScrollMotion
+                ? 1
+                : undefined
+        "
+        :data-straighten-strength="
+            usesScrollMotion
+                ? 0
+                : undefined
+        "
+        :data-max-y="
+            usesScrollMotion
+                ? 36
+                : undefined
+        "
+        :data-max-scale="
+            usesScrollMotion
+                ? 0.003
+                : undefined
+        "
+        :data-position-response="
+            usesScrollMotion
+                ? 0.145
+                : undefined
+        "
+        :data-rotation-response="
+            usesScrollMotion
+                ? 0.145
+                : undefined
+        "
+        :data-scale-response="
+            usesScrollMotion
+                ? 0.145
+                : undefined
+        "
         :aria-current="
             visual.isOpen
                 ? 'page'
@@ -715,17 +1160,33 @@ function onMouseLeave() {
                 ? 'button'
                 : undefined
         "
-        @click="handleClick"
-        @keydown="onKeydown"
-        @pointerdown="onCardPointerDown"
-        @pointermove="onCardPointerMove"
-        @pointerup="onCardPointerUp"
-        @pointercancel="onCardPointerCancel"
-        @mouseenter="onMouseEnter"
-        @mouseleave="onMouseLeave"
-        @transitionend="onTransitionEnd"
+        @click="
+            handleClick
+        "
+        @keydown="
+            onKeydown
+        "
+        @pointerdown="
+            onCardPointerDown
+        "
+        @pointermove="
+            onCardPointerMove
+        "
+        @pointerup="
+            onCardPointerUp
+        "
+        @pointercancel="
+            onCardPointerCancel
+        "
+        @transitionend="
+            onTransitionEnd
+        "
     >
-        <div :class="contentContainerClass">
+        <div
+            :class="
+                contentContainerClass
+            "
+        >
             <div
                 class="
                     relative
@@ -748,21 +1209,29 @@ function onMouseLeave() {
                         visual.isDragging
                 }"
                 aria-label="Potiahnutím nadol minimalizovať stránku"
-                @pointerdown.stop="onTopBarPointerDown"
-                @pointermove.stop="onTopBarPointerMove"
-                @pointerup.stop="onTopBarPointerUp"
-                @pointercancel.stop="onTopBarPointerCancel"
+                @pointerdown.stop="
+                    onTopBarPointerDown
+                "
+                @pointermove.stop="
+                    onTopBarPointerMove
+                "
+                @pointerup.stop="
+                    onTopBarPointerUp
+                "
+                @pointercancel.stop="
+                    onTopBarPointerCancel
+                "
             >
                 <button
                     type="button"
                     class="
-                        cursor-pointer
                         page-card-menu
                         relative
                         z-10
                         inline-flex
                         min-h-11
                         max-w-full
+                        cursor-pointer
                         items-center
                         justify-end
                         px-4
@@ -773,7 +1242,9 @@ function onMouseLeave() {
                         transition-[transform]
                         duration-300
                         ease-[cubic-bezier(0.16,1,0.3,1)]
+
                         active:scale-[0.98]
+
                         focus-visible:ring-2
                         focus-visible:ring-baige
                         focus-visible:ring-offset-2
@@ -787,7 +1258,9 @@ function onMouseLeave() {
                             visual.isOpen &&
                             !isMenuActionReady
                     }"
-                    :style="menuControlStyle"
+                    :style="
+                        menuControlStyle
+                    "
                     :aria-label="
                         isMenuMorphOpen
                             ? 'Otvoriť hlavné menu'
@@ -796,7 +1269,9 @@ function onMouseLeave() {
                     @pointerdown.stop
                     @pointerup.stop
                     @pointercancel.stop
-                    @click.stop="onMenuControlClick"
+                    @click.stop="
+                        onMenuControlClick
+                    "
                 >
                     <span
                         class="
@@ -814,10 +1289,10 @@ function onMouseLeave() {
                             class="
                                 page-card-menu__label
                                 page-card-menu__label--card
+                                text-regular
                                 col-start-1
                                 row-start-1
                                 whitespace-nowrap
-                                text-regular
                                 font-bold
                             "
                         >
@@ -828,10 +1303,10 @@ function onMouseLeave() {
                             class="
                                 page-card-menu__label
                                 page-card-menu__label--menu
+                                text-regular
                                 col-start-1
                                 row-start-1
                                 whitespace-nowrap
-                                text-regular
                                 font-bold
                             "
                         >
@@ -840,7 +1315,9 @@ function onMouseLeave() {
                     </span>
 
                     <span
-                        class="page-card-menu__icon"
+                        class="
+                            page-card-menu__icon
+                        "
                         aria-hidden="true"
                     >
                         <span
@@ -861,8 +1338,12 @@ function onMouseLeave() {
             </div>
 
             <component
-                :is="card.component"
-                :expanded="true"
+                :is="
+                    card.component
+                "
+                :expanded="
+                    true
+                "
             />
         </div>
     </article>
@@ -870,16 +1351,28 @@ function onMouseLeave() {
 
 <style scoped>
 .page-card-menu__text-window {
-    width: max-content;
+    width:
+        max-content;
 }
 
 .page-card-menu__label {
-    display: block;
-    min-width: max-content;
-    text-align: right;
+    display:
+        block;
+
+    min-width:
+        max-content;
+
+    text-align:
+        right;
 
     transition:
-        transform 620ms cubic-bezier(0.16, 1, 0.3, 1),
+        transform 620ms
+            cubic-bezier(
+                0.16,
+                1,
+                0.3,
+                1
+            ),
         opacity 320ms ease;
 
     will-change:
@@ -888,46 +1381,85 @@ function onMouseLeave() {
 }
 
 .page-card-menu__label--card {
-    opacity: 1;
+    opacity:
+        1;
 
     transform:
-        translate3d(0, 0, 0);
+        translate3d(
+            0,
+            0,
+            0
+        );
 }
 
 .page-card-menu__label--menu {
-    opacity: 0;
+    opacity:
+        0;
 
     transform:
-        translate3d(8px, 115%, 0);
+        translate3d(
+            8px,
+            115%,
+            0
+        );
 }
 
 .page-card-menu--open
 .page-card-menu__label--card {
-    opacity: 0;
+    opacity:
+        0;
 
     transform:
-        translate3d(-8px, -115%, 0);
+        translate3d(
+            -8px,
+            -115%,
+            0
+        );
 }
 
 .page-card-menu--open
 .page-card-menu__label--menu {
-    opacity: 1;
+    opacity:
+        1;
 
     transform:
-        translate3d(0, 0, 0);
+        translate3d(
+            0,
+            0,
+            0
+        );
 }
 
 .page-card-menu__icon {
-    position: relative;
-    display: block;
-    width: 2px;
-    height: 20px;
-    margin-left: 12px;
-    flex-shrink: 0;
-    overflow: visible;
+    position:
+        relative;
+
+    display:
+        block;
+
+    width:
+        2px;
+
+    height:
+        20px;
+
+    margin-left:
+        12px;
+
+    flex-shrink:
+        0;
+
+    overflow:
+        visible;
 
     transition:
-        width 660ms cubic-bezier(0.16, 1, 0.3, 1);
+        width 660ms
+            cubic-bezier(
+                0.16,
+                1,
+                0.3,
+                1
+            );
 
     will-change:
         width;
@@ -935,22 +1467,46 @@ function onMouseLeave() {
 
 .page-card-menu--open
 .page-card-menu__icon {
-    width: 16px;
+    width:
+        16px;
 }
 
 .page-card-menu__line {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    display: block;
-    width: 16px;
-    height: 2px;
-    border-radius: 9999px;
-    background: currentColor;
-    transform-origin: center;
+    position:
+        absolute;
+
+    top:
+        50%;
+
+    left:
+        50%;
+
+    display:
+        block;
+
+    width:
+        16px;
+
+    height:
+        2px;
+
+    border-radius:
+        9999px;
+
+    background:
+        currentColor;
+
+    transform-origin:
+        center;
 
     transition:
-        transform 660ms cubic-bezier(0.16, 1, 0.3, 1),
+        transform 660ms
+            cubic-bezier(
+                0.16,
+                1,
+                0.3,
+                1
+            ),
         opacity 300ms ease;
 
     will-change:
@@ -960,16 +1516,25 @@ function onMouseLeave() {
 
 .page-card-menu__line--primary {
     transform:
-        translate3d(-50%, -50%, 0)
+        translate3d(
+            -50%,
+            -50%,
+            0
+        )
         rotate(90deg)
         scaleX(1);
 }
 
 .page-card-menu__line--secondary {
-    opacity: 0;
+    opacity:
+        0;
 
     transform:
-        translate3d(-50%, -50%, 0)
+        translate3d(
+            -50%,
+            -50%,
+            0
+        )
         rotate(0deg)
         scaleX(0);
 }
@@ -977,27 +1542,40 @@ function onMouseLeave() {
 .page-card-menu--open
 .page-card-menu__line--primary {
     transform:
-        translate3d(-50%, -4px, 0)
+        translate3d(
+            -50%,
+            -4px,
+            0
+        )
         rotate(0deg)
         scaleX(1);
 }
 
 .page-card-menu--open
 .page-card-menu__line--secondary {
-    opacity: 1;
+    opacity:
+        1;
 
     transform:
-        translate3d(-50%, 4px, 0)
+        translate3d(
+            -50%,
+            4px,
+            0
+        )
         rotate(0deg)
         scaleX(1);
 }
 
-@media (prefers-reduced-motion: reduce) {
+@media (
+    prefers-reduced-motion:
+    reduce
+) {
     .page-card-menu,
     .page-card-menu__label,
     .page-card-menu__icon,
     .page-card-menu__line {
-        transition-duration: 0ms !important;
+        transition-duration:
+            0ms !important;
     }
 }
 </style>

@@ -743,10 +743,10 @@ onBeforeUnmount(() => {
                     gap-8
                     pt-5
 
-                    lg:min-h-[36rem]
-                    lg:grid-cols-2
-                    lg:gap-12
-                    lg:px-10
+                    md:min-h-[36rem]
+                    md:grid-cols-3
+                    md:gap-12
+                    md:px-10
 
                     xl:gap-20
                     xl:px-16
@@ -761,8 +761,9 @@ onBeforeUnmount(() => {
                         gap-3
                         text-center
 
-                        lg:items-start
-                        lg:text-left
+                        md:items-start
+                        md:text-left
+                        md:col-span-2
                     "
                 >
                     <h1
@@ -795,10 +796,10 @@ onBeforeUnmount(() => {
                                         heroPhrase
                                     "
                                     class="
-                                        col-start-1
-                                        row-start-1
-                                        inline-block
-                                        whitespace-nowrap
+                        col-start-1
+                        row-start-1
+                        inline-block
+                        whitespace-nowrap
                                     "
                                 >
                                     {{ heroPhrase }}
@@ -815,7 +816,7 @@ onBeforeUnmount(() => {
                             pb-6
                             text-baige/70
 
-                            lg:px-0
+                            md:px-0
                         "
                     >
                         Pomáhame deťom, dospelým aj rodinám
@@ -829,7 +830,7 @@ onBeforeUnmount(() => {
                             px-10
                             text-baige/70
 
-                            lg:px-0
+                            md:px-0
                         "
                     >
                         {{
@@ -862,10 +863,6 @@ onBeforeUnmount(() => {
 
                             lg:w-full
                             lg:max-w-[42rem]
-                        "
-                        style="
-                            width: 180vw;
-                            max-width: none;
                         "
                     >
                 </div>
@@ -1461,17 +1458,6 @@ onBeforeUnmount(() => {
                         text-color="#335940"
                     >
                         Kontaktujte nás
-                    </Button>
-
-                    <Button
-                        :href="
-                            servicesUrl
-                        "
-                        background-image=""
-                        background-color="#FBF9F3"
-                        text-color="#335940"
-                    >
-                        Ponúkané služby
                     </Button>
                 </div>
             </section>

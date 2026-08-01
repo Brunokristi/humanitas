@@ -187,12 +187,12 @@ const ambulances = [
         nameClass: [
             'text-[#BB5264]'
         ],
-        href: 'https://humanitas.sk'
+        href: 'https://klinickapsychologialucenec.sk'
     },
     {
         name: 'Humanitas',
         logo: '/images/humanitas_logo.png',
-        href: 'https://humanitas.sk'
+        href: 'https://klinickapsychologiars.sk'
     }
 ];
 
@@ -314,7 +314,7 @@ function openingHoursSchedule(entry) {
             bg-baige
             px-6
             pb-4
-            pt-20
+            pt-5
             text-green
 
             sm:pt-10
@@ -337,11 +337,8 @@ function openingHoursSchedule(entry) {
                 max-w-none
                 opacity-[0.2]
 
-                sm:bottom-[-6rem]
-                sm:w-[115%]
-
-                lg:bottom-[-9rem]
-                lg:w-[80%]
+                sm:bottom-[-9rem]
+                sm:w-[60%]
             "
         >
 
@@ -361,7 +358,7 @@ function openingHoursSchedule(entry) {
                     grid-cols-1
                     gap-x-12
                     gap-y-14
-                    pt-14
+                    pt-5
 
                     sm:justify-items-center
                     sm:pt-16

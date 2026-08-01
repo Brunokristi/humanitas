@@ -44,7 +44,22 @@ const form = reactive({
     sender_name: '',
     sender_email: '',
     sender_phone: '',
-    body: ''
+    body: '',
+
+    /*
+     * Honeypot.
+     *
+     * Real users never see this field.
+     */
+    website: '',
+
+    /*
+     * Used for basic bot timing protection.
+     */
+    form_started_at:
+        Math.floor(
+            Date.now() / 1000
+        )
 });
 
 const formErrors = reactive({
@@ -61,6 +76,9 @@ const submittedSuccessfully =
     ref(false);
 
 const submitError =
+    ref(null);
+
+const messageTextarea =
     ref(null);
 
 /*
@@ -81,16 +99,6 @@ const branch = computed(() => {
 const company = computed(() => {
     return (
         apiData.value?.company ??
-        null
-    );
-});
-
-const publicSite = computed(() => {
-    return (
-        apiData.value?.publicSite ??
-        apiData.value?.public_site ??
-        branch.value?.publicSite ??
-        branch.value?.public_site ??
         null
     );
 });
@@ -297,40 +305,11 @@ const openingHours = computed(() => {
 });
 
 /*
- * Contact form endpoint
+ * Contact endpoint
  */
 
 const contactMessageUrl =
-    computed(() => {
-        return (
-            apiData.value
-                ?.contactMessageUrl ??
-            apiData.value
-                ?.contact_message_url ??
-            publicSite.value
-                ?.contactMessageUrl ??
-            publicSite.value
-                ?.contact_message_url ??
-            branch.value
-                ?.contactMessageUrl ??
-            branch.value
-                ?.contact_message_url ??
-            null
-        );
-    });
-
-const csrfToken = computed(() => {
-    return (
-        document
-            .querySelector(
-                'meta[name="csrf-token"]'
-            )
-            ?.getAttribute(
-                'content'
-            ) ??
-        null
-    );
-});
+    '/api/contact.php';
 
 /*
  * Contact helpers
@@ -742,7 +721,7 @@ function animateMessageSuggestion() {
 
         scheduleMessageSuggestionTick(
             20 +
-                Math.random() *
+            Math.random() *
                 25
         );
 
@@ -813,7 +792,43 @@ function sendAnotherMessage() {
     submittedSuccessfully.value =
         false;
 
+    form.form_started_at =
+        Math.floor(
+            Date.now() / 1000
+        );
+
     resetMessageSuggestionAnimation();
+}
+
+function resizeMessageTextarea() {
+    const textarea =
+        messageTextarea.value;
+
+    if (!textarea) {
+        return;
+    }
+
+    textarea.style.height =
+        'auto';
+
+    textarea.style.height =
+        `${textarea.scrollHeight}px`;
+}
+
+function resetMessageTextarea() {
+    window.requestAnimationFrame(
+        () => {
+            const textarea =
+                messageTextarea.value;
+
+            if (!textarea) {
+                return;
+            }
+
+            textarea.style.height =
+                'auto';
+        }
+    );
 }
 
 /*
@@ -841,6 +856,16 @@ function resetForm() {
 
     form.body =
         '';
+
+    form.website =
+        '';
+
+    form.form_started_at =
+        Math.floor(
+            Date.now() / 1000
+        );
+
+    resetMessageTextarea();
 }
 
 function applyValidationErrors(
@@ -860,15 +885,6 @@ function applyValidationErrors(
 }
 
 async function submit() {
-    if (
-        !contactMessageUrl.value
-    ) {
-        submitError.value =
-            'Odosielanie správ zatiaľ nie je nakonfigurované.';
-
-        return;
-    }
-
     resetFormErrors();
 
     submitError.value =
@@ -878,31 +894,20 @@ async function submit() {
         true;
 
     try {
-        const headers = {
-            Accept:
-                'application/json',
-
-            'Content-Type':
-                'application/json'
-        };
-
-        if (
-            csrfToken.value
-        ) {
-            headers[
-                'X-CSRF-TOKEN'
-            ] =
-                csrfToken.value;
-        }
-
         const response =
             await fetch(
-                contactMessageUrl.value,
+                contactMessageUrl,
                 {
                     method:
                         'POST',
 
-                    headers,
+                    headers: {
+                        Accept:
+                            'application/json',
+
+                        'Content-Type':
+                            'application/json'
+                    },
 
                     body:
                         JSON.stringify({
@@ -916,7 +921,13 @@ async function submit() {
                                 form.sender_phone,
 
                             body:
-                                form.body
+                                form.body,
+
+                            website:
+                                form.website,
+
+                            form_started_at:
+                                form.form_started_at
                         })
                 }
             );
@@ -940,7 +951,19 @@ async function submit() {
             return;
         }
 
-        if (!response.ok) {
+        if (
+            response.status ===
+            429
+        ) {
+            throw new Error(
+                responseData.message ??
+                'Odoslali ste príliš veľa správ. Skúste to neskôr.'
+            );
+        }
+
+        if (
+            !response.ok
+        ) {
             throw new Error(
                 responseData.message ??
                 'Správu sa nepodarilo odoslať.'
@@ -970,12 +993,14 @@ async function submit() {
 
 /*
  * Lifecycle
- *
- * Scroll motion lifecycle is handled
- * internally by useScrollMotion().
  */
 
 onMounted(() => {
+    form.form_started_at =
+        Math.floor(
+            Date.now() / 1000
+        );
+
     startMessageSuggestionAnimation();
 });
 
@@ -1324,10 +1349,45 @@ onBeforeUnmount(() => {
                         </div>
 
                         <form
+                            class="
+                                relative
+                            "
                             @submit.prevent="
                                 submit
                             "
                         >
+                            <!-- Honeypot -->
+                            <div
+                                class="
+                                    pointer-events-none
+                                    absolute
+                                    left-[-9999px]
+                                    top-[-9999px]
+                                    h-px
+                                    w-px
+                                    overflow-hidden
+                                    opacity-0
+                                "
+                                aria-hidden="true"
+                            >
+                                <label
+                                    for="contact-website"
+                                >
+                                    Webová stránka
+                                </label>
+
+                                <input
+                                    id="contact-website"
+                                    v-model="
+                                        form.website
+                                    "
+                                    type="text"
+                                    name="website"
+                                    tabindex="-1"
+                                    autocomplete="off"
+                                >
+                            </div>
+
                             <!-- Name -->
                             <div
                                 class="
@@ -1575,7 +1635,6 @@ onBeforeUnmount(() => {
                                     class="
                                         relative
                                         mt-2
-                                        min-h-[11rem]
                                     "
                                 >
                                     <!-- Animated suggestion -->
@@ -1615,21 +1674,20 @@ onBeforeUnmount(() => {
                                         </span>
                                     </div>
 
-                                    <!-- Actual textarea -->
                                     <textarea
                                         id="contact-message"
-                                        v-model="
-                                            form.body
-                                        "
-                                        rows="6"
+                                        ref="messageTextarea"
+                                        v-model="form.body"
+                                        rows="1"
                                         aria-label="Správa"
                                         class="
                                             text-regular
                                             relative
                                             z-0
-                                            min-h-[11rem]
                                             w-full
+                                            min-h-[5rem]
                                             resize-none
+                                            overflow-hidden
                                             border-0
                                             bg-transparent
                                             p-0
@@ -1643,6 +1701,9 @@ onBeforeUnmount(() => {
                                             Boolean(
                                                 formErrors.body
                                             )
+                                        "
+                                        @input="
+                                            resizeMessageTextarea
                                         "
                                         @focus="
                                             handleMessageFocus
@@ -1763,7 +1824,6 @@ onBeforeUnmount(() => {
                         </p>
                     </div>
 
-                    <!-- Contact cards -->
                     <div
                         v-if="
                             contacts.length
