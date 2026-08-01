@@ -1,9 +1,12 @@
 <script setup>
 import {
     computed,
+    nextTick,
     onBeforeUnmount,
     onMounted,
-    ref
+    reactive,
+    ref,
+    watch
 } from 'vue';
 
 import { storeToRefs } from 'pinia';
@@ -37,6 +40,7 @@ const {
  * Each .services-track acts as its own
  * independent scroll source.
  */
+
 const {
     motionRoot
 } = useScrollMotion({
@@ -76,8 +80,33 @@ const selectedService =
 const serviceDetailsOpen =
     ref(false);
 
+/*
+ * Category slider references
+ */
+
 const categoryTracks =
     new Map();
+
+const categoryTrackHandlers =
+    new Map();
+
+const categoryResizeObservers =
+    new Map();
+
+const categorySliderStates =
+    reactive({});
+
+const emptyCategorySliderState =
+    Object.freeze({
+        canScroll:
+            false,
+
+        canScrollLeft:
+            false,
+
+        canScrollRight:
+            false
+    });
 
 /*
  * Services
@@ -593,15 +622,13 @@ function handleSearchBlur() {
 function clearSearch() {
     searchTerm.value =
         '';
+
+    if (
+        !searchFocused.value
+    ) {
+        startSearchPlaceholderAnimation();
+    }
 }
-
-onMounted(() => {
-    startSearchPlaceholderAnimation();
-});
-
-onBeforeUnmount(() => {
-    stopSearchPlaceholderAnimation();
-});
 
 /*
  * Playful cards
@@ -783,15 +810,172 @@ function serviceBackgroundPosition(
 }
 
 /*
- * Category slider
+ * Dynamic category slider
  */
+
+function ensureCategorySliderState(
+    category
+) {
+    if (
+        !categorySliderStates[
+            category
+        ]
+    ) {
+        categorySliderStates[
+            category
+        ] = {
+            canScroll:
+                false,
+
+            canScrollLeft:
+                false,
+
+            canScrollRight:
+                false
+        };
+    }
+
+    return categorySliderStates[
+        category
+    ];
+}
+
+function categorySliderState(
+    category
+) {
+    return (
+        categorySliderStates[
+            category
+        ] ??
+        emptyCategorySliderState
+    );
+}
+
+function updateCategorySliderState(
+    category
+) {
+    const track =
+        categoryTracks.get(
+            category
+        );
+
+    const state =
+        ensureCategorySliderState(
+            category
+        );
+
+    if (!track) {
+        state.canScroll =
+            false;
+
+        state.canScrollLeft =
+            false;
+
+        state.canScrollRight =
+            false;
+
+        return;
+    }
+
+    const tolerance =
+        3;
+
+    const maximumScroll =
+        Math.max(
+            track.scrollWidth -
+                track.clientWidth,
+            0
+        );
+
+    state.canScroll =
+        maximumScroll >
+        tolerance;
+
+    state.canScrollLeft =
+        state.canScroll &&
+        track.scrollLeft >
+            tolerance;
+
+    state.canScrollRight =
+        state.canScroll &&
+        track.scrollLeft <
+            maximumScroll -
+                tolerance;
+}
+
+function removeCategoryTrackListeners(
+    category
+) {
+    const track =
+        categoryTracks.get(
+            category
+        );
+
+    const handler =
+        categoryTrackHandlers.get(
+            category
+        );
+
+    if (
+        track &&
+        handler
+    ) {
+        track.removeEventListener(
+            'scroll',
+            handler
+        );
+    }
+
+    categoryTrackHandlers.delete(
+        category
+    );
+
+    const observer =
+        categoryResizeObservers.get(
+            category
+        );
+
+    if (observer) {
+        observer.disconnect();
+
+        categoryResizeObservers.delete(
+            category
+        );
+    }
+}
 
 function setCategoryTrack(
     category,
     element
 ) {
+    const existingTrack =
+        categoryTracks.get(
+            category
+        );
+
+    if (
+        existingTrack ===
+        element
+    ) {
+        nextTick(() => {
+            updateCategorySliderState(
+                category
+            );
+        });
+
+        return;
+    }
+
+    removeCategoryTrackListeners(
+        category
+    );
+
     if (!element) {
         categoryTracks.delete(
+            category
+        );
+
+        updateCategorySliderState(
             category
         );
 
@@ -802,6 +986,59 @@ function setCategoryTrack(
         category,
         element
     );
+
+    const handleScroll =
+        () => {
+            updateCategorySliderState(
+                category
+            );
+        };
+
+    categoryTrackHandlers.set(
+        category,
+        handleScroll
+    );
+
+    element.addEventListener(
+        'scroll',
+        handleScroll,
+        {
+            passive: true
+        }
+    );
+
+    if (
+        typeof ResizeObserver !==
+        'undefined'
+    ) {
+        const resizeObserver =
+            new ResizeObserver(
+                () => {
+                    updateCategorySliderState(
+                        category
+                    );
+                }
+            );
+
+        resizeObserver.observe(
+            element
+        );
+
+        categoryResizeObservers.set(
+            category,
+            resizeObserver
+        );
+    }
+
+    nextTick(() => {
+        window.requestAnimationFrame(
+            () => {
+                updateCategorySliderState(
+                    category
+                );
+            }
+        );
+    });
 }
 
 function scrollCategory(
@@ -813,7 +1050,26 @@ function scrollCategory(
             category
         );
 
+    const state =
+        categorySliderState(
+            category
+        );
+
     if (!track) {
+        return;
+    }
+
+    if (
+        direction < 0 &&
+        !state.canScrollLeft
+    ) {
+        return;
+    }
+
+    if (
+        direction > 0 &&
+        !state.canScrollRight
+    ) {
         return;
     }
 
@@ -853,6 +1109,79 @@ function scrollCategory(
             'smooth'
     });
 }
+
+/*
+ * Watchers
+ */
+
+watch(
+    groupedServices,
+    async () => {
+        await nextTick();
+
+        window.requestAnimationFrame(
+            () => {
+                categoryTracks.forEach(
+                    (
+                        _,
+                        category
+                    ) => {
+                        updateCategorySliderState(
+                            category
+                        );
+                    }
+                );
+            }
+        );
+    },
+    {
+        deep: true
+    }
+);
+
+/*
+ * Lifecycle
+ */
+
+onMounted(() => {
+    startSearchPlaceholderAnimation();
+
+    nextTick(() => {
+        window.requestAnimationFrame(
+            () => {
+                categoryTracks.forEach(
+                    (
+                        _,
+                        category
+                    ) => {
+                        updateCategorySliderState(
+                            category
+                        );
+                    }
+                );
+            }
+        );
+    });
+});
+
+onBeforeUnmount(() => {
+    stopSearchPlaceholderAnimation();
+
+    categoryTracks.forEach(
+        (
+            _,
+            category
+        ) => {
+            removeCategoryTrackListeners(
+                category
+            );
+        }
+    );
+
+    categoryTracks.clear();
+    categoryTrackHandlers.clear();
+    categoryResizeObservers.clear();
+});
 </script>
 
 <template>
@@ -868,13 +1197,9 @@ function scrollCategory(
             class="
                 mx-auto
                 w-full
-                max-w-[100rem]
                 px-5
                 py-10
-
-                lg:px-10
-
-                xl:px-16
+                lg:px-15
             "
         >
             <div
@@ -1006,8 +1331,8 @@ function scrollCategory(
             class="
                 mx-auto
                 w-full
-                max-w-[100rem]
                 pt-5
+
             "
         >
             <!-- Hero -->
@@ -1028,9 +1353,6 @@ function scrollCategory(
                         flex-col
                         items-center
                         text-center
-
-                        lg:items-start
-                        lg:text-left
                     "
                 >
                     <div
@@ -1043,10 +1365,6 @@ function scrollCategory(
                                 text-xl
                                 font-bold
                                 text-baige
-
-                                lg:text-4xl
-
-                                xl:text-5xl
                             "
                         >
                             Ponúkané služby
@@ -1426,20 +1744,15 @@ function scrollCategory(
                     <div
                         class="
                             px-5
-
                             lg:px-10
-
-                            xl:px-16
                         "
                     >
                         <div
                             class="
                                 mx-auto
                                 flex
-                                max-w-7xl
-                                items-end
-                                justify-between
-                                gap-6
+                                items-center
+                                gap-10
                             "
                         >
                             <div
@@ -1462,10 +1775,6 @@ function scrollCategory(
                                         text-xl
                                         font-bold
                                         text-baige
-
-                                        lg:text-3xl
-
-                                        xl:text-4xl
                                     "
                                 >
                                     {{ group.label }}
@@ -1476,7 +1785,7 @@ function scrollCategory(
                                         text-regular
                                         mt-2
                                         text-sm
-                                        text-baige/55
+                                        text-baige/60
                                     "
                                 >
                                     {{
@@ -1495,11 +1804,12 @@ function scrollCategory(
                                 </p>
                             </div>
 
-                            <!-- Desktop controls -->
+                            <!-- Dynamic desktop controls -->
                             <div
                                 v-if="
-                                    group.services.length >
-                                    2
+                                    categorySliderState(
+                                        group.value
+                                    ).canScroll
                                 "
                                 class="
                                     hidden
@@ -1510,28 +1820,41 @@ function scrollCategory(
                                     md:flex
                                 "
                             >
-                                <button
+                                <!-- Previous -->
+                                <Button
                                     type="button"
-                                    class="
-                                        flex
-                                        size-11
-                                        items-center
-                                        justify-center
-                                        rounded-full
-                                        border
-                                        border-baige/20
-                                        text-baige
-                                        transition-all
-                                        duration-300
-
-                                        hover:-translate-y-0.5
-                                        hover:bg-baige
-                                        hover:text-green
-
-                                        active:scale-95
+                                    background-image=""
+                                    :background-color="
+                                        categorySliderState(
+                                            group.value
+                                        ).canScrollLeft
+                                            ? '#FBF9F3'
+                                            : 'transparent'
+                                    "
+                                    :text-color="
+                                        categorySliderState(
+                                            group.value
+                                        ).canScrollLeft
+                                            ? '#335940'
+                                            : '#FBF9F3'
+                                    "
+                                    :disabled="
+                                        !categorySliderState(
+                                            group.value
+                                        ).canScrollLeft
                                     "
                                     :aria-label="
                                         `Predchádzajúce služby v kategórii ${group.label}`
+                                    "
+                                    class="
+                                        flex
+                                        size-11
+                                        min-h-0
+                                        min-w-0
+                                        shrink-0
+                                        items-center
+                                        justify-center
+                                        p-0
                                     "
                                     @click="
                                         scrollCategory(
@@ -1544,32 +1867,47 @@ function scrollCategory(
                                         class="
                                             bi
                                             bi-arrow-left
+                                            text-base
                                         "
                                         aria-hidden="true"
                                     />
-                                </button>
+                                </Button>
 
-                                <button
+                                <!-- Next -->
+                                <Button
                                     type="button"
-                                    class="
-                                        flex
-                                        size-11
-                                        items-center
-                                        justify-center
-                                        rounded-full
-                                        bg-baige
-                                        text-green
-                                        shadow-[var(--shadow-soft)]
-                                        transition-all
-                                        duration-300
-
-                                        hover:-translate-y-0.5
-
-                                        active:translate-y-0
-                                        active:scale-95
+                                    background-image=""
+                                    :background-color="
+                                        categorySliderState(
+                                            group.value
+                                        ).canScrollRight
+                                            ? '#FBF9F3'
+                                            : 'transparent'
+                                    "
+                                    :text-color="
+                                        categorySliderState(
+                                            group.value
+                                        ).canScrollRight
+                                            ? '#335940'
+                                            : 'rgba(251, 249, 243, 0.25)'
+                                    "
+                                    :disabled="
+                                        !categorySliderState(
+                                            group.value
+                                        ).canScrollRight
                                     "
                                     :aria-label="
                                         `Ďalšie služby v kategórii ${group.label}`
+                                    "
+                                    class="
+                                        flex
+                                        size-11
+                                        min-h-0
+                                        min-w-0
+                                        shrink-0
+                                        items-center
+                                        justify-center
+                                        p-0
                                     "
                                     @click="
                                         scrollCategory(
@@ -1582,10 +1920,11 @@ function scrollCategory(
                                         class="
                                             bi
                                             bi-arrow-right
+                                            text-base
                                         "
                                         aria-hidden="true"
                                     />
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </div>
@@ -1608,23 +1947,20 @@ function scrollCategory(
                                 snap-x
                                 snap-mandatory
                                 items-start
-                                gap-3
+                                gap-5
                                 overflow-x-auto
                                 overscroll-x-contain
                                 scroll-smooth
-                                px-[8vw]
+                                px-5
                                 pb-14
                                 pt-5
 
-                                sm:gap-4
-                                sm:px-[10vw]
 
-                                lg:gap-5
-                                lg:px-[max(2.5rem,calc((100vw-90rem)/2))]
+                                lg:gap-8
                                 lg:pb-16
+                                lg:px-0
+                                lg:pl-10
                                 lg:pt-6
-
-                                xl:gap-6
                             "
                         >
                             <div
@@ -1680,14 +2016,7 @@ function scrollCategory(
                                     )
                                 "
                             >
-                                <!--
-                                    The outer element above keeps
-                                    the EXACT existing service-card
-                                    rotation and vertical offset.
-
-                                    This inner wrapper receives only
-                                    the horizontal motion response.
-                                -->
+                                <!-- Horizontal motion wrapper -->
                                 <div
                                     class="
                                         scroll-motion

@@ -283,12 +283,14 @@ const branchAddressLabel =
         return [
             address.line1,
             address.line2,
+
             [
                 address.postalCode,
                 address.city
             ]
                 .filter(Boolean)
                 .join(' '),
+
             address.country
         ]
             .filter(Boolean)
@@ -298,7 +300,8 @@ const branchAddressLabel =
 const faqItems = computed(() => {
     return [
         {
-            id: 'location',
+            id:
+                'location',
 
             question:
                 'Kde nás nájdete?',
@@ -310,7 +313,8 @@ const faqItems = computed(() => {
         },
 
         {
-            id: 'booking',
+            id:
+                'booking',
 
             question:
                 'Ako sa objednať?',
@@ -323,7 +327,8 @@ const faqItems = computed(() => {
         },
 
         {
-            id: 'opening-hours',
+            id:
+                'opening-hours',
 
             question:
                 'Kedy máme otvorené?',
@@ -411,7 +416,10 @@ function shuffleItems(items) {
         const randomIndex =
             Math.floor(
                 Math.random() *
-                    (index + 1)
+                    (
+                        index +
+                        1
+                    )
             );
 
         [
@@ -543,6 +551,7 @@ function employeeInitials(
     return [
         employee?.firstName
             ?.charAt(0),
+
         employee?.lastName
             ?.charAt(0)
     ]
@@ -618,7 +627,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div>
+    <div >
         <!-- Loading -->
         <div
             v-if="
@@ -727,8 +736,11 @@ onBeforeUnmount(() => {
             v-else
             class="
                 space-y-20
+                pb-12
+                overflow-x-hidden
 
                 lg:space-y-32
+                lg:pb-24
             "
         >
             <!-- Hero -->
@@ -743,10 +755,11 @@ onBeforeUnmount(() => {
                     gap-8
                     pt-5
 
-                    md:min-h-[36rem]
-                    md:grid-cols-3
-                    md:gap-12
-                    md:px-10
+                    lg:min-h-[36rem]
+                    lg:grid-cols-[minmax(0,0.9fr)_minmax(28rem,1.1fr)]
+                    lg:gap-14
+                    lg:px-10
+                    lg:pt-10
 
                     xl:gap-20
                     xl:px-16
@@ -761,15 +774,18 @@ onBeforeUnmount(() => {
                         gap-3
                         text-center
 
-                        md:items-start
-                        md:text-left
-                        md:col-span-2
+                        lg:items-start
+                        lg:text-left
                     "
                 >
                     <h1
                         class="
+                            max-w-2xl
                             text-xl
+                            leading-[1.08]
                             text-baige
+
+                            lg:text-3xl
                         "
                     >
                         <span>
@@ -782,7 +798,7 @@ onBeforeUnmount(() => {
                             class="
                                 relative
                                 inline-grid
-                                min-h-[1.5em]
+                                min-h-[1.35em]
                                 overflow-hidden
                                 align-top
                             "
@@ -796,10 +812,10 @@ onBeforeUnmount(() => {
                                         heroPhrase
                                     "
                                     class="
-                        col-start-1
-                        row-start-1
-                        inline-block
-                        whitespace-nowrap
+                                        col-start-1
+                                        row-start-1
+                                        inline-block
+                                        whitespace-nowrap
                                     "
                                 >
                                     {{ heroPhrase }}
@@ -816,7 +832,8 @@ onBeforeUnmount(() => {
                             pb-6
                             text-baige/70
 
-                            md:px-0
+                            lg:px-0
+                            lg:text-lg
                         "
                     >
                         Pomáhame deťom, dospelým aj rodinám
@@ -830,7 +847,7 @@ onBeforeUnmount(() => {
                             px-10
                             text-baige/70
 
-                            md:px-0
+                            lg:px-0
                         "
                     >
                         {{
@@ -845,10 +862,13 @@ onBeforeUnmount(() => {
                     class="
                         relative
                         flex
+                        min-h-[20rem]
                         w-full
+                        items-center
                         justify-center
                         overflow-x-clip
 
+                        lg:min-h-[34rem]
                         lg:overflow-visible
                     "
                 >
@@ -860,163 +880,84 @@ onBeforeUnmount(() => {
                             h-auto
                             shrink-0
                             object-contain
+                            opacity-70
 
+                            lg:max-h-[34rem]
                             lg:w-full
                             lg:max-w-[42rem]
+                            lg:opacity-40
+                        "
+                        style="
+                            width: 180vw;
+                            max-width: none;
                         "
                     >
                 </div>
             </section>
 
-            <!-- FAQ -->
+                        <!-- Services -->
             <section
                 class="
                     mx-auto
-                    grid
+                    flex
                     w-full
-                    max-w-7xl
-                    grid-cols-1
-                    items-center
-                    gap-8
-
-                    lg:grid-cols-2
-                    lg:gap-12
-                    lg:px-10
-
-                    xl:gap-20
-                    xl:px-16
+                    max-w-[100rem]
+                    flex-col
+                    gap-7
                 "
             >
-                <!-- FAQ copy -->
+                <!-- Services heading -->
                 <div
                     class="
+                        mx-auto
                         flex
+                        w-full
+                        max-w-7xl
                         flex-col
                         items-center
-                        gap-3
+                        gap-4
                         px-5
                         text-center
 
-                        lg:items-start
-                        lg:px-0
-                        lg:text-left
+                        lg:px-10
+
+                        xl:px-16
                     "
                 >
-                    <h2
-                        class="
-                            text-xl
-                            font-bold
-                            text-baige
-                        "
-                    >
-                        Časté otázky
-                    </h2>
+                    <div>
+                        <h2
+                            class="
+                                text-xl
+                                font-bold
+                                text-baige
 
-                    <p
-                        class="
-                            text-regular
-                            text-baige/70
-                        "
-                    >
-                        Všetko dôležité na jednom mieste.
-                    </p>
-                </div>
+                                lg:text-3xl
+                            "
+                        >
+                            Ponúkané služby
+                        </h2>
 
-                <!-- FAQ cards -->
-                <div
-                    class="
-                        flex
-                        min-w-0
-                        justify-center
-                    "
-                >
-                    <FaqCarousel
-                        :items="
-                            faqItems
-                        "
-                        scroll-motion
-                    />
-                </div>
-            </section>
-
-            <!-- Services -->
-            <section
-                class="
-                    mx-auto
-                    grid
-                    w-full
-                    max-w-7xl
-                    grid-cols-1
-                    items-center
-                    gap-8
-
-                    lg:grid-cols-2
-                    lg:gap-12
-                    lg:px-10
-
-                    xl:gap-20
-                    xl:px-16
-                "
-            >
-                <!-- Service copy -->
-                <div
-                    class="
-                        flex
-                        flex-col
-                        items-center
-                        gap-3
-                        px-5
-                        text-center
-
-                        lg:items-start
-                        lg:px-0
-                        lg:text-left
-                    "
-                >
-                    <h2
-                        class="
-                            text-xl
-                            font-bold
-                            text-baige
-                        "
-                    >
-                        Ponúkané služby
-                    </h2>
-
-                    <p
-                        class="
-                            text-regular
-                            max-w-md
-                            text-baige/75
-                        "
-                    >
-                        Pozrite si, s čím sa na nás môžete
-                        obrátiť.
-                    </p>
-
-                    <div
-                        class="
-                            mt-4
-                            hidden
-                            flex-col
-                            items-start
-                            gap-4
-
-                            lg:flex
-                        "
-                    >
                         <p
                             class="
                                 text-regular
-                                max-w-sm
-                                text-baige/70
+                                mt-3
+                                max-w-md
+                                text-baige/75
                             "
                         >
-                            Nenašli ste, čo hľadáte?
-                            Pozrite si všetky služby,
-                            ktoré ponúkame.
+                            Pozrite si, s čím sa na nás môžete
+                            obrátiť.
                         </p>
+                    </div>
 
+                    <div
+                        class="
+                            hidden
+                            shrink-0
+
+                            lg:block
+                        "
+                    >
                         <Button
                             v-if="
                                 remainingServicesCount >
@@ -1041,7 +982,7 @@ onBeforeUnmount(() => {
                 <div
                     class="
                         min-w-0
-                        overflow-hidden
+                        overflow-visible
                     "
                 >
                     <ServicesSlider
@@ -1290,133 +1231,56 @@ onBeforeUnmount(() => {
                 </div>
             </section>
 
-                        <!-- Illustration -->
-            <section
+<!-- FAQ + Team -->
+<section
+    class="
+        mx-auto
+        grid
+        w-full
+        max-w-7xl
+        grid-cols-1
+        gap-y-20
+        px-5
+
+        lg:items-stretch
+        lg:gap-x-12
+        lg:gap-y-0
+        lg:px-10
+
+        xl:gap-x-16
+        xl:px-16
+    "
+    :class="
+        orderedEmployees.length
+            ? 'lg:grid-cols-2'
+            : 'lg:grid-cols-1'
+    "
+>
+    <!-- FAQ + CTA column -->
+    <section
+        class="
+            min-w-0
+
+            lg:flex
+            lg:h-full
+            lg:flex-col
+            lg:justify-between
+        "
+    >
+        <!-- FAQ content -->
+        <div
+            class="
+                min-w-0
+            "
+        >
+            <!-- FAQ copy -->
+            <div
                 class="
-                    relative
                     flex
-                    h-[20rem]
-                    w-full
-                    justify-center
-                    overflow-hidden
-
-                    lg:hidden
-                "
-            >
-                <img
-                    src="/images/humanitas_ruky.svg"
-                    alt="Humanitas"
-                    class="
-                        absolute
-                        left-1/2
-                        top-1/2
-                        h-auto
-                        max-w-none
-                        shrink-0
-                        object-contain
-                        -translate-x-1/2
-                        -translate-y-1/2
-                        rotate-[50deg]
-                        scale-[3]
-                    "
-                >
-            </section>
-
-            <!-- Team -->
-            <section
-                v-if="
-                    orderedEmployees.length
-                "
-                class="
-                    mx-auto
-                    grid
-                    w-full
-                    max-w-7xl
-                    grid-cols-1
-                    items-center
-                    gap-8
-                    overflow-hidden
-
-                    lg:grid-cols-2
-                    lg:gap-12
-                    lg:px-10
-
-                    xl:gap-20
-                    xl:px-16
-                "
-            >
-                <!-- Team copy -->
-                <div
-                    class="
-                        flex
-                        flex-col
-                        items-center
-                        gap-3
-                        px-5
-                        text-center
-
-                        lg:items-start
-                        lg:px-0
-                        lg:text-left
-                    "
-                >
-                    <h2
-                        class="
-                            text-xl
-                            font-bold
-                            text-baige
-                        "
-                    >
-                        Náš tím
-                    </h2>
-
-                    <p
-                        class="
-                            text-regular
-                            max-w-md
-                            text-baige/70
-                        "
-                    >
-                        Ľudia, na ktorých sa môžete
-                        obrátiť.
-                    </p>
-                </div>
-
-                <!-- Team carousel -->
-                <div
-                    class="
-                        min-w-0
-                    "
-                >
-                    <EmployeeCarousel
-                        :items="
-                            orderedEmployees
-                        "
-                        aria-label="Náš tím"
-                        scroll-motion
-                        @select="
-                            openEmployee
-                        "
-                    />
-                </div>
-            </section>
-
-            <!-- Final CTA -->
-            <section
-                class="
-                    mx-auto
-                    flex
-                    w-full
-                    max-w-4xl
                     flex-col
                     items-center
-                    justify-center
                     gap-3
-                    px-5
-                    pb-12
                     text-center
-
-                    lg:pb-20
                 "
             >
                 <h2
@@ -1424,43 +1288,250 @@ onBeforeUnmount(() => {
                         text-xl
                         font-bold
                         text-baige
+
+                        lg:text-2xl
                     "
                 >
-                    Ako ďalej?
+                    Časté otázky
                 </h2>
 
                 <p
                     class="
                         text-regular
-                        mt-3
+                        max-w-sm
                         text-baige/70
                     "
                 >
-                    Nájdite si cestu, ktorá vám vyhovuje.
+                    Všetko dôležité na jednom mieste.
                 </p>
+            </div>
 
-                <div
+            <!-- FAQ cards -->
+            <div
+                class="
+                    mt-8
+                    flex
+                    min-w-0
+                    justify-center
+                "
+            >
+                <FaqCarousel
+                    :items="
+                        faqItems
+                    "
+                    scroll-motion
+                />
+            </div>
+        </div>
+
+        <!-- Final CTA -->
+        <section
+            v-if="
+                orderedEmployees.length
+            "
+            class="
+                mx-auto
+                mt-12
+                flex
+                w-full
+                max-w-4xl
+                flex-col
+                items-center
+                justify-center
+                gap-3
+                px-5
+                pb-12
+                text-center
+
+                lg:mt-auto
+                lg:px-0
+                lg:pb-4
+                lg:pt-14
+            "
+        >
+            <h2
+                class="
+                    text-xl
+                    font-bold
+                    text-baige
+
+                    lg:text-2xl
+                "
+            >
+                Ako ďalej?
+            </h2>
+
+            <p
+                class="
+                    text-regular
+                    mt-2
+                    text-baige/70
+                "
+            >
+                Nájdite si cestu, ktorá vám vyhovuje.
+            </p>
+
+            <div
+                class="
+                    mt-5
+                    flex
+                    flex-wrap
+                    justify-center
+                    gap-3
+                "
+            >
+                <Button
+                    :href="
+                        contactUrl
+                    "
+                    background-image=""
+                    background-color="#FBF9F3"
+                    text-color="#335940"
+                >
+                    Kontaktujte nás
+                </Button>
+            </div>
+        </section>
+    </section>
+
+    <!-- Mobile illustration -->
+    <section
+        class="
+            relative
+            flex
+            h-[20rem]
+            w-full
+            justify-center
+            overflow-hidden
+
+            lg:hidden
+        "
+    >
+        <img
+            src="/images/humanitas_ruky.svg"
+            alt="Humanitas"
+            class="
+                absolute
+                left-1/2
+                top-1/2
+                h-auto
+                max-w-none
+                shrink-0
+                -translate-x-1/2
+                -translate-y-1/2
+                rotate-[50deg]
+                scale-[3]
+                object-contain
+            "
+        >
+    </section>
+
+    <!-- Team column -->
+    <section
+        v-if="
+            orderedEmployees.length
+        "
+        class="
+            relative
+            min-w-0
+            overflow-hidden
+
+            lg:h-full
+        "
+    >
+        <!-- Decorative illustration -->
+        <img
+            src="/images/humanitas_ruky.svg"
+            alt=""
+            aria-hidden="true"
+            draggable="false"
+            class="
+                pointer-events-none
+                absolute
+                bottom-[-8rem]
+                right-[-8rem]
+                z-0
+                hidden
+                h-auto
+                w-[34rem]
+                max-w-none
+                rotate-[20deg]
+                opacity-[0.08]
+
+                lg:block
+            "
+        >
+
+        <div
+            class="
+                relative
+                z-10
+                flex
+                h-full
+                min-w-0
+                flex-col
+            "
+        >
+            <!-- Team copy -->
+            <div
+                class="
+                    flex
+                    flex-col
+                    items-center
+                    gap-3
+                    text-center
+                "
+            >
+                <h2
                     class="
-                        my-6
-                        flex
-                        flex-col
-                        items-center
-                        justify-center
-                        gap-3
+                        text-xl
+                        font-bold
+                        text-baige
+
+                        lg:text-2xl
                     "
                 >
-                    <Button
-                        :href="
-                            contactUrl
-                        "
-                        background-image=""
-                        background-color="#FBF9F3"
-                        text-color="#335940"
-                    >
-                        Kontaktujte nás
-                    </Button>
-                </div>
-            </section>
+                    Náš tím
+                </h2>
+
+                <p
+                    class="
+                        text-regular
+                        max-w-md
+                        text-baige/70
+                    "
+                >
+                    Ľudia, na ktorých sa môžete
+                    obrátiť.
+                </p>
+            </div>
+
+            <!-- Team carousel -->
+            <div
+                class="
+                    mt-8
+                    min-w-0
+
+                    lg:flex
+                    lg:flex-1
+                    lg:flex-col
+                "
+            >
+                <EmployeeCarousel
+                    :items="
+                        orderedEmployees
+                    "
+                    aria-label="Náš tím"
+                    scroll-motion
+                    @select="
+                        openEmployee
+                    "
+                />
+            </div>
+        </div>
+    </section>
+</section>
+
         </main>
 
         <!-- Service detail -->

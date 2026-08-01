@@ -10,6 +10,7 @@ import {
     useScrollMotion
 } from '../composables/useScrollMotion';
 
+import Button from './Button.vue';
 import Card from './Card.vue';
 
 const props = defineProps({
@@ -457,6 +458,7 @@ function getCardWrapperStyle(
  * opposite amount while scrolling so
  * the visible card wants to straighten.
  */
+
 function getCardBaseRotation(
     index
 ) {
@@ -983,6 +985,8 @@ onBeforeUnmount(() => {
         class="
             w-full
             overflow-hidden
+
+            lg:overflow-visible
         "
         :aria-label="
             ariaLabel
@@ -1005,11 +1009,12 @@ onBeforeUnmount(() => {
                     isolate
                     grid
                     w-full
-                    place-items-center
                     cursor-grab
                     touch-pan-y
                     select-none
+                    place-items-center
                     outline-none
+
                     active:cursor-grabbing
                 "
                 @keydown="
@@ -1048,8 +1053,8 @@ onBeforeUnmount(() => {
                         flex
                         w-full
                         max-w-[36rem]
-                        justify-self-center
                         origin-[50%_92%]
+                        justify-self-center
                         [backface-visibility:hidden]
                         [will-change:transform]
                     "
@@ -1069,13 +1074,6 @@ onBeforeUnmount(() => {
                         )
                     "
                 >
-                    <!--
-                        The outer wrapper above still
-                        owns the entire carousel layout.
-
-                        Scroll motion is applied only
-                        to the visual card inside it.
-                    -->
                     <Card
                         :item="
                             item
@@ -1190,6 +1188,7 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
+        <!-- Desktop controls -->
         <div
             v-if="
                 cardCount > 1
@@ -1213,28 +1212,24 @@ onBeforeUnmount(() => {
                     px-10
                 "
             >
-                <button
+                <!-- Previous -->
+                <Button
                     type="button"
-                    class="
-                        flex
-                        h-13
-                        w-13
-                        cursor-pointer
-                        items-center
-                        justify-center
-                        text-baige
-                        transition-transform
-                        duration-200
-                        ease-[cubic-bezier(0.2,0.85,0.25,1)]
-                        hover:scale-110
-                        active:scale-95
-                        focus-visible:outline
-                        focus-visible:outline-2
-                        focus-visible:outline-offset-4
-                        focus-visible:outline-baige/70
-                    "
+                    background-image=""
+                    background-color="#FBF9F3"
+                    text-color="#335940"
                     :aria-label="
                         previousLabel
+                    "
+                    class="
+                        flex
+                        size-11
+                        min-h-0
+                        min-w-0
+                        shrink-0
+                        items-center
+                        justify-center
+                        p-0
                     "
                     @click="
                         goPrevious
@@ -1243,13 +1238,14 @@ onBeforeUnmount(() => {
                     <i
                         class="
                             bi
-                            bi-chevron-left
+                            bi-arrow-left
                             text-base
                         "
                         aria-hidden="true"
                     />
-                </button>
+                </Button>
 
+                <!-- Indicators -->
                 <div
                     class="
                         flex
@@ -1277,11 +1273,13 @@ onBeforeUnmount(() => {
                             h-1.5
                             cursor-pointer
                             rounded-full
-                            bg-baige/40
+                            bg-baige
                             transition-[width,background-color,transform]
-                            duration-200
-                            ease-[cubic-bezier(0.2,0.85,0.25,1)]
+                            duration-300
+                            ease-[cubic-bezier(0.22,1,0.36,1)]
+
                             hover:scale-110
+
                             focus-visible:outline
                             focus-visible:outline-2
                             focus-visible:outline-offset-4
@@ -1309,28 +1307,24 @@ onBeforeUnmount(() => {
                     />
                 </div>
 
-                <button
+                <!-- Next -->
+                <Button
                     type="button"
-                    class="
-                        flex
-                        h-13
-                        w-13
-                        cursor-pointer
-                        items-center
-                        justify-center
-                        text-baige
-                        transition-transform
-                        duration-200
-                        ease-[cubic-bezier(0.2,0.85,0.25,1)]
-                        hover:scale-110
-                        active:scale-95
-                        focus-visible:outline
-                        focus-visible:outline-2
-                        focus-visible:outline-offset-4
-                        focus-visible:outline-baige/70
-                    "
+                    background-image=""
+                    background-color="#FBF9F3"
+                    text-color="#335940"
                     :aria-label="
                         nextLabel
+                    "
+                    class="
+                        flex
+                        size-11
+                        min-h-0
+                        min-w-0
+                        shrink-0
+                        items-center
+                        justify-center
+                        p-0
                     "
                     @click="
                         goNext
@@ -1339,12 +1333,12 @@ onBeforeUnmount(() => {
                     <i
                         class="
                             bi
-                            bi-chevron-right
+                            bi-arrow-right
                             text-base
                         "
                         aria-hidden="true"
                     />
-                </button>
+                </Button>
             </div>
         </div>
 

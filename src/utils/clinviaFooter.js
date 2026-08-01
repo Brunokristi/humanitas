@@ -417,29 +417,37 @@ export function normalizeClinviaPublicFooterData(payload = {}, options = {}) {
         ? payload.branch
         : pickBranch(company, requestedBranchIdentifier)
 
+    const companyIdentifierSource =
+        branch?.company && typeof branch.company === 'object'
+            ? {
+                ...company,
+                company: branch.company
+            }
+            : company
+
     const publicSite = payload?.public_site && typeof payload.public_site === 'object'
         ? payload.public_site
         : normalizePublicSite(company, branch)
 
     return {
         company: {
-            name: cleanText(company.name),
-            legalName: cleanText(company.legal_name),
-            ico: pickCompanyIdentifier(company, [
+            name: cleanText(company.name) || cleanText(branch?.company?.name),
+            legalName: cleanText(company.legal_name) || cleanText(branch?.company?.legal_name),
+            ico: pickCompanyIdentifier(companyIdentifierSource, [
                 'ico',
                 'company_id_number',
                 'company_ico',
                 'ico_number',
                 'registration_number'
             ]),
-            dic: pickCompanyIdentifier(company, [
+            dic: pickCompanyIdentifier(companyIdentifierSource, [
                 'dic',
                 'tax_id',
                 'company_dic',
                 'dic_number',
                 'tin'
             ]),
-            icDph: pickCompanyIdentifier(company, [
+            icDph: pickCompanyIdentifier(companyIdentifierSource, [
                 'ic_dph',
                 'icdph',
                 'vat_id',

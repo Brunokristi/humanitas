@@ -80,7 +80,8 @@ const branchAddress = computed(() => {
 const companyAddress = computed(() => {
     const address =
         company.value?.registeredAddress ??
-        company.value?.registered_address;
+        company.value?.registered_address ??
+        company.value?.address;
 
     if (!address) {
         return [];
@@ -335,6 +336,7 @@ function openingHoursSchedule(entry) {
                 h-auto
                 w-[150%]
                 max-w-none
+                max-h-[40rem]
                 opacity-[0.2]
 
                 sm:bottom-[-9rem]

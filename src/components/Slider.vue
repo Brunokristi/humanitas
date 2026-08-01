@@ -1,12 +1,14 @@
 <script setup>
 import {
     computed,
+    nextTick,
     onBeforeUnmount,
     onMounted,
     ref,
     watch
 } from 'vue';
 
+import Button from './Button.vue';
 import Card from './Card.vue';
 
 const props = defineProps({
@@ -25,9 +27,9 @@ const props = defineProps({
         default: 'Posuvník'
     },
 
-    cardHeight: {
-        type: String,
-        default: '23rem'
+    equalHeight: {
+        type: Boolean,
+        default: false
     },
 
     backgroundImage: {
@@ -55,22 +57,17 @@ const emit = defineEmits([
     'select'
 ]);
 
-const currentIndex = ref(
-    Math.min(
-        Math.max(
-            props.initialIndex,
-            0
-        ),
-        Math.max(
-            props.items.length - 1,
-            0
-        )
-    )
-);
+const sliderElement =
+    ref(null);
 
-const sliderElement = ref(null);
+const sliderWidth =
+    ref(1024);
 
-const cardWidth = ref(360);
+const cardWidth =
+    ref(360);
+
+const equalCardHeight =
+    ref(null);
 
 const viewportWidth = ref(
     typeof window !== 'undefined'
@@ -78,23 +75,139 @@ const viewportWidth = ref(
         : 1024
 );
 
-const dragX = ref(0);
+const dragX =
+    ref(0);
 
-const isDragging = ref(false);
-const hasDragged = ref(false);
+const isDragging =
+    ref(false);
 
-const pointerId = ref(null);
-const pointerStartX = ref(0);
-const previousPointerX = ref(0);
-const previousPointerTime = ref(0);
-const pointerVelocity = ref(0);
+const hasDragged =
+    ref(false);
 
-const CARD_ANGLE_GAP = 14;
-const RECYCLE_DISTANCE = 2;
-const CLICK_DRAG_THRESHOLD = 8;
+const pointerId =
+    ref(null);
+
+const pointerStartX =
+    ref(0);
+
+const previousPointerX =
+    ref(0);
+
+const previousPointerTime =
+    ref(0);
+
+const pointerVelocity =
+    ref(0);
+
+/*
+ * We render three copies of every card.
+ *
+ * The active card starts inside the middle
+ * copy. This allows cards to move continuously
+ * in both directions without visibly jumping
+ * from the back to the front.
+ */
+
+const virtualIndex =
+    ref(0);
+
+const suppressTransitions =
+    ref(false);
+
+let normalizationTimer =
+    null;
+
+let normalizationFrame =
+    null;
+
+const CARD_ANGLE_GAP =
+    14;
+
+const CLICK_DRAG_THRESHOLD =
+    8;
+
+const TRANSITION_DURATION =
+    300;
 
 const cardCount = computed(() => {
     return props.items.length;
+});
+
+const renderedItems = computed(() => {
+    if (!cardCount.value) {
+        return [];
+    }
+
+    return [
+        0,
+        1,
+        2
+    ].flatMap((copyIndex) => {
+        return props.items.map(
+            (
+                item,
+                originalIndex
+            ) => {
+                return {
+                    item,
+                    copyIndex,
+                    originalIndex,
+
+                    renderKey:
+                        `${copyIndex}-${
+                            item?.id ??
+                            item?.slug ??
+                            originalIndex
+                        }`
+                };
+            }
+        );
+    });
+});
+
+const currentIndex = computed(() => {
+    return circularIndex(
+        virtualIndex.value
+    );
+});
+
+const isMobile = computed(() => {
+    return (
+        viewportWidth.value <
+        768
+    );
+});
+
+const isDesktop = computed(() => {
+    return (
+        viewportWidth.value >=
+        1024
+    );
+});
+
+/*
+ * Mobile and tablet:
+ * active card + one card on each side.
+ *
+ * Desktop:
+ * active card + two cards on each side.
+ */
+
+const visibleSideCount = computed(() => {
+    return isDesktop.value
+        ? 2
+        : 1;
+});
+
+const dragProgress = computed(() => {
+    if (!cardWidth.value) {
+        return 0;
+    }
+
+    return (
+        dragX.value /
+        cardWidth.value
+    );
 });
 
 const circleRadius = computed(() => {
@@ -133,30 +246,66 @@ const wheelOffsetY = computed(() => {
     return 42;
 });
 
-const dragAngle = computed(() => {
-    if (!cardWidth.value) {
-        return 0;
-    }
+/*
+ * Desktop spacing.
+ *
+ * The previous value was 1.08 times the
+ * card width. A larger multiplier creates
+ * more breathing room between cards.
+ */
 
-    return (
-        dragX.value /
-        cardWidth.value
-    ) * CARD_ANGLE_GAP;
+const desktopCardStep = computed(() => {
+    const preferredStep =
+        cardWidth.value *
+        1.1;
+
+    const minimumStep =
+        cardWidth.value *
+        1.0;
+
+    const responsiveStep =
+        sliderWidth.value /
+        4.15;
+
+    return Math.max(
+        minimumStep,
+        Math.min(
+            preferredStep,
+            responsiveStep
+        )
+    );
 });
 
-const wheelAngle = computed(() => {
-    return dragAngle.value;
+const sliderHeight = computed(() => {
+    if (
+        props.equalHeight &&
+        equalCardHeight.value
+    ) {
+        const extraSpace =
+            isDesktop.value
+                ? 115
+                : 85;
+
+        return `${
+            equalCardHeight.value +
+            extraSpace
+        }px`;
+    }
+
+    if (
+        isDesktop.value
+    ) {
+        return '32rem';
+    }
+
+    return isMobile.value
+        ? '25rem'
+        : '36rem';
 });
 
 /*
- * We know the exact card height.
- *
- * We only add some room underneath because
- * the cards travel down the circular path.
+ * Index helpers
  */
-const sliderHeight = computed(() => {
-    return `calc(${props.cardHeight} + 5.5rem)`;
-});
 
 function circularIndex(index) {
     if (!cardCount.value) {
@@ -164,60 +313,89 @@ function circularIndex(index) {
     }
 
     return (
-        index %
-        cardCount.value +
+        (
+            index %
+            cardCount.value
+        ) +
         cardCount.value
-    ) % cardCount.value;
+    ) %
+        cardCount.value;
 }
 
-function getRelativeIndex(index) {
+function middleCopyIndex(
+    originalIndex
+) {
+    return (
+        cardCount.value +
+        circularIndex(
+            originalIndex
+        )
+    );
+}
+
+function initializeVirtualIndex() {
     if (!cardCount.value) {
-        return 0;
+        virtualIndex.value =
+            0;
+
+        return;
     }
 
-    let difference =
-        index -
-        currentIndex.value;
-
-    const half =
-        cardCount.value / 2;
-
-    if (
-        difference >
-        half
-    ) {
-        difference -=
-            cardCount.value;
-    }
-
-    if (
-        difference <
-        -half
-    ) {
-        difference +=
-            cardCount.value;
-    }
-
-    return difference;
+    virtualIndex.value =
+        middleCopyIndex(
+            Math.min(
+                Math.max(
+                    props.initialIndex,
+                    0
+                ),
+                cardCount.value -
+                    1
+            )
+        );
 }
 
-function isRecyclingCard(index) {
+function getCardPosition(
+    renderIndex
+) {
     return (
-        Math.abs(
-            getRelativeIndex(index)
-        ) >=
-        RECYCLE_DISTANCE
+        renderIndex -
+        virtualIndex.value +
+        dragProgress.value
     );
 }
 
-function isCardVisible(index) {
+function isCardSelectable(
+    renderIndex
+) {
     return (
         Math.abs(
-            getRelativeIndex(index)
-        ) <
-        RECYCLE_DISTANCE
+            renderIndex -
+            virtualIndex.value
+        ) <=
+        visibleSideCount.value
     );
 }
+
+function isCardVisible(
+    renderIndex
+) {
+    const distance =
+        Math.abs(
+            getCardPosition(
+                renderIndex
+            )
+        );
+
+    return (
+        distance <
+        visibleSideCount.value +
+            0.8
+    );
+}
+
+/*
+ * Measurements
+ */
 
 function updateMeasurements() {
     if (
@@ -226,6 +404,15 @@ function updateMeasurements() {
     ) {
         viewportWidth.value =
             window.innerWidth;
+    }
+
+    if (
+        sliderElement.value
+            ?.clientWidth
+    ) {
+        sliderWidth.value =
+            sliderElement.value
+                .clientWidth;
     }
 
     const card =
@@ -238,23 +425,146 @@ function updateMeasurements() {
         return;
     }
 
-    const rect =
-        card.getBoundingClientRect();
+    const width =
+        card.offsetWidth;
 
-    if (rect.width) {
+    if (width) {
         cardWidth.value =
-            rect.width;
+            width;
     }
 }
 
-function getCardStyle(index) {
-    const relativeIndex =
-        getRelativeIndex(index);
+async function updateEqualCardHeight() {
+    if (
+        !props.equalHeight
+    ) {
+        equalCardHeight.value =
+            null;
+
+        return;
+    }
+
+    equalCardHeight.value =
+        null;
+
+    await nextTick();
+
+    const cards =
+        sliderElement.value
+            ?.querySelectorAll(
+                '[data-slider-card-content]'
+            );
+
+    if (
+        !cards?.length
+    ) {
+        return;
+    }
+
+    const heights =
+        Array.from(
+            cards
+        ).map((card) => {
+            return card.scrollHeight;
+        });
+
+    equalCardHeight.value =
+        Math.max(
+            ...heights
+        );
+}
+
+/*
+ * Card positioning
+ */
+
+function getDesktopCardStyle(
+    renderIndex
+) {
+    const position =
+        getCardPosition(
+            renderIndex
+        );
+
+    const distance =
+        Math.abs(
+            position
+        );
+
+    const x =
+        desktopCardStep.value *
+        position;
+
+    const y =
+        64 -
+        Math.pow(
+            distance,
+            1.65
+        ) *
+            24;
+
+    const rotation =
+        position *
+        -6.5;
+
+    const scale =
+        1 -
+        Math.min(
+            distance,
+            2
+        ) *
+            0.025;
+
+    let opacity =
+        1;
+
+    if (
+        distance >
+        2.05
+    ) {
+        opacity =
+            Math.max(
+                0,
+                (
+                    2.7 -
+                    distance
+                ) /
+                    0.65
+            );
+    }
+
+    const zIndex =
+        1000 -
+        Math.round(
+            distance *
+            100
+        );
+
+    return {
+        transform: [
+            'translateX(-50%)',
+            `translate3d(${x}px, ${y}px, 0)`,
+            `rotate(${rotation}deg)`,
+            `scale(${scale})`
+        ].join(' '),
+
+        opacity,
+
+        zIndex
+    };
+}
+
+function getMobileCardStyle(
+    renderIndex
+) {
+    const position =
+        getCardPosition(
+            renderIndex
+        );
 
     const angleDegrees =
-        relativeIndex *
-        CARD_ANGLE_GAP +
-        wheelAngle.value;
+        position *
+        CARD_ANGLE_GAP;
 
     const angleRadians =
         angleDegrees *
@@ -286,67 +596,34 @@ function getCardStyle(index) {
     const rotation =
         -angleDegrees;
 
-    const relativeDistance =
+    const distance =
         Math.abs(
-            relativeIndex
+            position
         );
 
-    let opacity = 1;
+    let opacity =
+        1;
 
     if (
-        relativeDistance >=
-        2
-    ) {
-        opacity = 0;
-    } else if (
-        relativeDistance >
-        1
+        distance >
+        1.05
     ) {
         opacity =
             Math.max(
                 0,
-                1 -
                 (
-                    relativeDistance -
-                    1
-                )
-            );
-    }
-
-    const fractionalPosition =
-        Math.abs(
-            relativeIndex +
-            (
-                wheelAngle.value /
-                CARD_ANGLE_GAP
-            )
-        );
-
-    if (
-        fractionalPosition >
-        1.65
-    ) {
-        opacity =
-            Math.min(
-                opacity,
-                Math.max(
-                    0,
-                    (
-                        2 -
-                        fractionalPosition
-                    ) /
-                    0.35
-                )
+                    1.8 -
+                    distance
+                ) /
+                    0.75
             );
     }
 
     const zIndex =
         1000 -
         Math.round(
-            Math.abs(
-                angleDegrees
-            ) *
-            10
+            distance *
+            100
         );
 
     return {
@@ -362,50 +639,228 @@ function getCardStyle(index) {
     };
 }
 
-function goNext() {
+function getCardStyle(
+    renderIndex
+) {
     if (
-        cardCount.value <= 1
+        isDesktop.value
+    ) {
+        return getDesktopCardStyle(
+            renderIndex
+        );
+    }
+
+    return getMobileCardStyle(
+        renderIndex
+    );
+}
+
+/*
+ * Invisible normalization
+ *
+ * After entering the first or third copy,
+ * we silently move to the equivalent card
+ * in the middle copy. Since both positions
+ * look exactly the same, the reset is invisible.
+ */
+
+function clearNormalization() {
+    if (
+        normalizationTimer !==
+        null
+    ) {
+        window.clearTimeout(
+            normalizationTimer
+        );
+
+        normalizationTimer =
+            null;
+    }
+
+    if (
+        normalizationFrame !==
+        null
+    ) {
+        window.cancelAnimationFrame(
+            normalizationFrame
+        );
+
+        normalizationFrame =
+            null;
+    }
+}
+
+function normalizeVirtualIndex() {
+    if (
+        cardCount.value <=
+        1
     ) {
         return;
     }
 
-    currentIndex.value =
-        circularIndex(
-            currentIndex.value + 1
+    const lowerBoundary =
+        cardCount.value;
+
+    const upperBoundary =
+        cardCount.value *
+        2;
+
+    if (
+        virtualIndex.value >=
+            lowerBoundary &&
+        virtualIndex.value <
+            upperBoundary
+    ) {
+        return;
+    }
+
+    const normalizedIndex =
+        middleCopyIndex(
+            virtualIndex.value
         );
 
-    dragX.value = 0;
+    suppressTransitions.value =
+        true;
+
+    virtualIndex.value =
+        normalizedIndex;
+
+    normalizationFrame =
+        window.requestAnimationFrame(
+            () => {
+                normalizationFrame =
+                    window.requestAnimationFrame(
+                        () => {
+                            suppressTransitions.value =
+                                false;
+
+                            normalizationFrame =
+                                null;
+                        }
+                    );
+            }
+        );
+}
+
+function scheduleNormalization() {
+    clearNormalization();
+
+    normalizationTimer =
+        window.setTimeout(
+            () => {
+                normalizationTimer =
+                    null;
+
+                normalizeVirtualIndex();
+            },
+            TRANSITION_DURATION +
+                30
+        );
+}
+
+/*
+ * Navigation
+ */
+
+function moveToVirtualIndex(
+    nextVirtualIndex
+) {
+    if (
+        cardCount.value <=
+        1
+    ) {
+        dragX.value =
+            0;
+
+        return;
+    }
+
+    suppressTransitions.value =
+        false;
+
+    virtualIndex.value =
+        nextVirtualIndex;
+
+    dragX.value =
+        0;
+
+    scheduleNormalization();
+}
+
+function goNext() {
+    moveToVirtualIndex(
+        virtualIndex.value +
+            1
+    );
 }
 
 function goPrevious() {
+    moveToVirtualIndex(
+        virtualIndex.value -
+            1
+    );
+}
+
+function goTo(
+    originalIndex
+) {
     if (
-        cardCount.value <= 1
+        cardCount.value <=
+        1
     ) {
         return;
     }
 
-    currentIndex.value =
+    const normalizedTarget =
         circularIndex(
-            currentIndex.value - 1
+            originalIndex
         );
 
-    dragX.value = 0;
+    const currentOriginalIndex =
+        currentIndex.value;
+
+    const forwardDistance =
+        (
+            normalizedTarget -
+            currentOriginalIndex +
+            cardCount.value
+        ) %
+        cardCount.value;
+
+    const backwardDistance =
+        (
+            currentOriginalIndex -
+            normalizedTarget +
+            cardCount.value
+        ) %
+        cardCount.value;
+
+    const targetVirtualIndex =
+        forwardDistance <=
+        backwardDistance
+            ? virtualIndex.value +
+                forwardDistance
+            : virtualIndex.value -
+                backwardDistance;
+
+    moveToVirtualIndex(
+        targetVirtualIndex
+    );
 }
 
-function goTo(index) {
-    currentIndex.value =
-        circularIndex(index);
-
-    dragX.value = 0;
-}
+/*
+ * Card selection
+ */
 
 function handleCardClick(
     event,
-    item,
-    index
+    renderedItem,
+    renderIndex
 ) {
     if (
-        !isCardVisible(index)
+        !isCardSelectable(
+            renderIndex
+        )
     ) {
         return;
     }
@@ -433,13 +888,20 @@ function handleCardClick(
 
     emit(
         'select',
-        item
+        renderedItem.item
     );
 }
 
-function handlePointerDown(event) {
+/*
+ * Drag
+ */
+
+function handlePointerDown(
+    event
+) {
     if (
-        event.button !== 0
+        event.button !==
+        0
     ) {
         return;
     }
@@ -459,17 +921,22 @@ function handlePointerDown(event) {
         return;
     }
 
-    hasDragged.value = false;
+    hasDragged.value =
+        false;
 
     if (
-        cardCount.value <= 1
+        cardCount.value <=
+        1
     ) {
         return;
     }
 
+    clearNormalization();
+
     updateMeasurements();
 
-    isDragging.value = true;
+    isDragging.value =
+        true;
 
     pointerId.value =
         event.pointerId;
@@ -483,7 +950,8 @@ function handlePointerDown(event) {
     previousPointerTime.value =
         performance.now();
 
-    pointerVelocity.value = 0;
+    pointerVelocity.value =
+        0;
 
     try {
         event.currentTarget
@@ -495,7 +963,9 @@ function handlePointerDown(event) {
     }
 }
 
-function handlePointerMove(event) {
+function handlePointerMove(
+    event
+) {
     if (
         !isDragging.value ||
         pointerId.value !==
@@ -510,7 +980,7 @@ function handlePointerMove(event) {
     const elapsed =
         Math.max(
             now -
-            previousPointerTime.value,
+                previousPointerTime.value,
             1
         );
 
@@ -533,10 +1003,13 @@ function handlePointerMove(event) {
         pointerStartX.value;
 
     if (
-        Math.abs(distance) >
+        Math.abs(
+            distance
+        ) >
         CLICK_DRAG_THRESHOLD
     ) {
-        hasDragged.value = true;
+        hasDragged.value =
+            true;
     }
 
     const maximumDrag =
@@ -553,7 +1026,9 @@ function handlePointerMove(event) {
         );
 }
 
-function handlePointerEnd(event) {
+function handlePointerEnd(
+    event
+) {
     if (
         !isDragging.value ||
         pointerId.value !==
@@ -591,7 +1066,9 @@ function handlePointerEnd(event) {
         ) >=
             velocityThreshold;
 
-    if (!shouldMove) {
+    if (
+        !shouldMove
+    ) {
         restoreSlider();
 
         return;
@@ -600,9 +1077,12 @@ function handlePointerEnd(event) {
     const directionValue =
         Math.abs(
             dragX.value
-        ) > 5
+        ) >
+        5
             ? dragX.value
             : pointerVelocity.value;
+
+    restorePointerState();
 
     if (
         directionValue <
@@ -612,18 +1092,18 @@ function handlePointerEnd(event) {
     } else {
         goPrevious();
     }
-
-    restorePointerState();
 }
 
 function handlePointerCancel() {
-    hasDragged.value = true;
+    hasDragged.value =
+        true;
 
     restoreSlider();
 }
 
 function restorePointerState() {
-    isDragging.value = false;
+    isDragging.value =
+        false;
 
     pointerId.value =
         null;
@@ -635,10 +1115,17 @@ function restorePointerState() {
 function restoreSlider() {
     restorePointerState();
 
-    dragX.value = 0;
+    dragX.value =
+        0;
 }
 
-function handleKeydown(event) {
+/*
+ * Keyboard
+ */
+
+function handleKeydown(
+    event
+) {
     if (
         event.key ===
         'ArrowLeft'
@@ -658,22 +1145,45 @@ function handleKeydown(event) {
     }
 }
 
-function handleResize() {
+/*
+ * Resize
+ */
+
+async function handleResize() {
     updateMeasurements();
+
+    await updateEqualCardHeight();
 }
+
+/*
+ * Watchers
+ */
 
 watch(
     () => props.items,
-    () => {
+    async () => {
+        clearNormalization();
+
+        suppressTransitions.value =
+            true;
+
+        initializeVirtualIndex();
+
+        await nextTick();
+
+        await updateEqualCardHeight();
+
         updateMeasurements();
 
-        currentIndex.value =
-            Math.min(
-                currentIndex.value,
-                Math.max(
-                    props.items.length - 1,
-                    0
-                )
+        normalizationFrame =
+            window.requestAnimationFrame(
+                () => {
+                    suppressTransitions.value =
+                        false;
+
+                    normalizationFrame =
+                        null;
+                }
             );
     },
     {
@@ -681,8 +1191,25 @@ watch(
     }
 );
 
-onMounted(() => {
+watch(
+    () => props.equalHeight,
+    async () => {
+        await updateEqualCardHeight();
+    }
+);
+
+/*
+ * Lifecycle
+ */
+
+onMounted(async () => {
+    initializeVirtualIndex();
+
+    await nextTick();
+
     updateMeasurements();
+
+    await updateEqualCardHeight();
 
     window.addEventListener(
         'resize',
@@ -692,6 +1219,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     restoreSlider();
+
+    clearNormalization();
 
     window.removeEventListener(
         'resize',
@@ -705,10 +1234,16 @@ onBeforeUnmount(() => {
         class="
             relative
             w-full
-            overflow-hidden
+            overflow-x-clip
+            overflow-y-visible
+
+            lg:overflow-visible
         "
-        :aria-label="ariaLabel"
+        :aria-label="
+            ariaLabel
+        "
     >
+        <!-- Slider stage -->
         <div
             ref="sliderElement"
             tabindex="0"
@@ -719,12 +1254,17 @@ onBeforeUnmount(() => {
                 cursor-grab
                 touch-pan-y
                 select-none
+                overflow-visible
                 outline-none
                 transition-[height]
                 duration-300
+
                 active:cursor-grabbing
-                h-[420px]
             "
+            :style="{
+                height:
+                    sliderHeight
+            }"
             @keydown="
                 handleKeydown
             "
@@ -743,12 +1283,14 @@ onBeforeUnmount(() => {
         >
             <div
                 v-for="
-                    (item, index)
-                    in items
+                    (
+                        renderedItem,
+                        renderIndex
+                    ) in
+                    renderedItems
                 "
                 :key="
-                    item.id ??
-                    index
+                    renderedItem.renderKey
                 "
                 data-slider-card
                 class="
@@ -765,78 +1307,96 @@ onBeforeUnmount(() => {
                     duration-300
                     ease-[cubic-bezier(0.2,0.85,0.25,1)]
 
+                    sm:w-[66vw]
+
+                    md:w-[52vw]
+
+                    lg:min-w-[12.5rem]
+                    lg:w-[18vw]
+                    lg:max-w-[20rem]
+
+                    xl:w-[17vw]
+
                     [backface-visibility:hidden]
                     [will-change:transform,opacity]
                 "
                 :class="{
                     'transition-none':
                         isDragging ||
-                        isRecyclingCard(
-                            index
-                        ),
+                        suppressTransitions,
 
                     'pointer-events-none':
-                        !isCardVisible(
-                            index
+                        !isCardSelectable(
+                            renderIndex
                         ),
 
                     'cursor-pointer':
-                        isCardVisible(
-                            index
+                        isCardSelectable(
+                            renderIndex
                         )
                 }"
                 :style="
                     getCardStyle(
-                        index
+                        renderIndex
                     )
                 "
                 :aria-hidden="
                     !isCardVisible(
-                        index
+                        renderIndex
                     )
                 "
                 @click="
                     handleCardClick(
                         $event,
-                        item,
-                        index
+                        renderedItem,
+                        renderIndex
                     )
                 "
             >
                 <div
                     data-slider-card-content
-                    class="
-                        w-full
-                    "
                     :style="{
-                        height: cardHeight
+                        height:
+                            equalHeight &&
+                            equalCardHeight
+                                ? `${equalCardHeight}px`
+                                : 'auto'
                     }"
                 >
                     <Card
-                        :item="item"
-                        :active="
-                            index ===
-                            currentIndex
+                        :item="
+                            renderedItem.item
                         "
-                        :equal-height="true"
+                        :active="
+                            renderIndex ===
+                            virtualIndex
+                        "
+                        :equal-height="
+                            equalHeight
+                        "
                         :background-image="
                             backgroundImage
                         "
                         :background-color="
                             backgroundColor
                         "
+                        :image-opacity="
+                            imageOpacity
+                        "
                         :image-scale="
                             imageScale
                         "
                     >
-                        <template #default="slotProps">
+                        <template
+                            #default="slotProps"
+                        >
                             <slot
                                 name="card"
                                 :item="
                                     slotProps.item
                                 "
                                 :index="
-                                    index
+                                    renderedItem.originalIndex
                                 "
                                 :active="
                                     slotProps.active
@@ -848,6 +1408,7 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
+        <!-- Desktop controls -->
         <div
             v-if="
                 cardCount > 1
@@ -855,117 +1416,151 @@ onBeforeUnmount(() => {
             class="
                 mt-5
                 hidden
+                w-full
                 items-center
                 justify-center
-                gap-5
+
                 md:flex
             "
         >
-            <button
-                type="button"
-                class="
-                    flex
-                    h-11
-                    w-11
-                    cursor-pointer
-                    items-center
-                    justify-center
-                    rounded-full
-                    text-baige
-                    transition-transform
-                    duration-200
-                    hover:scale-110
-                    active:scale-95
-                "
-                aria-label="
-                    Predchádzajúca karta
-                "
-                @click="
-                    goPrevious
-                "
-            >
-                <i
-                    class="
-                        bi
-                        bi-chevron-left
-                        text-lg
-                    "
-                    aria-hidden="true"
-                />
-            </button>
-
             <div
                 class="
+                    mx-auto
                     flex
                     items-center
                     justify-center
-                    gap-2
+                    gap-3
+                    px-10
                 "
             >
-                <button
-                    v-for="
-                        (_, index)
-                        in items
-                    "
-                    :key="index"
+                <!-- Previous -->
+                <Button
                     type="button"
+                    background-image=""
+                    background-color="#FBF9F3"
+                    text-color="#335940"
+                    aria-label="Predchádzajúca karta"
                     class="
-                        h-1.5
-                        cursor-pointer
-                        rounded-full
-                        bg-baige/40
-                        transition-[width,background-color]
-                        duration-200
-                    "
-                    :class="
-                        index ===
-                        currentIndex
-                            ? 'w-8 bg-baige'
-                            : 'w-1.5'
-                    "
-                    :aria-label="
-                        `Zobraziť kartu ${
-                            index + 1
-                        }`
+                        flex
+                        size-11
+                        min-h-0
+                        min-w-0
+                        shrink-0
+                        items-center
+                        justify-center
+                        p-0
                     "
                     @click="
-                        goTo(index)
+                        goPrevious
                     "
-                />
-            </div>
+                >
+                    <i
+                        class="
+                            bi
+                            bi-arrow-left
+                            text-base
+                        "
+                        aria-hidden="true"
+                    />
+                </Button>
 
-            <button
-                type="button"
-                class="
-                    flex
-                    h-11
-                    w-11
-                    cursor-pointer
-                    items-center
-                    justify-center
-                    rounded-full
-                    text-baige
-                    transition-transform
-                    duration-200
-                    hover:scale-110
-                    active:scale-95
-                "
-                aria-label="
-                    Nasledujúca karta
-                "
-                @click="
-                    goNext
-                "
-            >
-                <i
+                <!-- Indicators -->
+                <div
                     class="
-                        bi
-                        bi-chevron-right
-                        text-lg
+                        flex
+                        min-w-20
+                        items-center
+                        justify-center
+                        gap-2
                     "
-                    aria-hidden="true"
-                />
-            </button>
+                    role="tablist"
+                    aria-label="Výber služby"
+                >
+                    <button
+                        v-for="
+                            (
+                                _,
+                                index
+                            ) in
+                            items
+                        "
+                        :key="
+                            index
+                        "
+                        type="button"
+                        class="
+                            h-1.5
+                            cursor-pointer
+                            rounded-full
+                            bg-baige/35
+                            transition-[width,background-color,transform]
+                            duration-300
+                            ease-[cubic-bezier(0.22,1,0.36,1)]
+
+                            hover:scale-110
+                            hover:bg-baige/65
+
+                            focus-visible:outline
+                            focus-visible:outline-2
+                            focus-visible:outline-offset-4
+                            focus-visible:outline-baige/70
+                        "
+                        :class="
+                            index ===
+                            currentIndex
+                                ? 'w-8 bg-baige'
+                                : 'w-1.5'
+                        "
+                        :aria-label="
+                            `Zobraziť kartu ${
+                                index +
+                                1
+                            }`
+                        "
+                        :aria-selected="
+                            index ===
+                            currentIndex
+                        "
+                        role="tab"
+                        @click="
+                            goTo(
+                                index
+                            )
+                        "
+                    />
+                </div>
+
+                <!-- Next -->
+                <Button
+                    type="button"
+                    background-image=""
+                    background-color="#FBF9F3"
+                    text-color="#335940"
+                    aria-label="Nasledujúca karta"
+                    class="
+                        flex
+                        size-11
+                        min-h-0
+                        min-w-0
+                        shrink-0
+                        items-center
+                        justify-center
+                        p-0
+                    "
+                    @click="
+                        goNext
+                    "
+                >
+                    <i
+                        class="
+                            bi
+                            bi-arrow-right
+                            text-base
+                        "
+                        aria-hidden="true"
+                    />
+                </Button>
+            </div>
         </div>
     </section>
 </template>

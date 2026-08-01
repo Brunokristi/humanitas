@@ -379,6 +379,60 @@ function normalizeBranch(branch) {
     };
 }
 
+function pickCompanyIdentifier(company, candidates) {
+    const branchCompanySources =
+        Array.isArray(company?.branches)
+            ? company.branches
+                .map((branch) => {
+                    return branch?.company;
+                })
+                .filter(Boolean)
+            : [];
+
+    const sources = [
+        company,
+        company?.identification,
+        company?.identifiers,
+        company?.ids,
+        company?.company,
+        company?.company?.identification,
+        company?.company?.identifiers,
+        company?.company?.ids,
+        ...branchCompanySources,
+        ...branchCompanySources
+            .map((nestedCompany) => {
+                return nestedCompany?.identification;
+            })
+            .filter(Boolean),
+        ...branchCompanySources
+            .map((nestedCompany) => {
+                return nestedCompany?.identifiers;
+            })
+            .filter(Boolean),
+        ...branchCompanySources
+            .map((nestedCompany) => {
+                return nestedCompany?.ids;
+            })
+            .filter(Boolean)
+    ].filter(Boolean);
+
+    for (const source of sources) {
+        for (const key of candidates) {
+            const value = source[key];
+
+            if (
+                value !== null &&
+                value !== undefined &&
+                value !== ''
+            ) {
+                return String(value);
+            }
+        }
+    }
+
+    return null;
+}
+
 export function normalizeCompany(company) {
     if (!company) {
         return null;
@@ -387,12 +441,48 @@ export function normalizeCompany(company) {
     return {
         id: company.id,
 
+        name:
+            company.name ??
+            null,
+
         slug:
             company.slug ?? '',
 
         legalName:
             company.legal_name ??
             '',
+
+        ico: pickCompanyIdentifier(company, [
+            'ico',
+            'company_id_number',
+            'company_ico',
+            'ico_number',
+            'registration_number'
+        ]),
+
+        dic: pickCompanyIdentifier(company, [
+            'dic',
+            'tax_id',
+            'company_dic',
+            'dic_number',
+            'tin'
+        ]),
+
+        taxId: pickCompanyIdentifier(company, [
+            'tax_id',
+            'dic',
+            'company_dic',
+            'dic_number',
+            'tin'
+        ]),
+
+        icDph: pickCompanyIdentifier(company, [
+            'ic_dph',
+            'icdph',
+            'vat_id',
+            'vat_number',
+            'company_vat_id'
+        ]),
 
         email:
             company.email ?? null,
@@ -404,6 +494,32 @@ export function normalizeCompany(company) {
             company.website ?? null,
 
         address: {
+            line1:
+                company.address_line_1 ??
+                null,
+
+            line2:
+                company.address_line_2 ??
+                null,
+
+            city:
+                company.city ??
+                null,
+
+            postalCode:
+                company.postal_code ??
+                null,
+
+            region:
+                company.region ??
+                null,
+
+            country:
+                company.country ??
+                null
+        },
+
+        registeredAddress: {
             line1:
                 company.address_line_1 ??
                 null,

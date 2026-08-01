@@ -50,7 +50,7 @@ defineProps({
             w-full
             max-w-[36rem]
             overflow-hidden
-            rounded-[clamp(2.5rem,8vw,4.4rem)]
+            rounded-[40px]
             text-green
             shadow-[var(--shadow-mid)]
         "

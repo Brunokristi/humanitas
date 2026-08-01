@@ -7,6 +7,151 @@ import {
     normalizeClinviaPublicFooterData
 } from '../utils/clinviaFooter';
 
+function resolveBranchSlug(rawCompany, configuredIdentifier) {
+    const branches =
+        rawCompany?.branches;
+
+    if (
+        !Array.isArray(branches) ||
+        !branches.length
+    ) {
+        return null;
+    }
+
+    const normalizedIdentifier =
+        String(
+            configuredIdentifier ?? ''
+        ).trim();
+
+    if (!normalizedIdentifier) {
+        return (
+            branches[0]?.slug ??
+            null
+        );
+    }
+
+    const branchById = branches.find((branch) => {
+        return (
+            String(branch.id) ===
+            normalizedIdentifier
+        );
+    });
+
+    if (branchById?.slug) {
+        return branchById.slug;
+    }
+
+    const branchBySlug = branches.find((branch) => {
+        return (
+            String(branch.slug) ===
+            normalizedIdentifier
+        );
+    });
+
+    return (
+        branchBySlug?.slug ??
+        normalizedIdentifier
+    );
+}
+
+function pickFirstDefined(...values) {
+    for (const value of values) {
+        if (
+            value !== null &&
+            value !== undefined &&
+            value !== ''
+        ) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+async function fetchBranchCompanyIdentifiers(branchSlug) {
+    if (!branchSlug) {
+        return null;
+    }
+
+    if (typeof DOMParser === 'undefined') {
+        return null;
+    }
+
+    const response = await fetch(
+        `/clinvia-proxy/p/${encodeURIComponent(branchSlug)}`,
+        {
+            headers: {
+                Accept: 'text/html'
+            }
+        }
+    );
+
+    if (!response.ok) {
+        return null;
+    }
+
+    const html =
+        await response.text();
+
+    const parsedDocument =
+        new DOMParser().parseFromString(
+            html,
+            'text/html'
+        );
+
+    const payloadAttribute =
+        parsedDocument
+            .querySelector('#app')
+            ?.getAttribute('data-page');
+
+    if (!payloadAttribute) {
+        return null;
+    }
+
+    let pagePayload;
+
+    try {
+        pagePayload = JSON.parse(
+            payloadAttribute
+        );
+    } catch {
+        return null;
+    }
+
+    const companyFromBranchPage =
+        pagePayload?.props?.branch
+            ?.company;
+
+    if (
+        !companyFromBranchPage ||
+        typeof companyFromBranchPage !== 'object'
+    ) {
+        return null;
+    }
+
+    return {
+        ico: pickFirstDefined(
+            companyFromBranchPage.ico,
+            companyFromBranchPage.company_id_number
+        ),
+
+        dic: pickFirstDefined(
+            companyFromBranchPage.dic,
+            companyFromBranchPage.tax_id
+        ),
+
+        taxId: pickFirstDefined(
+            companyFromBranchPage.tax_id,
+            companyFromBranchPage.dic
+        ),
+
+        icDph: pickFirstDefined(
+            companyFromBranchPage.ic_dph,
+            companyFromBranchPage.vat_id
+        )
+    };
+}
+
 export const usePublicSiteStore = defineStore(
     'publicSite',
     () => {
@@ -204,11 +349,11 @@ export const usePublicSiteStore = defineStore(
                         responseData?.data ??
                         responseData;
 
-                    company.value = normalizeCompany(
+                    const normalizedCompany = normalizeCompany(
                         rawCompany
                     );
 
-                    footerData.value =
+                    const normalizedFooterData =
                         normalizeClinviaPublicFooterData(
                             responseData,
                             {
@@ -216,6 +361,71 @@ export const usePublicSiteStore = defineStore(
                                     configuredBranchIdentifier
                             }
                         );
+
+                    let branchPageIdentifiers =
+                        null;
+
+                    if (
+                        import.meta.env.DEV &&
+                        !pickFirstDefined(
+                            normalizedCompany?.ico,
+                            normalizedCompany?.dic,
+                            normalizedFooterData?.company?.ico,
+                            normalizedFooterData?.company?.dic
+                        )
+                    ) {
+                        const branchSlug =
+                            resolveBranchSlug(
+                                rawCompany,
+                                configuredBranchIdentifier
+                            );
+
+                        try {
+                            branchPageIdentifiers =
+                                await fetchBranchCompanyIdentifiers(
+                                    branchSlug
+                                );
+                        } catch {
+                            branchPageIdentifiers =
+                                null;
+                        }
+                    }
+
+                    footerData.value =
+                        normalizedFooterData;
+
+                    company.value = {
+                        ...normalizedCompany,
+
+                        ico:
+                            normalizedCompany?.ico ??
+                            normalizedFooterData?.company?.ico ??
+                            branchPageIdentifiers?.ico ??
+                            null,
+
+                        dic:
+                            normalizedCompany?.dic ??
+                            normalizedFooterData?.company?.dic ??
+                            branchPageIdentifiers?.dic ??
+                            null,
+
+                        taxId:
+                            normalizedCompany?.taxId ??
+                            normalizedFooterData?.company?.dic ??
+                            branchPageIdentifiers?.taxId ??
+                            null,
+
+                        icDph:
+                            normalizedCompany?.icDph ??
+                            normalizedFooterData?.company?.icDph ??
+                            branchPageIdentifiers?.icDph ??
+                            null,
+
+                        registeredAddress:
+                            normalizedCompany?.registeredAddress ??
+                            normalizedFooterData?.company?.registeredAddress ??
+                            null
+                    };
 
                     loaded.value = true;
 
