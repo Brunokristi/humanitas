@@ -14,6 +14,44 @@ npm install
 npm run dev
 ```
 
+### Contact Form (PHP API)
+
+The contact form submits to `/api/contact.php`.
+In local development this is proxied by Vite to a local PHP server.
+
+1. Copy the env file and fill mail settings:
+
+```bash
+cp .env.example .env
+```
+
+Required keys:
+
+- `MAIL_HOST`
+- `MAIL_PORT`
+- `MAIL_USERNAME`
+- `MAIL_PASSWORD`
+- `MAIL_ENCRYPTION`
+- `MAIL_FROM_ADDRESS`
+- `MAIL_FROM_NAME`
+- `CONTACT_MAIL_TO`
+
+Optional dev API URL (default is already set):
+
+- `VITE_CONTACT_API_URL=http://127.0.0.1:8080`
+
+2. Start the PHP API server in one terminal:
+
+```bash
+npm run dev:api
+```
+
+3. Start Vite in another terminal:
+
+```bash
+npm run dev
+```
+
 ## Production Build
 
 ```bash

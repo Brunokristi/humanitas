@@ -82,6 +82,68 @@ const messageTextarea =
     ref(null);
 
 /*
+ * Phone formatting
+ *
+ * Numbers without a country code are treated as
+ * Slovak numbers and automatically receive +421.
+ */
+
+const PHONE_SETTINGS = Object.freeze({
+    defaultCountryCode: '421',
+    example: '+421 900 123 456',
+    minimumDigits: 8,
+    maximumDigits: 15
+});
+
+const TWO_DIGIT_COUNTRY_CODES =
+    new Set([
+        '20',
+        '27',
+        '30',
+        '31',
+        '32',
+        '33',
+        '34',
+        '36',
+        '39',
+        '40',
+        '41',
+        '43',
+        '44',
+        '45',
+        '46',
+        '47',
+        '48',
+        '49',
+        '51',
+        '52',
+        '53',
+        '54',
+        '55',
+        '56',
+        '57',
+        '58',
+        '60',
+        '61',
+        '62',
+        '63',
+        '64',
+        '65',
+        '66',
+        '81',
+        '82',
+        '84',
+        '86',
+        '90',
+        '91',
+        '92',
+        '93',
+        '94',
+        '95',
+        '98'
+    ]);
+
+/*
  * API data
  */
 
@@ -182,32 +244,52 @@ const longitude = computed(() => {
  * Maps
  */
 
-const googleMapsUrl =
+const googleMapsQuery =
     computed(() => {
         if (
             latitude.value !== null &&
             longitude.value !== null
         ) {
             return (
-                'https://www.google.com/maps/search/' +
-                '?api=1&query=' +
                 `${latitude.value},${longitude.value}`
             );
         }
 
-        if (
-            branchAddress.value
-        ) {
-            return (
-                'https://www.google.com/maps/search/' +
-                '?api=1&query=' +
-                encodeURIComponent(
-                    branchAddress.value
-                )
-            );
+        return (
+            branchAddress.value ||
+            null
+        );
+    });
+
+const googleMapsUrl =
+    computed(() => {
+        if (!googleMapsQuery.value) {
+            return null;
         }
 
-        return null;
+        return (
+            'https://www.google.com/maps/search/' +
+            '?api=1&query=' +
+            encodeURIComponent(
+                googleMapsQuery.value
+            )
+        );
+    });
+
+const googleMapsEmbedUrl =
+    computed(() => {
+        if (!googleMapsQuery.value) {
+            return null;
+        }
+
+        return (
+            'https://www.google.com/maps?' +
+            'q=' +
+            encodeURIComponent(
+                googleMapsQuery.value
+            ) +
+            '&z=16&output=embed'
+        );
     });
 
 /*
@@ -813,6 +895,226 @@ function resetMessageTextarea() {
 }
 
 /*
+ * Phone helpers
+ */
+
+function phoneDigits(value) {
+    return String(
+        value ?? ''
+    ).replace(
+        /\D/g,
+        ''
+    );
+}
+
+function normalizePhoneDigits(value) {
+    const rawValue =
+        String(
+            value ?? ''
+        ).trim();
+
+    let digits =
+        phoneDigits(
+            rawValue
+        );
+
+    if (!digits) {
+        return '';
+    }
+
+    if (
+        rawValue.startsWith(
+            '00'
+        )
+    ) {
+        digits =
+            digits.slice(
+                2
+            );
+    } else if (
+        rawValue.startsWith(
+            '+'
+        )
+    ) {
+        /*
+         * The country code is already present.
+         */
+    } else if (
+        digits.startsWith(
+            PHONE_SETTINGS
+                .defaultCountryCode
+        )
+    ) {
+        /*
+         * The user entered 421 without the plus.
+         */
+    } else if (
+        digits.startsWith(
+            '0'
+        )
+    ) {
+        digits =
+            PHONE_SETTINGS
+                .defaultCountryCode +
+            digits.slice(
+                1
+            );
+    } else {
+        digits =
+            PHONE_SETTINGS
+                .defaultCountryCode +
+            digits;
+    }
+
+    return digits.slice(
+        0,
+        PHONE_SETTINGS.maximumDigits
+    );
+}
+
+function phoneCountryCodeLength(
+    digits
+) {
+    if (!digits) {
+        return 0;
+    }
+
+    if (
+        digits.startsWith(
+            '1'
+        ) ||
+        digits.startsWith(
+            '7'
+        )
+    ) {
+        return 1;
+    }
+
+    if (
+        TWO_DIGIT_COUNTRY_CODES.has(
+            digits.slice(
+                0,
+                2
+            )
+        )
+    ) {
+        return Math.min(
+            2,
+            digits.length
+        );
+    }
+
+    return Math.min(
+        3,
+        digits.length
+    );
+}
+
+function formatPhoneNumber(value) {
+    const digits =
+        normalizePhoneDigits(
+            value
+        );
+
+    if (!digits) {
+        return '';
+    }
+
+    const countryCodeLength =
+        phoneCountryCodeLength(
+            digits
+        );
+
+    const countryCode =
+        digits.slice(
+            0,
+            countryCodeLength
+        );
+
+    const nationalNumber =
+        digits.slice(
+            countryCodeLength
+        );
+
+    const nationalGroups =
+        nationalNumber.match(
+            /.{1,3}/g
+        ) ?? [];
+
+    return (
+        `+${countryCode}` +
+        (
+            nationalGroups.length
+                ? ` ${nationalGroups.join(
+                    ' '
+                )}`
+                : ''
+        )
+    );
+}
+
+function normalizePhoneForSubmission(
+    value
+) {
+    const digits =
+        normalizePhoneDigits(
+            value
+        );
+
+    return digits
+        ? `+${digits}`
+        : '';
+}
+
+function handlePhoneInput(event) {
+    form.sender_phone =
+        formatPhoneNumber(
+            event.target.value
+        );
+
+    formErrors.sender_phone =
+        null;
+}
+
+function handlePhoneBlur() {
+    form.sender_phone =
+        formatPhoneNumber(
+            form.sender_phone
+        );
+}
+
+function validatePhoneNumber() {
+    const normalizedPhone =
+        normalizePhoneForSubmission(
+            form.sender_phone
+        );
+
+    const digits =
+        phoneDigits(
+            normalizedPhone
+        );
+
+    if (
+        digits.length <
+            PHONE_SETTINGS.minimumDigits ||
+        digits.length >
+            PHONE_SETTINGS.maximumDigits
+    ) {
+        formErrors.sender_phone =
+            `Zadajte číslo v medzinárodnom formáte, napr. ${PHONE_SETTINGS.example}.`;
+
+        return null;
+    }
+
+    form.sender_phone =
+        formatPhoneNumber(
+            normalizedPhone
+        );
+
+    return normalizedPhone;
+}
+
+/*
  * Form helpers
  */
 
@@ -871,6 +1173,13 @@ async function submit() {
     submitError.value =
         null;
 
+    const normalizedPhone =
+        validatePhoneNumber();
+
+    if (!normalizedPhone) {
+        return;
+    }
+
     isSubmitting.value =
         true;
 
@@ -899,7 +1208,7 @@ async function submit() {
                                 form.sender_email,
 
                             sender_phone:
-                                form.sender_phone,
+                                normalizedPhone,
 
                             body:
                                 form.body,
@@ -1325,9 +1634,12 @@ onBeforeUnmount(() => {
                                 <!-- Name -->
                                 <div
                                     class="
+                                        flex
+                                        flex-col
                                         px-6
-                                        pb-5
+                                        pb-3
                                         pt-5
+                                        gap-2
                                     "
                                 >
                                     <label
@@ -1395,8 +1707,12 @@ onBeforeUnmount(() => {
                                     class="
                                         border-t
                                         border-green/10
+                                        flex
+                                        flex-col
                                         px-6
-                                        py-5
+                                        pb-3
+                                        pt-5
+                                        gap-2
                                     "
                                 >
                                     <label
@@ -1464,8 +1780,12 @@ onBeforeUnmount(() => {
                                     class="
                                         border-t
                                         border-green/10
+                                        flex
+                                        flex-col
                                         px-6
-                                        py-5
+                                        pb-3
+                                        pt-5
+                                        gap-2
                                     "
                                 >
                                     <label
@@ -1482,12 +1802,16 @@ onBeforeUnmount(() => {
 
                                     <input
                                         id="contact-phone"
-                                        v-model="
+                                        :value="
                                             form.sender_phone
                                         "
                                         type="tel"
+                                        inputmode="tel"
                                         autocomplete="tel"
-                                        placeholder="+421"
+                                        :placeholder="
+                                            PHONE_SETTINGS.example
+                                        "
+                                        maxlength="24"
                                         required
                                         class="
                                             text-regular
@@ -1509,12 +1833,22 @@ onBeforeUnmount(() => {
                                                 formErrors.sender_phone
                                             )
                                         "
+                                        aria-describedby="
+                                            contact-phone-hint
+                                        "
+                                        @input="
+                                            handlePhoneInput
+                                        "
+                                        @blur="
+                                            handlePhoneBlur
+                                        "
                                     >
 
                                     <p
                                         v-if="
                                             formErrors.sender_phone
                                         "
+                                        id="contact-phone-hint"
                                         class="
                                             text-regular
                                             mt-2
@@ -1533,8 +1867,12 @@ onBeforeUnmount(() => {
                                     class="
                                         border-t
                                         border-green/10
+                                        flex
+                                        flex-col
                                         px-6
-                                        py-5
+                                        pb-3
+                                        pt-5
+                                        gap-2
                                     "
                                 >
                                     <label
@@ -1756,24 +2094,35 @@ onBeforeUnmount(() => {
                                 `${contact.type}-${contact.value}-${index}`
                             "
                             :is="
-                                contactHref(
-                                    contact
-                                )
-                                    ? 'a'
-                                    : 'div'
-                            "
-                            :href="
-                                contactHref(
-                                    contact
-                                ) ||
-                                undefined
-                            "
-                            v-bind="
-                                linkAttrs(
-                                    contactHref(
+                                contact.type ===
+                                'address'
+                                    ? 'div'
+                                    : contactHref(
                                         contact
                                     )
-                                )
+                                        ? 'a'
+                                        : 'div'
+                            "
+                            :href="
+                                contact.type !==
+                                    'address'
+                                    ? (
+                                        contactHref(
+                                            contact
+                                        ) ||
+                                        undefined
+                                    )
+                                    : undefined
+                            "
+                            v-bind="
+                                contact.type !==
+                                    'address'
+                                    ? linkAttrs(
+                                        contactHref(
+                                            contact
+                                        )
+                                    )
+                                    : {}
                             "
                             class="
                                 scroll-motion
@@ -1781,7 +2130,6 @@ onBeforeUnmount(() => {
                                 relative
                                 flex
                                 min-w-0
-                                items-center
                                 gap-4
                                 rounded-[40px]
                                 bg-baige
@@ -1795,6 +2143,12 @@ onBeforeUnmount(() => {
 
                                 hover:z-20
                                 hover:-translate-y-[1px]
+                            "
+                            :class="
+                                contact.type ===
+                                'address'
+                                    ? 'flex-col items-stretch'
+                                    : 'items-center'
                             "
                             :style="
                                 contactCardMotionStyle(
@@ -1818,62 +2172,133 @@ onBeforeUnmount(() => {
                             <div
                                 class="
                                     flex
-                                    size-10
-                                    shrink-0
+                                    min-w-0
                                     items-center
-                                    justify-center
-                                    rounded-full
-                                    bg-green
-                                    text-baige
+                                    gap-4
                                 "
                             >
-                                <i
-                                    class="bi"
-                                    :class="
-                                        contactIcon(
-                                            contact
-                                        )
+                                <div
+                                    class="
+                                        flex
+                                        size-10
+                                        shrink-0
+                                        items-center
+                                        justify-center
+                                        rounded-full
+                                        bg-green
+                                        text-baige
                                     "
-                                    aria-hidden="true"
-                                />
+                                >
+                                    <i
+                                        class="bi"
+                                        :class="
+                                            contactIcon(
+                                                contact
+                                            )
+                                        "
+                                        aria-hidden="true"
+                                    />
+                                </div>
+
+                                <p
+                                    class="
+                                        min-w-0
+                                        flex-1
+                                    "
+                                >
+                                    <span
+                                        class="
+                                            text-regular
+                                            block
+                                            text-sm
+                                            text-green/50
+                                        "
+                                    >
+                                        {{
+                                            contactLabel(
+                                                contact
+                                            )
+                                        }}
+                                    </span>
+
+                                    <a
+                                        v-if="
+                                            contact.type ===
+                                                'address' &&
+                                            googleMapsUrl
+                                        "
+                                        :href="
+                                            googleMapsUrl
+                                        "
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="
+                                            text-regular
+                                            mt-0.5
+                                            block
+                                            break-words
+                                            font-bold
+                                            text-green
+                                            transition-opacity
+                                            hover:opacity-60
+                                        "
+                                    >
+                                        {{
+                                            contact.value
+                                        }}
+                                    </a>
+
+                                    <span
+                                        v-else
+                                        class="
+                                            text-regular
+                                            mt-0.5
+                                            block
+                                            break-words
+                                            font-bold
+                                            text-green
+                                        "
+                                    >
+                                        {{
+                                            contact.value
+                                        }}
+                                    </span>
+                                </p>
                             </div>
 
-                            <p
+                            <div
+                                v-if="
+                                    contact.type ===
+                                        'address' &&
+                                    googleMapsEmbedUrl
+                                "
                                 class="
-                                    min-w-0
-                                    flex-1
+                                    mt-1
+                                    overflow-hidden
+                                    rounded-[28px]
+                                    bg-green/10
                                 "
                             >
-                                <span
-                                    class="
-                                        text-regular
-                                        block
-                                        text-sm
-                                        text-green/50
+                                <iframe
+                                    :src="
+                                        googleMapsEmbedUrl
                                     "
-                                >
-                                    {{
-                                        contactLabel(
-                                            contact
-                                        )
-                                    }}
-                                </span>
+                                    :title="
+                                        `Mapa adresy ${contact.value}`
+                                    "
+                                    class="
+                                        block
+                                        h-64
+                                        w-full
+                                        border-0
 
-                                <span
-                                    class="
-                                        text-regular
-                                        mt-0.5
-                                        block
-                                        break-words
-                                        font-bold
-                                        text-green
+                                        lg:h-72
                                     "
-                                >
-                                    {{
-                                        contact.value
-                                    }}
-                                </span>
-                            </p>
+                                    loading="lazy"
+                                    allowfullscreen
+                                    referrerpolicy="no-referrer-when-downgrade"
+                                />
+                            </div>
                         </component>
                     </div>
 

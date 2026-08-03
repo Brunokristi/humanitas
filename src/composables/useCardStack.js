@@ -144,12 +144,16 @@ function createCardStack({
             reducedMotionQuery.matches
         )
 
+    function handleReducedMotionChange(
+        event
+    ) {
+        reducedMotion.value =
+            event.matches
+    }
+
     reducedMotionQuery.addEventListener(
         'change',
-        (event) => {
-            reducedMotion.value =
-                event.matches
-        }
+        handleReducedMotionChange
     )
 
     function getTransitionMs() {
@@ -169,6 +173,13 @@ function createCardStack({
         )
     }
 
+    /*
+     * The reusable motion engine now owns
+     * scroll movement.
+     *
+     * No additional layout compensation is
+     * required because the motion is temporary.
+     */
     const stackBottomCompensation =
         computed(() => {
             return 0
@@ -232,51 +243,6 @@ function createCardStack({
             openingOverlayElement =
                 null
         }
-    }
-
-    function makeOverlayInert(
-        element
-    ) {
-        element.setAttribute(
-            'aria-hidden',
-            'true'
-        )
-
-        element.removeAttribute(
-            'tabindex'
-        )
-
-        element
-            .querySelectorAll(
-                '[id]'
-            )
-            .forEach(
-                (child) => {
-                    child.removeAttribute(
-                        'id'
-                    )
-                }
-            )
-
-        element
-            .querySelectorAll(
-                [
-                    'button',
-                    'a',
-                    'input',
-                    'textarea',
-                    'select',
-                    '[tabindex]'
-                ].join(', ')
-            )
-            .forEach(
-                (child) => {
-                    child.setAttribute(
-                        'tabindex',
-                        '-1'
-                    )
-                }
-            )
     }
 
     function createOpeningOverlay(
@@ -352,13 +318,50 @@ function createCardStack({
                 sourceStyles.transformOrigin
         }
 
-        makeOverlayInert(
-            overlay
+        overlay.setAttribute(
+            'aria-hidden',
+            'true'
+        )
+
+        overlay.removeAttribute(
+            'tabindex'
         )
 
         overlay.classList.add(
             'card-opening-overlay'
         )
+
+        overlay
+            .querySelectorAll(
+                '[id]'
+            )
+            .forEach(
+                (element) => {
+                    element.removeAttribute(
+                        'id'
+                    )
+                }
+            )
+
+        overlay
+            .querySelectorAll(
+                [
+                    'button',
+                    'a',
+                    'input',
+                    'textarea',
+                    'select',
+                    '[tabindex]'
+                ].join(', ')
+            )
+            .forEach(
+                (element) => {
+                    element.setAttribute(
+                        'tabindex',
+                        '-1'
+                    )
+                }
+            )
 
         Object.assign(
             overlay.style,
@@ -475,6 +478,13 @@ function createCardStack({
     ) {
         cleanupOpeningOverlay()
 
+        /*
+         * The shell changes size and position.
+         *
+         * The cloned page inside keeps the exact
+         * expanded width and height, so its content
+         * is clipped instead of scaled or squeezed.
+         */
         const shell =
             document.createElement(
                 'div'
@@ -490,10 +500,6 @@ function createCardStack({
                 sourceElement
             )
 
-        makeOverlayInert(
-            content
-        )
-
         shell.setAttribute(
             'aria-hidden',
             'true'
@@ -503,11 +509,52 @@ function createCardStack({
             'card-closing-overlay'
         )
 
+        content.setAttribute(
+            'aria-hidden',
+            'true'
+        )
+
+        content.removeAttribute(
+            'tabindex'
+        )
+
+        content
+            .querySelectorAll(
+                '[id]'
+            )
+            .forEach(
+                (element) => {
+                    element.removeAttribute(
+                        'id'
+                    )
+                }
+            )
+
+        content
+            .querySelectorAll(
+                [
+                    'button',
+                    'a',
+                    'input',
+                    'textarea',
+                    'select',
+                    '[tabindex]'
+                ].join(', ')
+            )
+            .forEach(
+                (element) => {
+                    element.setAttribute(
+                        'tabindex',
+                        '-1'
+                    )
+                }
+            )
+
         Object.assign(
             shell.style,
             {
                 position:
-                    'absolute',
+                    'fixed',
 
                 top:
                     `${sourceRect.top}px`,
@@ -524,6 +571,9 @@ function createCardStack({
                 maxWidth:
                     'none',
 
+                minWidth:
+                    '0',
+
                 minHeight:
                     '0',
 
@@ -531,7 +581,7 @@ function createCardStack({
                     '0',
 
                 transform:
-                    'translate3d(0, 0, 0) scale(1, 1)',
+                    'none',
 
                 transformOrigin:
                     'top left',
@@ -541,6 +591,9 @@ function createCardStack({
 
                 visibility:
                     'visible',
+
+                zIndex:
+                    '9999',
 
                 overflow:
                     'hidden',
@@ -556,7 +609,10 @@ function createCardStack({
 
                 willChange:
                     [
-                        'transform',
+                        'top',
+                        'left',
+                        'width',
+                        'height',
                         'border-radius',
                         'box-shadow'
                     ].join(', '),
@@ -567,8 +623,8 @@ function createCardStack({
                 boxShadow:
                     sourceStyles.boxShadow,
 
-                backgroundColor:
-                    sourceStyles.backgroundColor
+                background:
+                    sourceStyles.background
             }
         )
 
@@ -600,13 +656,19 @@ function createCardStack({
                     'none',
 
                 minWidth:
-                    '0',
+                    `${sourceRect.width}px`,
 
                 minHeight:
-                    '0',
+                    `${sourceRect.height}px`,
 
                 margin:
                     '0',
+
+                transform:
+                    'none',
+
+                transformOrigin:
+                    'top left',
 
                 opacity:
                     '1',
@@ -614,14 +676,14 @@ function createCardStack({
                 visibility:
                     'visible',
 
+                overflow:
+                    'visible',
+
                 pointerEvents:
                     'none',
 
                 transition:
-                    'none',
-
-                willChange:
-                    'transform'
+                    'none'
             }
         )
 
@@ -636,12 +698,7 @@ function createCardStack({
         openingOverlayElement =
             shell
 
-        return {
-            element:
-                shell,
-
-            content
-        }
+        return shell
     }
 
     function schedulePreviewEffectsEnable(
@@ -1164,7 +1221,7 @@ function createCardStack({
             await openingOverlayAnimation
                 .finished
         } catch {
-            // The animation can be cancelled during cleanup.
+            //
         }
 
         finishOpening(
@@ -1176,6 +1233,7 @@ function createCardStack({
     function finishOpening(
         cardId =
             openCardId.value,
+
         shouldUpdateRoute =
             true
     ) {
@@ -1331,6 +1389,10 @@ function createCardStack({
 
         clearPreviewEffectsTimer()
 
+        cleanupOpeningOverlay()
+
+        unlockViewportScroll()
+
         suppressTransition.value =
             true
 
@@ -1373,10 +1435,6 @@ function createCardStack({
         nextTick(
             () => {
                 rememberAllStackedRects()
-
-                cleanupOpeningOverlay()
-
-                unlockViewportScroll()
 
                 requestAnimationFrame(
                     () => {
@@ -1476,17 +1534,19 @@ function createCardStack({
             return
         }
 
-        const closingVisual =
+        /*
+         * Freeze the expanded card before moving
+         * the real card back into the stack.
+         *
+         * Only the overlay shell changes size.
+         * Its cloned page keeps the expanded size
+         * and is progressively clipped.
+         */
+        const overlay =
             createClosingOverlay(
                 element,
                 sourceRect
             )
-
-        const overlay =
-            closingVisual.element
-
-        const overlayContent =
-            closingVisual.content
 
         transitionBox.value = {
             source:
@@ -1535,14 +1595,8 @@ function createCardStack({
             phase.value !==
             'closing' ||
             !overlay ||
-            !overlayContent ||
             !transitionBox.value
         ) {
-            finalizeMinimize({
-                updateRoute:
-                    shouldUpdateRoute
-            })
-
             return
         }
 
@@ -1565,49 +1619,21 @@ function createCardStack({
             transitionBox.value
                 .target
 
-        const translateX =
-            target.left -
-            source.left
-
-        const translateY =
-            target.top -
-            source.top
-
-        const scaleX =
-            target.width /
-            Math.max(
-                source.width,
-                1
-            )
-
-        const scaleY =
-            target.height /
-            Math.max(
-                source.height,
-                1
-            )
-
-        const safeScaleX =
-            Math.max(
-                scaleX,
-                0.0001
-            )
-
-        const safeScaleY =
-            Math.max(
-                scaleY,
-                0.0001
-            )
-
         openingOverlayAnimation =
             overlay.animate(
                 [
                     {
-                        transform:
-                            'translate3d(0, 0, 0) scale(1, 1)',
+                        top:
+                            `${source.top}px`,
 
-                        transformOrigin:
-                            'top left',
+                        left:
+                            `${source.left}px`,
+
+                        width:
+                            `${source.width}px`,
+
+                        height:
+                            `${source.height}px`,
 
                         borderRadius:
                             '28px',
@@ -1617,14 +1643,17 @@ function createCardStack({
                     },
 
                     {
-                        transform:
-                            [
-                                `translate3d(${translateX}px, ${translateY}px, 0)`,
-                                `scale(${scaleX}, ${scaleY})`
-                            ].join(' '),
+                        top:
+                            `${target.top}px`,
 
-                        transformOrigin:
-                            'top left',
+                        left:
+                            `${target.left}px`,
+
+                        width:
+                            `${target.width}px`,
+
+                        height:
+                            `${target.height}px`,
 
                         borderRadius:
                             '32px',
@@ -1645,11 +1674,30 @@ function createCardStack({
                 }
             )
 
+        fallbackTimer =
+            window.setTimeout(
+                () => {
+                    if (
+                        phase.value !==
+                        'closing'
+                    ) {
+                        return
+                    }
+
+                    finalizeMinimize({
+                        updateRoute:
+                            shouldUpdateRoute
+                    })
+                },
+                getTransitionMs() +
+                100
+            )
+
         try {
             await openingOverlayAnimation
                 .finished
         } catch {
-            // The animations can be cancelled during cleanup.
+            // The animation can be cancelled during cleanup.
         }
 
         if (
@@ -1825,6 +1873,25 @@ function createCardStack({
             closingHeightDone.value =
                 true
         }
+
+        if (
+            !closingTopDone.value ||
+            !closingLeftDone.value ||
+            !closingWidthDone.value ||
+            !closingHeightDone.value
+        ) {
+            return
+        }
+
+        const shouldUpdateRoute =
+            transitionBox.value
+                ?.updateRoute ??
+            true
+
+        finalizeMinimize({
+            updateRoute:
+                shouldUpdateRoute
+        })
     }
 
     function getCardVisual(
@@ -2079,6 +2146,12 @@ function createCardStack({
             if (
                 selected
             ) {
+                /*
+                 * The real selected card already sits
+                 * in the final front stack position.
+                 * Keep it hidden while the frozen
+                 * overlay performs the close animation.
+                 */
                 return {
                     isOpen:
                         false,
@@ -2363,7 +2436,8 @@ function createCardStack({
 
     function handleCardActivate(
         cardId,
-        sourceElement = null
+        sourceElement =
+            null
     ) {
         if (
             phase.value !==

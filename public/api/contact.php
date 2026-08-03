@@ -163,6 +163,65 @@ $mailConfig = [
         ''
 ];
 
+/*
+|--------------------------------------------------------------------------
+| Easy branding controls
+|--------------------------------------------------------------------------
+|
+| MAIL_LOGO_PATH is optional.
+|
+| When it is missing, the code automatically checks:
+|
+| public/images/humanitas_logo.png
+| dist/images/humanitas_logo.png
+|
+| The logo is embedded directly into every message using CID, so it does not
+| depend on the recipient allowing external images.
+*/
+
+$branding = [
+    'name' =>
+        $_ENV['BRAND_NAME'] ??
+        'Humanitas',
+
+    'logo_path' =>
+        $_ENV['MAIL_LOGO_PATH'] ??
+        '',
+
+    'logo_cid' =>
+        'humanitas-logo',
+
+    'green' =>
+        '#335940',
+
+    'beige' =>
+        '#FBF9F3',
+
+    'soft_beige' =>
+        '#F3EFE4',
+
+    'muted_green' =>
+        '#6F8576',
+
+    /*
+     * Simple e-mail style controls.
+     */
+    'email_logo_width' =>
+        96,
+
+    'email_card_radius' =>
+        34,
+
+    'email_card_max_width' =>
+        620,
+
+    'email_outer_padding' =>
+        24,
+
+    'email_horizontal_padding' =>
+        34
+];
+
 if (
     !$mailConfig['username'] ||
     !$mailConfig['password'] ||
@@ -284,8 +343,8 @@ $formStartedAt =
 |
 | A real visitor never fills this field.
 |
-| Return success intentionally so a bot does
-| not learn that it has been detected.
+| Return success intentionally so a bot does not learn that it has been
+| detected.
 */
 
 if (
@@ -302,8 +361,8 @@ if (
 | Timing protection
 |--------------------------------------------------------------------------
 |
-| Submitting a full form in less than two seconds
-| is extremely unlikely for a human.
+| Submitting a full form in less than two seconds is extremely unlikely for
+| a human.
 */
 
 if (
@@ -438,8 +497,7 @@ if (
 | Rate limiting
 |--------------------------------------------------------------------------
 |
-| Maximum 5 real submissions from one IP
-| during a 10 minute window.
+| Maximum 5 real submissions from one IP during a 10 minute window.
 */
 
 function isRateLimited(
@@ -471,8 +529,8 @@ function isRateLimited(
 
     if (!$handle) {
         /*
-         * If temporary storage is unavailable,
-         * don't prevent legitimate submissions.
+         * If temporary storage is unavailable, do not prevent legitimate
+         * submissions.
          */
         return false;
     }
@@ -677,6 +735,681 @@ function createMailer(
 
 /*
 |--------------------------------------------------------------------------
+| Logo helpers
+|--------------------------------------------------------------------------
+*/
+
+function resolveLogoPath(
+    string $projectRoot,
+    string $configuredPath
+): ?string {
+    $candidates = [];
+
+    if (
+        trim(
+            $configuredPath
+        ) !== ''
+    ) {
+        if (
+            str_starts_with(
+                $configuredPath,
+                '/'
+            )
+        ) {
+            $candidates[] =
+                $configuredPath;
+        } else {
+            $candidates[] =
+                $projectRoot .
+                '/' .
+                ltrim(
+                    $configuredPath,
+                    '/'
+                );
+        }
+    }
+
+    $candidates[] =
+        $projectRoot .
+        '/public/images/humanitas_logo.png';
+
+    $candidates[] =
+        $projectRoot .
+        '/dist/images/humanitas_logo.png';
+
+    foreach (
+        $candidates as
+        $candidate
+    ) {
+        if (
+            is_file(
+                $candidate
+            ) &&
+            is_readable(
+                $candidate
+            )
+        ) {
+            return $candidate;
+        }
+    }
+
+    return null;
+}
+
+function embedBrandLogo(
+    PHPMailer $mailer,
+    array $branding,
+    string $projectRoot
+): ?string {
+    $logoPath =
+        resolveLogoPath(
+            $projectRoot,
+            (string) (
+                $branding[
+                    'logo_path'
+                ] ??
+                ''
+            )
+        );
+
+    if (!$logoPath) {
+        error_log(
+            'Contact form: email logo was not found.'
+        );
+
+        return null;
+    }
+
+    $extension =
+        strtolower(
+            pathinfo(
+                $logoPath,
+                PATHINFO_EXTENSION
+            )
+        );
+
+    $mimeType =
+        match (
+            $extension
+        ) {
+            'svg' =>
+                'image/svg+xml',
+
+            'jpg',
+            'jpeg' =>
+                'image/jpeg',
+
+            'webp' =>
+                'image/webp',
+
+            default =>
+                'image/png'
+        };
+
+    $fileName =
+        basename(
+            $logoPath
+        );
+
+    $mailer->addEmbeddedImage(
+        $logoPath,
+        $branding[
+            'logo_cid'
+        ],
+        $fileName,
+        'base64',
+        $mimeType
+    );
+
+    return (
+        'cid:' .
+        $branding[
+            'logo_cid'
+        ]
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| Email design helpers
+|--------------------------------------------------------------------------
+|
+| Email clients support less CSS than browsers, so the design uses tables
+| and inline styles. The visual language follows the app:
+|
+| green page background
+| simple beige rounded sheet
+| small centered logo
+| plain green typography
+| no decorative header or footer blocks
+*/
+
+function renderBrandHeader(
+    array $branding,
+    ?string $logoSource
+): string {
+    $brandName =
+        htmlspecialchars(
+            (string) $branding[
+                'name'
+            ],
+            ENT_QUOTES |
+            ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+
+    $logoWidth =
+        max(
+            48,
+            min(
+                240,
+                (int) (
+                    $branding[
+                        'email_logo_width'
+                    ] ??
+                    96
+                )
+            )
+        );
+
+    if ($logoSource) {
+        $safeLogoSource =
+            htmlspecialchars(
+                $logoSource,
+                ENT_QUOTES |
+                ENT_SUBSTITUTE,
+                'UTF-8'
+            );
+
+        return <<<HTML
+<img
+    src="{$safeLogoSource}"
+    width="{$logoWidth}"
+    alt="{$brandName}"
+    style="
+        display: block;
+        width: {$logoWidth}px;
+        max-width: 100%;
+        height: auto;
+        margin: 0 auto;
+        border: 0;
+        outline: none;
+        text-decoration: none;
+    "
+>
+HTML;
+    }
+
+    return <<<HTML
+<div
+    style="
+        color: #335940;
+        font-family:
+            Georgia,
+            'Times New Roman',
+            serif;
+        font-size: 21px;
+        line-height: 1.2;
+        font-weight: 700;
+        text-align: center;
+    "
+>
+    {$brandName}
+</div>
+HTML;
+}
+
+function renderEmailShell(
+    array $branding,
+    ?string $logoSource,
+    string $documentTitle,
+    string $content,
+    string $footer
+): string {
+    $brandHeader =
+        renderBrandHeader(
+            $branding,
+            $logoSource
+        );
+
+    $safeDocumentTitle =
+        htmlspecialchars(
+            $documentTitle,
+            ENT_QUOTES |
+            ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+
+    $safeFooter =
+        htmlspecialchars(
+            $footer,
+            ENT_QUOTES |
+            ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+
+    $green =
+        $branding[
+            'green'
+        ];
+
+    $beige =
+        $branding[
+            'beige'
+        ];
+
+    $cardRadius =
+        max(
+            12,
+            min(
+                60,
+                (int) (
+                    $branding[
+                        'email_card_radius'
+                    ] ??
+                    34
+                )
+            )
+        );
+
+    $cardMaxWidth =
+        max(
+            320,
+            min(
+                760,
+                (int) (
+                    $branding[
+                        'email_card_max_width'
+                    ] ??
+                    620
+                )
+            )
+        );
+
+    $outerPadding =
+        max(
+            10,
+            min(
+                60,
+                (int) (
+                    $branding[
+                        'email_outer_padding'
+                    ] ??
+                    24
+                )
+            )
+        );
+
+    $horizontalPadding =
+        max(
+            18,
+            min(
+                60,
+                (int) (
+                    $branding[
+                        'email_horizontal_padding'
+                    ] ??
+                    34
+                )
+            )
+        );
+
+    return <<<HTML
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <meta
+        name="color-scheme"
+        content="light"
+    >
+
+    <meta
+        name="supported-color-schemes"
+        content="light"
+    >
+
+    <title>{$safeDocumentTitle}</title>
+</head>
+
+<body
+    style="
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        background-color: {$green};
+        color: {$green};
+        font-family:
+            'Avenir Next',
+            'Segoe UI',
+            Arial,
+            Helvetica,
+            sans-serif;
+        -webkit-text-size-adjust: 100%;
+        -ms-text-size-adjust: 100%;
+    "
+>
+    <table
+        role="presentation"
+        width="100%"
+        cellpadding="0"
+        cellspacing="0"
+        border="0"
+        style="
+            width: 100%;
+            border-collapse: collapse;
+            background-color: {$green};
+        "
+    >
+        <tr>
+            <td
+                align="center"
+                style="
+                    padding: {$outerPadding}px 10px;
+                "
+            >
+                <table
+                    role="presentation"
+                    width="100%"
+                    cellpadding="0"
+                    cellspacing="0"
+                    border="0"
+                    style="
+                        width: 100%;
+                        max-width: {$cardMaxWidth}px;
+                        border-collapse: separate;
+                        background-color: {$beige};
+                        border-radius: {$cardRadius}px;
+                        overflow: hidden;
+                    "
+                >
+                    <tr>
+                        <td
+                            align="center"
+                            style="
+                                padding:
+                                    28px
+                                    28px
+                                    0;
+                            "
+                        >
+                            {$brandHeader}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td
+                            style="
+                                padding:
+                                    28px
+                                    {$horizontalPadding}px
+                                    0;
+                            "
+                        >
+                            {$content}
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td
+                            align="center"
+                            style="
+                                padding:
+                                    26px
+                                    {$horizontalPadding}px
+                                    30px;
+                                color:
+                                    rgba(
+                                        51,
+                                        89,
+                                        64,
+                                        0.5
+                                    );
+                                font-size: 11px;
+                                line-height: 1.6;
+                            "
+                        >
+                            {$safeFooter}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+HTML;
+}
+
+function renderDetailRow(
+    string $label,
+    string $value,
+    ?string $href = null
+): string {
+    $safeLabel =
+        htmlspecialchars(
+            $label,
+            ENT_QUOTES |
+            ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+
+    $safeValue =
+        htmlspecialchars(
+            $value,
+            ENT_QUOTES |
+            ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+
+    $valueHtml =
+        $safeValue;
+
+    if ($href) {
+        $safeHref =
+            htmlspecialchars(
+                $href,
+                ENT_QUOTES |
+                ENT_SUBSTITUTE,
+                'UTF-8'
+            );
+
+        $valueHtml = <<<HTML
+<a
+    href="{$safeHref}"
+    style="
+        color: #335940;
+        text-decoration: none;
+    "
+>
+    {$safeValue}
+</a>
+HTML;
+    }
+
+    return <<<HTML
+<tr>
+    <td
+        style="
+            padding:
+                0
+                0
+                12px;
+        "
+    >
+        <table
+            role="presentation"
+            width="100%"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            style="
+                width: 100%;
+                border-collapse: collapse;
+            "
+        >
+            <tr>
+                <td
+                    style="
+                        width: 2px;
+                        background-color: #335940;
+                        border-radius: 999px;
+                        font-size: 0;
+                        line-height: 0;
+                    "
+                >
+                    &nbsp;
+                </td>
+
+                <td
+                    style="
+                        padding:
+                            3px
+                            0
+                            3px
+                            14px;
+                    "
+                >
+                    <p
+                        style="
+                            margin: 0;
+                            color:
+                                rgba(
+                                    51,
+                                    89,
+                                    64,
+                                    0.52
+                                );
+                            font-size: 11px;
+                            line-height: 1.4;
+                            font-weight: 700;
+                            letter-spacing: 0.1em;
+                            text-transform: uppercase;
+                        "
+                    >
+                        {$safeLabel}
+                    </p>
+
+                    <p
+                        style="
+                            margin:
+                                6px
+                                0
+                                0;
+                            color: #335940;
+                            font-size: 16px;
+                            line-height: 1.55;
+                            font-weight: 700;
+                            word-break: break-word;
+                        "
+                    >
+                        {$valueHtml}
+                    </p>
+                </td>
+            </tr>
+        </table>
+    </td>
+</tr>
+HTML;
+}
+
+function renderMessageBlock(
+    string $title,
+    string $safeMessage
+): string {
+    $safeTitle =
+        htmlspecialchars(
+            $title,
+            ENT_QUOTES |
+            ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+
+    return <<<HTML
+<table
+    role="presentation"
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    border="0"
+    style="
+        width: 100%;
+        margin-top: 22px;
+        border-collapse: collapse;
+    "
+>
+    <tr>
+        <td
+            style="
+                width: 2px;
+                background-color:
+                    rgba(
+                        51,
+                        89,
+                        64,
+                        0.22
+                    );
+                border-radius: 999px;
+                font-size: 0;
+                line-height: 0;
+            "
+        >
+            &nbsp;
+        </td>
+
+        <td
+            style="
+                padding:
+                    1px
+                    0
+                    1px
+                    14px;
+            "
+        >
+            <p
+                style="
+                    margin: 0;
+                    color: #335940;
+                    font-size: 12px;
+                    line-height: 1.4;
+                    font-weight: 700;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                "
+            >
+                {$safeTitle}
+            </p>
+
+            <div
+                style="
+                    margin-top: 9px;
+                    color:
+                        rgba(
+                            51,
+                            89,
+                            64,
+                            0.78
+                        );
+                    font-size: 15px;
+                    line-height: 1.75;
+                    word-break: break-word;
+                "
+            >
+                {$safeMessage}
+            </div>
+        </td>
+    </tr>
+</table>
+HTML;
+}
+
+/*
+|--------------------------------------------------------------------------
 | Safe HTML values
 |--------------------------------------------------------------------------
 */
@@ -715,6 +1448,13 @@ $safeMessage =
         )
     );
 
+$phoneHrefValue =
+    preg_replace(
+        '/[^\d+]/',
+        '',
+        $phone
+    ) ?: '';
+
 /*
 |--------------------------------------------------------------------------
 | Send enquiry to clinic
@@ -735,11 +1475,9 @@ try {
         );
 
     /*
-     * Gmail still sees the authenticated
-     * Gmail account as the sender.
+     * Gmail still sees the authenticated account as the sender.
      *
-     * Reply in Gmail goes directly to
-     * the visitor.
+     * Reply in Gmail goes directly to the visitor.
      */
     $notification
         ->addReplyTo(
@@ -751,164 +1489,49 @@ try {
         'Nová správa z webu – ' .
         $name;
 
-    $notification->Body = <<<HTML
-<!DOCTYPE html>
-<html lang="sk">
-<head>
-    <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
-</head>
+    $notificationLogoSource =
+        embedBrandLogo(
+            $notification,
+            $branding,
+            $projectRoot
+        );
 
-<body
-    style="
-        margin: 0;
-        padding: 0;
-        background: #FBF9F3;
-        color: #335940;
-        font-family:
-            Arial,
-            Helvetica,
-            sans-serif;
-    "
->
-    <div
-        style="
-            padding: 32px 16px;
-        "
-    >
-        <div
-            style="
-                max-width: 620px;
-                margin: 0 auto;
-                background: #ffffff;
-                border-radius: 28px;
-                overflow: hidden;
-            "
-        >
-            <div
-                style="
-                    padding: 34px;
-                "
-            >
-                <p
-                    style="
-                        margin: 0 0 8px;
-                        color: rgba(
-                            51,
-                            89,
-                            64,
-                            0.55
-                        );
-                        font-size: 13px;
-                        font-weight: 700;
-                        letter-spacing: 0.08em;
-                        text-transform: uppercase;
-                    "
-                >
-                    Humanitas
-                </p>
+    $notificationDetails =
+        '<table role="presentation" width="100%" cellpadding="0" ' .
+        'cellspacing="0" border="0" style="width: 100%; ' .
+        'border-collapse: collapse;">' .
+        renderDetailRow(
+            'Meno',
+            $name
+        ) .
+        renderDetailRow(
+            'E-mail',
+            $email,
+            'mailto:' .
+            $email
+        ) .
+        renderDetailRow(
+            'Telefón',
+            $phone,
+            $phoneHrefValue !== ''
+                ? 'tel:' .
+                    $phoneHrefValue
+                : null
+        ) .
+        '</table>' .
+        renderMessageBlock(
+            'Správa',
+            $safeMessage
+        );
 
-                <h1
-                    style="
-                        margin: 0;
-                        color: #335940;
-                        font-size: 28px;
-                        line-height: 1.15;
-                    "
-                >
-                    Nová správa z webu
-                </h1>
-
-                <div
-                    style="
-                        margin-top: 30px;
-                    "
-                >
-                    <p
-                        style="
-                            margin: 0 0 18px;
-                            line-height: 1.6;
-                        "
-                    >
-                        <strong>Meno</strong><br>
-                        {$safeName}
-                    </p>
-
-                    <p
-                        style="
-                            margin: 0 0 18px;
-                            line-height: 1.6;
-                        "
-                    >
-                        <strong>E-mail</strong><br>
-
-                        <a
-                            href="mailto:{$safeEmail}"
-                            style="
-                                color: #335940;
-                            "
-                        >
-                            {$safeEmail}
-                        </a>
-                    </p>
-
-                    <p
-                        style="
-                            margin: 0;
-                            line-height: 1.6;
-                        "
-                    >
-                        <strong>Telefón</strong><br>
-                        {$safePhone}
-                    </p>
-                </div>
-
-                <div
-                    style="
-                        margin-top: 30px;
-                        padding-top: 26px;
-                        border-top:
-                            1px solid
-                            rgba(
-                                51,
-                                89,
-                                64,
-                                0.14
-                            );
-                    "
-                >
-                    <p
-                        style="
-                            margin: 0 0 12px;
-                            font-weight: 700;
-                        "
-                    >
-                        Správa
-                    </p>
-
-                    <div
-                        style="
-                            line-height: 1.75;
-                            color: rgba(
-                                51,
-                                89,
-                                64,
-                                0.82
-                            );
-                        "
-                    >
-                        {$safeMessage}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-HTML;
+    $notification->Body =
+        renderEmailShell(
+            $branding,
+            $notificationLogoSource,
+            'Nová správa z webu',
+            $notificationDetails,
+            'Odpovedzte priamo na tento e-mail a odpoveď pôjde odosielateľovi formulára.'
+        );
 
     $notification->AltBody =
         "Nová správa z webu Humanitas\n\n" .
@@ -938,12 +1561,10 @@ HTML;
 | Confirmation to visitor
 |--------------------------------------------------------------------------
 |
-| At this point the clinic already has the
-| enquiry.
+| At this point the clinic already has the enquiry.
 |
-| If confirmation fails, don't tell the user
-| that their original message failed and risk
-| them submitting it repeatedly.
+| If confirmation fails, do not tell the visitor that the original message
+| failed and risk repeated submissions.
 */
 
 try {
@@ -961,154 +1582,123 @@ try {
     $confirmation->Subject =
         'Vašu správu sme prijali';
 
-    $confirmation->Body = <<<HTML
-<!DOCTYPE html>
-<html lang="sk">
-<head>
-    <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
-</head>
+    $confirmationLogoSource =
+        embedBrandLogo(
+            $confirmation,
+            $branding,
+            $projectRoot
+        );
 
-<body
+    $confirmationContent = <<<HTML
+<table
+    role="presentation"
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    border="0"
     style="
-        margin: 0;
-        padding: 0;
-        background: #FBF9F3;
-        color: #335940;
-        font-family:
-            Arial,
-            Helvetica,
-            sans-serif;
+        width: 100%;
+        border-collapse: collapse;
     "
 >
-    <div
-        style="
-            padding: 32px 16px;
-        "
-    >
-        <div
+    <tr>
+        <td
             style="
-                max-width: 620px;
-                margin: 0 auto;
-                background: #ffffff;
-                border-radius: 28px;
-                overflow: hidden;
+                padding-bottom: 18px;
+                color:
+                    rgba(
+                        51,
+                        89,
+                        64,
+                        0.88
+                    );
+                font-size: 15px;
+                line-height: 1.75;
             "
         >
-            <div
-                style="
-                    padding: 34px;
-                "
-            >
-                <p
-                    style="
-                        margin: 0 0 8px;
-                        color: rgba(
-                            51,
-                            89,
-                            64,
-                            0.55
-                        );
-                        font-size: 13px;
-                        font-weight: 700;
-                        letter-spacing: 0.08em;
-                        text-transform: uppercase;
-                    "
-                >
-                    Humanitas
-                </p>
+            Dobrý deň, <strong>{$safeName}</strong>,
+        </td>
+    </tr>
 
-                <h1
-                    style="
-                        margin: 0;
-                        color: #335940;
-                        font-size: 28px;
-                        line-height: 1.15;
-                    "
-                >
-                    Ďakujeme za vašu správu
-                </h1>
+    <tr>
+        <td
+            style="
+                padding-bottom: 8px;
+                color:
+                    rgba(
+                        51,
+                        89,
+                        64,
+                        0.78
+                    );
+                font-size: 15px;
+                line-height: 1.75;
+            "
+        >
+            Vašu správu sme úspešne prijali. Ozveme sa vám čo najskôr
+            na e-mail
+            <strong>{$safeEmail}</strong>
+            alebo telefonicky na
+            <strong>{$safePhone}</strong>.
+        </td>
+    </tr>
+</table>
 
-                <p
-                    style="
-                        margin: 26px 0 0;
-                        line-height: 1.75;
-                    "
-                >
-                    Dobrý deň,
-                    {$safeName},
-                </p>
-
-                <p
-                    style="
-                        margin: 14px 0 0;
-                        line-height: 1.75;
-                    "
-                >
-                    vašu správu sme úspešne
-                    prijali. Ozveme sa vám čo
-                    najskôr.
-                </p>
-
-                <div
-                    style="
-                        margin-top: 28px;
-                        padding: 22px;
-                        border-radius: 20px;
-                        background: #FBF9F3;
-                    "
-                >
-                    <p
-                        style="
-                            margin: 0 0 10px;
-                            font-weight: 700;
-                        "
-                    >
-                        Vaša správa
-                    </p>
-
-                    <div
-                        style="
-                            line-height: 1.75;
-                            color: rgba(
-                                51,
-                                89,
-                                64,
-                                0.76
-                            );
-                        "
-                    >
-                        {$safeMessage}
-                    </div>
-                </div>
-
-                <p
-                    style="
-                        margin: 30px 0 0;
-                        line-height: 1.75;
-                    "
-                >
-                    S pozdravom<br>
-
-                    <strong>
-                        Humanitas
-                    </strong>
-                </p>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
 HTML;
+
+    $confirmationContent .=
+        renderMessageBlock(
+            'Vaša správa',
+            $safeMessage
+        );
+
+    $confirmationContent .= <<<HTML
+<table
+    role="presentation"
+    width="100%"
+    cellpadding="0"
+    cellspacing="0"
+    border="0"
+    style="
+        width: 100%;
+        margin-top: 24px;
+        border-collapse: collapse;
+    "
+>
+    <tr>
+        <td
+            style="
+                color:
+                    rgba(
+                        51,
+                        89,
+                        64,
+                        0.88
+                    );
+                font-size: 15px;
+                line-height: 1.75;
+            "
+        >
+            S pozdravom<br>
+            <strong>Humanitas</strong>
+        </td>
+    </tr>
+</table>
+HTML;
+
+    $confirmation->Body =
+        renderEmailShell(
+            $branding,
+            $confirmationLogoSource,
+            'Vašu správu sme prijali',
+            $confirmationContent,
+            'Tento e-mail bol odoslaný automaticky ako potvrdenie prijatia formulára.'
+        );
 
     $confirmation->AltBody =
         "Dobrý deň, {$name},\n\n" .
         "vašu správu sme úspešne prijali. " .
         "Ozveme sa vám čo najskôr.\n\n" .
-        "Vaša správa:\n{$message}\n\n" .
         "S pozdravom\n" .
         "Humanitas";
 

@@ -380,10 +380,9 @@ function handleCookiesClick() {
                     grid-cols-1
                     gap-x-12
                     gap-y-14
-                    pt-5
+                    pt-15
 
                     sm:justify-items-center
-                    sm:pt-16
 
                     md:grid-cols-3
 

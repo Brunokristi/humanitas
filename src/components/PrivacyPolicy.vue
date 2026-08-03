@@ -83,17 +83,6 @@ const normalizedSections = computed(() => {
     );
 });
 
-function formattedSectionNumber(
-    number
-) {
-    return String(
-        number
-    ).padStart(
-        2,
-        '0'
-    );
-}
-
 function scrollToSection(id) {
     const element =
         document.getElementById(
@@ -291,26 +280,6 @@ function scrollToSection(id) {
                                 <span
                                     class="
                                         text-regular
-                                        block
-                                        text-sm
-                                        font-bold
-                                        text-green/40
-                                        transition-colors
-                                        duration-200
-
-                                        group-hover:text-green/60
-                                    "
-                                >
-                                    {{
-                                        formattedSectionNumber(
-                                            section.number
-                                        )
-                                    }}
-                                </span>
-
-                                <span
-                                    class="
-                                        text-regular
                                         mt-1
                                         block
                                         max-w-64
@@ -362,23 +331,6 @@ function scrollToSection(id) {
                                 gap-3
                             "
                         >
-                            <span
-                                class="
-                                    text-regular
-                                    shrink-0
-                                    pt-[0.15rem]
-                                    text-sm
-                                    font-bold
-                                    text-green/40
-                                "
-                            >
-                                {{
-                                    formattedSectionNumber(
-                                        section.number
-                                    )
-                                }}
-                            </span>
-
                             <h3
                                 class="
                                     text-regular

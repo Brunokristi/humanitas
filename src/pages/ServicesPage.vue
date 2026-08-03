@@ -2197,7 +2197,6 @@ onBeforeUnmount(() => {
                                                                 text-green
                                                             "
                                                         >
-                                                            od
                                                             {{
                                                                 selfPayPrice(
                                                                     item

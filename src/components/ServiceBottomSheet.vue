@@ -76,6 +76,42 @@ const selfPayPrice = computed(() => {
     );
 });
 
+/*
+ * Optional note displayed next to the price.
+ *
+ * Supported API field names:
+ * selfPayNote
+ * self_pay_note
+ * selfPayPriceNote
+ * self_pay_price_note
+ * priceNote
+ * price_note
+ */
+
+const selfPayPriceNote = computed(() => {
+    const note =
+        props.service?.selfPayNote ??
+        props.service?.self_pay_note ??
+        props.service?.selfPayPriceNote ??
+        props.service?.self_pay_price_note ??
+        props.service?.priceNote ??
+        props.service?.price_note ??
+        null;
+
+    if (
+        typeof note !==
+        'string'
+    ) {
+        return null;
+    }
+
+    const normalizedNote =
+        note.trim();
+
+    return normalizedNote ||
+        null;
+});
+
 const informationItems = computed(() => {
     if (
         !Array.isArray(
@@ -159,17 +195,79 @@ function buildPublicAssetUrl(path) {
         import.meta.env.VITE_CLINVIA_API_URL ??
         'https://clinvia.studiokristian.com';
 
+    const publicBaseUrl =
+        String(apiBaseUrl)
+            .replace(/\/+$/, '')
+            .replace(/\/api$/i, '');
+
     const normalizedPath =
         path.startsWith('/')
             ? path
             : `/${path}`;
 
-    return `${apiBaseUrl}${normalizedPath}`;
+    return `${publicBaseUrl}${normalizedPath}`;
+}
+
+function normalizeServiceFilePath(path) {
+    const normalizedPath =
+        path.startsWith('/')
+            ? path
+            : `/${path}`;
+
+    if (
+        normalizedPath.startsWith(
+            '/storage/'
+        )
+    ) {
+        return normalizedPath;
+    }
+
+    if (
+        normalizedPath.startsWith(
+            '/service-files/'
+        )
+    ) {
+        return `/storage${normalizedPath}`;
+    }
+
+    return normalizedPath;
 }
 
 function fileUrl(file) {
+    const candidate =
+        file?.url ??
+        file?.downloadUrl ??
+        file?.download_url ??
+        file?.path ??
+        null;
+
+    if (!candidate) {
+        return null;
+    }
+
+    if (
+        candidate.startsWith('http://') ||
+        candidate.startsWith('https://')
+    ) {
+        try {
+            const parsedUrl =
+                new URL(candidate);
+
+            parsedUrl.pathname =
+                normalizeServiceFilePath(
+                    parsedUrl.pathname
+                );
+
+            return parsedUrl.toString();
+        } catch {
+            return candidate;
+        }
+    }
+
     return buildPublicAssetUrl(
-        file?.path
+        normalizeServiceFilePath(
+            candidate
+        )
     );
 }
 
@@ -229,8 +327,10 @@ function formatBytes(value) {
                 max-w-6xl
                 pb-4
                 pt-4
+
                 sm:pb-12
                 sm:pt-6
+
                 lg:pb-14
                 lg:pt-8
             "
@@ -240,6 +340,7 @@ function formatBytes(value) {
                     grid
                     grid-cols-1
                     gap-10
+
                     md:grid-cols-2
                     md:items-start
                     md:gap-12
@@ -249,6 +350,7 @@ function formatBytes(value) {
                 <div
                     class="
                         min-w-0
+
                         lg:sticky
                         lg:top-0
                     "
@@ -333,12 +435,35 @@ function formatBytes(value) {
                             <p
                                 class="
                                     text-regular
-                                    font-bold
+                                    flex
+                                    flex-wrap
+                                    items-baseline
+                                    gap-x-2
+                                    gap-y-1
                                     leading-5
-                                    text-green
                                 "
                             >
-                                od {{ selfPayPrice }} €
+                                <span
+                                    class="
+                                        font-bold
+                                        text-green
+                                    "
+                                >
+                                    {{ selfPayPrice }} €
+                                </span>
+
+                                <span
+                                    v-if="
+                                        selfPayPriceNote
+                                    "
+                                    class="
+                                        text-sm
+                                        font-normal
+                                        text-green/60
+                                    "
+                                >
+                                    {{ selfPayPriceNote }}
+                                </span>
                             </p>
                         </div>
                     </div>
@@ -358,6 +483,7 @@ function formatBytes(value) {
                         "
                         class="
                             pt-8
+
                             lg:pt-0
                         "
                     >
@@ -498,6 +624,7 @@ function formatBytes(value) {
                                 mt-5
                                 grid
                                 gap-3
+
                                 xl:grid-cols-2
                             "
                         >
@@ -528,8 +655,10 @@ function formatBytes(value) {
                                     text-green
                                     transition-all
                                     duration-200
+
                                     hover:-translate-y-0.5
                                     hover:bg-green/20
+
                                     active:translate-y-0
                                 "
                             >
@@ -597,35 +726,6 @@ function formatBytes(value) {
                                             )
                                         }}
                                     </p>
-                                </div>
-
-                                <!-- Download -->
-                                <div
-                                    v-if="
-                                        fileUrl(file)
-                                    "
-                                    class="
-                                        flex
-                                        size-8
-                                        shrink-0
-                                        items-center
-                                        justify-center
-                                        rounded-full
-                                        text-green/60
-                                        transition-all
-                                        duration-200
-                                        group-hover:bg-green
-                                        group-hover:text-baige
-                                    "
-                                >
-                                    <i
-                                        class="
-                                            bi
-                                            bi-download
-                                            text-sm
-                                        "
-                                        aria-hidden="true"
-                                    />
                                 </div>
                             </component>
                         </div>

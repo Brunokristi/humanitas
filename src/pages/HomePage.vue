@@ -1105,7 +1105,6 @@ onBeforeUnmount(() => {
                                                     text-green
                                                 "
                                             >
-                                                od
                                                 {{
                                                     selfPayPrice(
                                                         item
@@ -1214,9 +1213,9 @@ onBeforeUnmount(() => {
                     items-center
                     gap-8
 
-                    md:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.5fr)_minmax(12rem,0.8fr)]
-                    md:gap-10
-                    md:px-10
+                    lg:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.5fr)_minmax(12rem,0.8fr)]
+                    lg:gap-10
+                    lg:px-10
 
                     xl:gap-14
                     xl:px-16
@@ -1313,16 +1312,21 @@ onBeforeUnmount(() => {
             <!-- Team -->
             <div
                 class="
-                    flex
-                    flex-col
+                    mx-auto
+                    grid
+                    w-full
+                    max-w-7xl
+                    grid-cols-1
                     gap-y-32
 
-                    md:flex-row
+                    md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]
                     md:items-center
                     md:gap-x-12
                     md:gap-y-0
+                    md:px-10
 
                     xl:gap-x-16
+                    xl:px-16
                 "
             >
                 <!-- Illustration -->
@@ -1331,13 +1335,12 @@ onBeforeUnmount(() => {
                         relative
                         flex
                         h-[18rem]
+                        min-w-0
                         w-full
-                        shrink-0
                         items-center
                         justify-center
                         overflow-hidden
 
-                        md:w-2/3
                         md:overflow-visible
                     "
                 >
@@ -1364,8 +1367,8 @@ onBeforeUnmount(() => {
                             md:max-w-[34rem]
                             md:translate-x-0
                             md:translate-y-0
-                            md:rotate-[50deg]
-                            md:scale-90
+                            md:rotate-[20deg]
+                            md:scale-[1.2]
                         "
                     >
                 </section>
@@ -1379,11 +1382,9 @@ onBeforeUnmount(() => {
                         relative
                         z-10
                         mx-auto
+                        min-w-0
                         w-full
                         overflow-visible
-
-                        md:w-1/3
-                        md:min-w-0
                     "
                 >
                     <!-- Team copy -->
@@ -1394,7 +1395,6 @@ onBeforeUnmount(() => {
                             items-center
                             gap-3
                             text-center
-                            px-5
                         "
                     >
                         <h2
@@ -1427,6 +1427,7 @@ onBeforeUnmount(() => {
                             mx-auto
                             mt-8
                             min-w-0
+                            w-full
                             max-w-3xl
                         "
                     >

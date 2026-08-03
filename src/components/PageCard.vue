@@ -1,6 +1,7 @@
 <script setup>
 import {
     computed,
+    onBeforeUnmount,
     ref,
     watch
 } from 'vue'
@@ -45,6 +46,9 @@ const emit = defineEmits([
 const rootElementRef =
     ref(null)
 
+const isHovered =
+    ref(false)
+
 const {
     motionRoot
 } = useScrollMotion({
@@ -57,12 +61,6 @@ const {
     includeRoot:
         true,
 
-    /*
-     * Stronger vertical movement.
-     *
-     * No horizontal movement and no
-     * resting rotation.
-     */
     velocityMultiplier:
         0.14,
 
@@ -118,6 +116,55 @@ let stackDragStartX =
 let stackDragStartY =
     0
 
+/*
+ * Hover effects and rotation are only enabled
+ * for devices with a real fine pointer, such
+ * as a mouse or trackpad.
+ *
+ * Touch devices do not receive hover, tilt,
+ * drag rotation, or scroll-motion rotation.
+ */
+const hoverCapabilityQuery =
+    window.matchMedia(
+        '(hover: hover) and (pointer: fine)'
+    )
+
+const hasHoverPointer =
+    ref(
+        hoverCapabilityQuery.matches
+    )
+
+function handleHoverCapabilityChange(
+    event
+) {
+    hasHoverPointer.value =
+        event.matches
+
+    if (
+        event.matches
+    ) {
+        return
+    }
+
+    isHovered.value =
+        false
+
+    stackDragRotate.value =
+        0
+}
+
+hoverCapabilityQuery.addEventListener(
+    'change',
+    handleHoverCapabilityChange
+)
+
+onBeforeUnmount(() => {
+    hoverCapabilityQuery.removeEventListener(
+        'change',
+        handleHoverCapabilityChange
+    )
+})
+
 const isPreviewMode =
     computed(() => {
         return !props.visual.isOpen
@@ -138,13 +185,11 @@ const usesScrollMotion =
             isPreviewMode.value &&
             props.visual.interactive &&
             previewEffectsReady.value &&
+            hasHoverPointer.value &&
             !props.reducedMotion
         )
     })
 
-/*
- * Page cards always rest straight.
- */
 const scrollMotionBaseRotation =
     computed(() => {
         return 0
@@ -226,7 +271,7 @@ const menuControlStyle =
 const cardStyle =
     computed(() => {
         /*
-         * Fixed opening / closing transition.
+         * Fixed opening or closing transition.
          */
         if (
             usesFixedTransitionBox.value
@@ -429,8 +474,33 @@ const cardStyle =
         }
 
         /*
-         * Stack / preview mode.
+         * Stack or preview mode.
          */
+        const hoverActive =
+            Boolean(
+                hasHoverPointer.value &&
+                isPreviewMode.value &&
+                props.visual.interactive &&
+                previewEffectsReady.value &&
+                isHovered.value &&
+                !isStackDragActive.value &&
+                !props.reducedMotion
+            )
+
+        const hoverLiftY =
+            hoverActive
+                ? -5
+                : 0
+
+        const hoverTiltDeg =
+            hoverActive
+                ? -0.7
+                : 0
+
+        const hoverScale =
+            hoverActive
+                ? 1.006
+                : 1
 
         const stackPlayX =
             isPreviewMode.value &&
@@ -445,15 +515,13 @@ const cardStyle =
                 : 0
 
         /*
-         * Rotation exists ONLY while the
-         * user is physically dragging
-         * the card sideways.
-         *
-         * Resting cards always have 0deg.
+         * Rotation is completely disabled
+         * on touch and coarse-pointer devices.
          */
         const stackPlayRotate =
             isPreviewMode.value &&
-            props.visual.interactive
+            props.visual.interactive &&
+            hasHoverPointer.value
                 ? stackDragRotate.value
                 : 0
 
@@ -487,38 +555,51 @@ const cardStyle =
 
             transform: [
                 /*
-                 * Existing horizontal centering.
+                 * Horizontal centering.
                  */
                 'translate3d(-50%, 0, 0)',
 
                 /*
-                 * Direct user card drag.
+                 * Direct pointer drag.
+                 *
+                 * This translation remains enabled
+                 * on mobile, but rotation does not.
                  */
                 `translate3d(${stackPlayX}px, ${stackPlayY}px, 0)`,
 
                 /*
-                 * Existing stack layout.
+                 * Stack position.
                  */
                 `translate3d(0, ${props.visual.y}px, 0)`,
 
                 /*
-                 * Shared vertical scroll inertia.
+                 * Desktop-only hover lift.
+                 */
+                `translate3d(0, ${hoverLiftY}px, 0)`,
+
+                /*
+                 * Desktop-only scroll inertia.
                  */
                 'translate3d(0, var(--scroll-y, 0px), 0)',
 
                 /*
-                 * Only direct pointer drag can
-                 * rotate a PageCard.
+                 * Desktop-only pointer and hover
+                 * rotation.
                  */
-                `rotate(${stackPlayRotate}deg)`,
+                `rotate(${stackPlayRotate + hoverTiltDeg}deg)`,
 
                 /*
-                 * Existing stack depth scale.
+                 * Stack depth.
                  */
                 `scale(${props.visual.scale ?? 1})`,
 
                 /*
-                 * Very subtle physical compression.
+                 * Desktop-only hover growth.
+                 */
+                `scale(${hoverScale})`,
+
+                /*
+                 * Scroll compression.
                  */
                 'scale(var(--scroll-scale, 1))'
             ].join(' '),
@@ -581,12 +662,16 @@ const cardClass =
                 props.visual.interactive,
 
             'cursor-grab':
+                hasHoverPointer.value &&
                 isPreviewMode.value &&
                 props.visual.interactive,
 
             'cursor-grabbing':
-                props.visual.isDragging ||
-                isStackDragActive.value
+                hasHoverPointer.value &&
+                (
+                    props.visual.isDragging ||
+                    isStackDragActive.value
+                )
         }
     })
 
@@ -614,38 +699,47 @@ watch(
     () => [
         isPreviewMode.value,
         usesFixedTransitionBox.value,
-        previewEffectsReady.value
+        previewEffectsReady.value,
+        props.visual.interactive,
+        hasHoverPointer.value
     ],
-
     (
         [
             isPreview,
             isFixedTransition,
-            effectsReady
+            effectsReady,
+            interactive,
+            canHover
         ]
     ) => {
         if (
+            !canHover ||
             !isPreview ||
             isFixedTransition ||
-            !effectsReady
+            !effectsReady ||
+            !interactive
         ) {
-            /*
-             * If state changes during a
-             * manual drag, remove the
-             * temporary pointer transform.
-             */
-            stackDragX.value =
-                0
-
-            stackDragY.value =
-                0
-
-            stackDragRotate.value =
-                0
-
-            isStackDragActive.value =
+            isHovered.value =
                 false
+
+            return
         }
+
+        /*
+         * The pointer may already be over the card
+         * when the minimizing animation finishes.
+         */
+        isHovered.value =
+            Boolean(
+                rootElementRef.value
+                    ?.matches(
+                        ':hover'
+                    )
+            )
+    },
+    {
+        flush:
+            'post'
     }
 )
 
@@ -874,6 +968,9 @@ function beginStackDrag(
     isStackDragActive.value =
         true
 
+    isHovered.value =
+        false
+
     suppressPreviewActivate.value =
         false
 
@@ -940,12 +1037,14 @@ function updateStackDrag(
         clampedY
 
     /*
-     * Rotation only happens while the
-     * user directly pulls sideways.
+     * Desktop mouse and trackpad devices may tilt.
+     * Mobile and touch devices always stay straight.
      */
     stackDragRotate.value =
-        clampedX *
-        0.08
+        hasHoverPointer.value
+            ? clampedX *
+                0.08
+            : 0
 
     if (
         Math.abs(
@@ -996,6 +1095,15 @@ function endStackDrag(
 
     stackDragPointerId =
         null
+
+    isHovered.value =
+        Boolean(
+            hasHoverPointer.value &&
+            rootElementRef.value
+                ?.matches(
+                    ':hover'
+                )
+        )
 }
 
 function onCardPointerDown(
@@ -1055,6 +1163,26 @@ function onCardPointerCancel(
     }
 }
 
+function onMouseEnter() {
+    if (
+        !hasHoverPointer.value ||
+        !isPreviewMode.value ||
+        !props.visual.interactive ||
+        !previewEffectsReady.value ||
+        isStackDragActive.value
+    ) {
+        return
+    }
+
+    isHovered.value =
+        true
+}
+
+function onMouseLeave() {
+    isHovered.value =
+        false
+}
+
 function onTransitionEnd(
     event
 ) {
@@ -1100,7 +1228,7 @@ function onTransitionEnd(
         "
         :data-base-rotation="
             usesScrollMotion
-                ? 0
+                ? scrollMotionBaseRotation
                 : undefined
         "
         :data-rotation-mode="
@@ -1177,6 +1305,12 @@ function onTransitionEnd(
         "
         @pointercancel="
             onCardPointerCancel
+        "
+        @mouseenter="
+            onMouseEnter
+        "
+        @mouseleave="
+            onMouseLeave
         "
         @transitionend="
             onTransitionEnd

@@ -8,6 +8,8 @@ export default defineConfig(({ mode }) => {
   const clinviaBaseUrl = (env.VITE_CLINVIA_API_URL || 'https://clinvia.studiokristian.com')
     .replace(/\/+$/, '')
     .replace(/\/api$/i, '')
+  const contactApiBaseUrl = (env.VITE_CONTACT_API_URL || 'http://127.0.0.1:8080')
+    .replace(/\/+$/, '')
 
   return {
     plugins: [vue(), tailwindcss()],
@@ -28,6 +30,11 @@ export default defineConfig(({ mode }) => {
               }
             })
           }
+        },
+        '/api': {
+          target: contactApiBaseUrl,
+          changeOrigin: true,
+          secure: false
         }
       }
     }

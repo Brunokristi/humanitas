@@ -32,65 +32,113 @@ const isOpen = computed({
     }
 });
 
-const fullName = computed(() => {
+const employeeName = computed(() => {
     return [
-        props.employee?.titleBefore,
-        props.employee?.firstName,
-        props.employee?.lastName,
-        props.employee?.titleAfter
+        props.employee?.titleBefore ??
+            props.employee?.title_before,
+
+        props.employee?.firstName ??
+            props.employee?.first_name,
+
+        props.employee?.lastName ??
+            props.employee?.last_name,
+
+        props.employee?.titleAfter ??
+            props.employee?.title_after
     ]
         .filter(Boolean)
-        .join(' ')
-        .trim();
+        .join(' ');
 });
 
-const description = computed(() => {
-    return (
-        props.employee?.description ??
-        props.employee?.bio ??
-        props.employee?.about ??
-        ''
+const employeeInitials = computed(() => {
+    const firstName =
+        props.employee?.firstName ??
+        props.employee?.first_name ??
+        '';
+
+    const lastName =
+        props.employee?.lastName ??
+        props.employee?.last_name ??
+        '';
+
+    return [
+        String(firstName).charAt(0),
+        String(lastName).charAt(0)
+    ]
+        .filter(Boolean)
+        .join('');
+});
+
+const employeePhotoUrl = computed(() => {
+    return buildPublicAssetUrl(
+        props.employee?.photoUrl ??
+        props.employee?.photo_url ??
+        null
     );
 });
 
-const positions = computed(() => {
+const employeePositions = computed(() => {
     const value =
         props.employee?.position ??
+        props.employee?.positions ??
         '';
+
+    if (Array.isArray(value)) {
+        return value
+            .map((position) => {
+                if (
+                    position &&
+                    typeof position === 'object'
+                ) {
+                    return (
+                        position.name ??
+                        position.label ??
+                        position.title ??
+                        ''
+                    );
+                }
+
+                return String(
+                    position ??
+                    ''
+                );
+            })
+            .map((position) => {
+                return position.trim();
+            })
+            .filter(Boolean);
+    }
 
     return String(value)
         .split(/[\n,;]+/)
-        .map((entry) => {
-            return entry.trim();
+        .map((position) => {
+            return position.trim();
         })
         .filter(Boolean);
 });
 
-const photoUrl = computed(() => {
-    const path =
-        props.employee?.photoUrl ??
-        props.employee?.photoPath ??
-        props.employee?.photo_url ??
-        props.employee?.photo_path;
+const employeeBio = computed(() => {
+    return (
+        props.employee?.bio ??
+        props.employee?.description ??
+        ''
+    );
+});
 
+function buildPublicAssetUrl(path) {
     if (!path) {
         return null;
     }
 
     if (
-        path.startsWith(
-            'http://'
-        ) ||
-        path.startsWith(
-            'https://'
-        )
+        path.startsWith('http://') ||
+        path.startsWith('https://')
     ) {
         return path;
     }
 
     const apiBaseUrl =
-        import.meta.env
-            .VITE_CLINVIA_API_URL ??
+        import.meta.env.VITE_CLINVIA_API_URL ??
         'https://clinvia.studiokristian.com';
 
     const normalizedPath =
@@ -99,7 +147,7 @@ const photoUrl = computed(() => {
             : `/${path}`;
 
     return `${apiBaseUrl}${normalizedPath}`;
-});
+}
 </script>
 
 <template>
@@ -111,11 +159,15 @@ const photoUrl = computed(() => {
             class="
                 mx-auto
                 w-full
-                max-w-5xl
+                max-w-6xl
                 pb-4
                 pt-4
+
                 sm:pb-12
                 sm:pt-6
+
+                lg:pb-14
+                lg:pt-8
             "
         >
             <div
@@ -123,28 +175,40 @@ const photoUrl = computed(() => {
                     grid
                     grid-cols-1
                     gap-8
-                    md:grid-cols-[20rem_minmax(0,1fr)]
+
+                    md:grid-cols-[minmax(12rem,0.4fr)_minmax(0,1fr)]
                     md:items-start
+                    md:gap-12
+
+                    lg:grid-cols-[minmax(15rem,0.42fr)_minmax(0,1fr)]
+                    lg:gap-16
                 "
             >
+                <!-- Employee photo column -->
                 <div
                     class="
-                        relative
-                        overflow-hidden
-                        rounded-[2rem]
-                        bg-baige/30
-                        aspect-[4/5]
+                        flex
+                        min-w-0
+                        justify-center
+
+                        md:sticky
+                        md:top-0
+                        md:block
                     "
                 >
                     <img
-                        v-if="photoUrl"
-                        :src="photoUrl"
-                        :alt="fullName || 'Zamestnanec'"
+                        v-if="employeePhotoUrl"
+                        :src="employeePhotoUrl"
+                        :alt="employeeName"
                         class="
-                            h-full
+                            aspect-[3/4]
                             w-full
+                            max-w-[15rem]
+                            rounded-[2rem]
                             object-cover
-                            object-center
+                            shadow-[var(--shadow-mid)]
+
+                            md:max-w-none
                         "
                     >
 
@@ -152,91 +216,108 @@ const photoUrl = computed(() => {
                         v-else
                         class="
                             flex
-                            h-full
+                            aspect-[3/4]
                             w-full
+                            max-w-[15rem]
                             items-center
                             justify-center
-                            px-8
-                            text-center
-                            text-green/50
+                            rounded-[2rem]
+                            bg-green/15
+
+                            md:max-w-none
                         "
                     >
                         <span
                             class="
                                 font-heading
-                                text-2xl
+                                text-4xl
                                 font-bold
-                                leading-tight
+                                text-green/30
+
+                                lg:text-5xl
                             "
                         >
-                            {{
-                                fullName ||
-                                'Humanitas'
-                            }}
+                            {{ employeeInitials }}
                         </span>
                     </div>
                 </div>
 
+                <!-- Employee information column -->
                 <div
                     class="
                         min-w-0
-                        space-y-5
                     "
                 >
-                    <h2
-                        class="
-                            text-xl
-                            font-bold
-                            text-green
-                            sm:text-2xl
-                        "
-                    >
-                        {{
-                            fullName ||
-                            'Náš tím'
-                        }}
-                    </h2>
-
                     <div
-                        v-if="positions.length"
                         class="
                             flex
-                            flex-wrap
-                            gap-2
+                            flex-col
+                            gap-6
                         "
                     >
-                        <span
-                            v-for="position in positions"
-                            :key="position"
+                        <!-- Name -->
+                        <h2
                             class="
-                                rounded-full
-                                border
-                                border-green/20
-                                bg-baige/60
-                                px-3
-                                py-1
-                                text-xs
-                                font-semibold
-                                uppercase
-                                tracking-[0.08em]
-                                text-green/80
+                                text-xl
+                                font-bold
+                                leading-[1.15]
+                                text-green
+
+                                lg:text-2xl
                             "
                         >
-                            {{ position }}
-                        </span>
-                    </div>
+                            {{ employeeName }}
+                        </h2>
 
-                    <p
-                        v-if="description"
-                        class="
-                            text-regular
-                            whitespace-pre-line
-                            leading-relaxed
-                            text-green/80
-                        "
-                    >
-                        {{ description }}
-                    </p>
+                        <!-- Positions -->
+                        <div
+                            v-if="employeePositions.length"
+                            class="
+                                flex
+                                flex-col
+                                gap-3
+                            "
+                        >
+                            <div
+                                v-for="(
+                                    position,
+                                    index
+                                ) in employeePositions"
+                                :key="
+                                    `position-${index}-${position}`
+                                "
+                                class="
+                                    border-l-2
+                                    border-green
+                                    pl-3
+                                "
+                            >
+                                <p
+                                    class="
+                                        text-regular
+                                        font-bold
+                                        leading-5
+                                        text-green
+                                    "
+                                >
+                                    {{ position }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Bio -->
+                        <p
+                            v-if="employeeBio"
+                            class="
+                                text-regular
+                                whitespace-pre-line
+                                leading-[1.7]
+                                text-green/75
+                            "
+                        >
+                            {{ employeeBio }}
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>

@@ -438,12 +438,6 @@ export const usePublicSiteStore = defineStore(
                 operatorDic
                     ? `DIČ: ${operatorDic}`
                     : null,
-                operatorEmail
-                    ? `E-mail: ${operatorEmail}`
-                    : null,
-                operatorPhone
-                    ? `Telefón: ${operatorPhone}`
-                    : null
             ].filter(Boolean);
 
             return {
