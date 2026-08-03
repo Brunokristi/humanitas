@@ -11,11 +11,13 @@ import {
 } from 'vue-router';
 
 import { pages } from '../data/pages';
+import { useCookieConsent } from '../composables/useCookieConsent';
 import { useCardStack } from '../composables/useCardStack';
 
 import AppHeader from './AppHeader.vue';
 import AppFooter from './AppFooter.vue';
 import CardStage from './CardStage.vue';
+import CookieConsentSheet from './CookieConsentSheet.vue';
 
 const route =
     useRoute();
@@ -29,6 +31,10 @@ const stack =
         router,
         route
     });
+
+const {
+    initializeCookieConsent
+} = useCookieConsent();
 
 const isFullyExpanded = computed(() => {
     return (
@@ -58,6 +64,8 @@ function handleMenuClick() {
 }
 
 onMounted(() => {
+    initializeCookieConsent();
+
     window.addEventListener(
         'keydown',
         handleGlobalKeydown
@@ -149,6 +157,8 @@ onUnmounted(() => {
 
             <!-- Footer -->
             <AppFooter />
+
+            <CookieConsentSheet />
         </div>
     </div>
 </template>

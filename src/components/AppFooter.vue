@@ -1,23 +1,35 @@
 <script setup>
 import {
-    computed
+    computed,
+    ref
 } from 'vue';
 
 import { storeToRefs } from 'pinia';
 
+import PrivacyPolicyBottomSheet from './PrivacyPolicy.vue';
+
 import { usePublicSiteStore } from '../stores/publicSite';
+import { useCookieConsent } from '../composables/useCookieConsent';
 
 const publicSiteStore =
     usePublicSiteStore();
 
 const {
+    openSettings: openCookieSettings
+} = useCookieConsent();
+
+const {
     company,
     currentBranch,
     contacts,
-    openingHours
+    openingHours,
+    privacyPolicy
 } = storeToRefs(
     publicSiteStore
 );
+
+const privacyPolicyOpen =
+    ref(false);
 
 const currentYear =
     new Date().getFullYear();
@@ -304,6 +316,14 @@ function openingHoursSchedule(entry) {
         .filter(Boolean)
         .join(', ');
 }
+
+function handlePrivacyPolicyClick() {
+    privacyPolicyOpen.value = true;
+}
+
+function handleCookiesClick() {
+    openCookieSettings();
+}
 </script>
 
 <template>
@@ -335,8 +355,8 @@ function openingHoursSchedule(entry) {
                 z-0
                 h-auto
                 w-[150%]
-                max-w-none
                 max-h-[40rem]
+                max-w-none
                 opacity-[0.2]
 
                 sm:bottom-[-9rem]
@@ -827,31 +847,50 @@ function openingHoursSchedule(entry) {
                     "
                     aria-label="Právne odkazy"
                 >
-                    <a
-                        href="/ochrana-osobnych-udajov"
+                    <button
+                        type="button"
                         class="
                             text-regular
                             text-green/70
                             transition-opacity
                             hover:opacity-55
+                        "
+                        @click="
+                            handlePrivacyPolicyClick
                         "
                     >
                         Ochrana osobných údajov
-                    </a>
+                    </button>
 
-                    <a
-                        href="/cookies"
+                    <button
+                        type="button"
                         class="
                             text-regular
                             text-green/70
                             transition-opacity
                             hover:opacity-55
                         "
+                        @click="
+                            handleCookiesClick
+                        "
                     >
                         Cookies
-                    </a>
+                    </button>
                 </nav>
             </div>
         </div>
     </footer>
+
+    <PrivacyPolicyBottomSheet
+        v-model="privacyPolicyOpen"
+        :title="
+            privacyPolicy.title
+        "
+        :updated-at="
+            privacyPolicy.updatedAt
+        "
+        :sections="
+            privacyPolicy.sections
+        "
+    />
 </template>

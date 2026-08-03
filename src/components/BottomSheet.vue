@@ -706,11 +706,52 @@ onBeforeUnmount(() => {
                 shadow-[var(--shadow-soft)]
                 [backface-visibility:hidden]
                 [will-change:transform]
+
                 md:rounded-t-[40px]
             "
             :style="sheetStyle"
             @click.stop
         >
+            <!-- Desktop close button -->
+            <button
+                type="button"
+                class="
+                    absolute
+                    right-6
+                    top-5
+                    z-30
+                    hidden
+                    size-10
+                    items-center
+                    justify-center
+                    rounded-full
+                    bg-green/15
+                    text-green
+                    transition-all
+                    duration-200
+
+                    hover:bg-green/20
+
+                    active:scale-90
+
+                    lg:flex
+                "
+                aria-label="Zavrieť"
+                @pointerdown.stop
+                @click.stop="
+                    requestClose
+                "
+            >
+                <i
+                    class="
+                        bi
+                        bi-x-lg
+                        text-sm
+                    "
+                    aria-hidden="true"
+                />
+            </button>
+
             <!-- Drag area -->
             <div
                 class="
@@ -724,61 +765,41 @@ onBeforeUnmount(() => {
                     justify-center
                     px-5
                     cursor-grab
+
                     active:cursor-grabbing
                 "
-                @pointerdown="handlePointerDown"
-                @pointermove="handlePointerMove"
-                @pointerup="handlePointerUp"
-                @pointercancel="handlePointerCancel"
+                @pointerdown="
+                    handlePointerDown
+                "
+                @pointermove="
+                    handlePointerMove
+                "
+                @pointerup="
+                    handlePointerUp
+                "
+                @pointercancel="
+                    handlePointerCancel
+                "
             >
-                <!-- Handle -->
+                <!-- Mobile handle -->
                 <span
                     class="
                         h-1.5
                         w-12
                         rounded-full
+                        bg-green/15
                         transition-[transform]
                         duration-200
                         ease-out
                         [will-change:transform]
-                        bg-green/15
+
+                        lg:hidden
+                    "
+                    :style="
+                        handleStyle
                     "
                     aria-hidden="true"
                 />
-
-                <!-- Close -->
-                <button
-                    type="button"
-                    class="
-                        hidden
-                        lg:absolute
-                        right-5
-                        top-1/2
-                        flex
-                        size-5
-                        -translate-y-1/2
-                        items-center
-                        justify-center
-                        rounded-full
-                        text-green/50
-                        transition-[background-color,transform]
-                        duration-200
-                        hover:bg-green/8
-                        active:scale-90
-                    "
-                    aria-label="Zavrieť"
-                    @pointerdown.stop
-                    @click.stop="requestClose"
-                >
-                    <i
-                        class="
-                            bi
-                            bi-x-lg
-                            text-sm
-                        "
-                        aria-hidden="true"
-                    />
-                </button>
             </div>
 
             <!-- Content -->
@@ -790,7 +811,9 @@ onBeforeUnmount(() => {
                     overscroll-contain
                     px-5
                     pb-[calc(2rem+env(safe-area-inset-bottom))]
+
                     sm:px-8
+
                     lg:px-12
                 "
             >

@@ -983,6 +983,8 @@ onBeforeUnmount(() => {
     <section
         ref="motionRoot"
         class="
+            relative
+            z-20
             w-full
             overflow-hidden
 
@@ -1216,8 +1218,8 @@ onBeforeUnmount(() => {
                 <Button
                     type="button"
                     background-image=""
-                    background-color="#FBF9F3"
-                    text-color="#335940"
+                    background-color=""
+                    text-color="#FBF9F3"
                     :aria-label="
                         previousLabel
                     "
@@ -1270,10 +1272,10 @@ onBeforeUnmount(() => {
                         "
                         type="button"
                         class="
-                            h-1.5
+                            h-[2px]
                             cursor-pointer
                             rounded-full
-                            bg-baige
+                            bg-baige/50
                             transition-[width,background-color,transform]
                             duration-300
                             ease-[cubic-bezier(0.22,1,0.36,1)]
@@ -1311,8 +1313,8 @@ onBeforeUnmount(() => {
                 <Button
                     type="button"
                     background-image=""
-                    background-color="#FBF9F3"
-                    text-color="#335940"
+                    background-color=""
+                    text-color="#FBF9F3"
                     :aria-label="
                         nextLabel
                     "

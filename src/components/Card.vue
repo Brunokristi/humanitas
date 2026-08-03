@@ -49,6 +49,7 @@ defineProps({
             flex
             w-full
             max-w-[36rem]
+            min-w-[15rem]
             overflow-hidden
             rounded-[40px]
             text-green

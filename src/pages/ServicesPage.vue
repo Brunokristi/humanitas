@@ -1508,7 +1508,7 @@ onBeforeUnmount(() => {
                                 z-30
                                 -translate-y-1/2
                                 text-xs
-                                text-green/45
+                                text-green
                             "
                             aria-hidden="true"
                         />
@@ -1596,7 +1596,7 @@ onBeforeUnmount(() => {
                                 w-full
                                 rounded-[1.5rem]
                                 border
-                                border-green/10
+                                border-green
                                 bg-transparent
                                 py-0
                                 pl-12

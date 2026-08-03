@@ -10,12 +10,12 @@ import { storeToRefs } from 'pinia';
 
 import { usePublicSiteStore } from '../stores/publicSite';
 
-import BottomSheet from '../components/BottomSheet.vue';
 import Button from '../components/Button.vue';
 import EmployeeCarousel from '../components/EmployeeCarousel.vue';
 import FaqCarousel from '../components/Carousel.vue';
 import ServiceBottomSheet from '../components/ServiceBottomSheet.vue';
 import ServicesSlider from '../components/Slider.vue';
+import EmployeeBottomSheet from '../components/EmployeeBottomSheet.vue';
 
 defineProps({
     expanded: {
@@ -735,12 +735,14 @@ onBeforeUnmount(() => {
         <main
             v-else
             class="
-                space-y-20
+                relative
+                isolate
+                space-y-32
                 pb-12
-                overflow-x-hidden
+                overflow-hidden
 
-                lg:space-y-32
-                lg:pb-24
+                md:space-y-32
+                md:pb-24
             "
         >
             <!-- Hero -->
@@ -755,11 +757,11 @@ onBeforeUnmount(() => {
                     gap-8
                     pt-5
 
-                    lg:min-h-[36rem]
-                    lg:grid-cols-[minmax(0,0.9fr)_minmax(28rem,1.1fr)]
-                    lg:gap-14
-                    lg:px-10
-                    lg:pt-10
+                    md:min-h-[36rem]
+                    md:grid-cols-[minmax(0,0.9fr)_minmax(28rem,1.1fr)]
+                    md:gap-14
+                    md:px-10
+                    md:pt-10
 
                     xl:gap-20
                     xl:px-16
@@ -774,8 +776,8 @@ onBeforeUnmount(() => {
                         gap-3
                         text-center
 
-                        lg:items-start
-                        lg:text-left
+                        md:items-start
+                        md:text-left
                     "
                 >
                     <h1
@@ -785,7 +787,7 @@ onBeforeUnmount(() => {
                             leading-[1.08]
                             text-baige
 
-                            lg:text-3xl
+                            md:text-3xl
                         "
                     >
                         <span>
@@ -832,8 +834,8 @@ onBeforeUnmount(() => {
                             pb-6
                             text-baige/70
 
-                            lg:px-0
-                            lg:text-lg
+                            md:px-0
+                            md:text-lg
                         "
                     >
                         Pomáhame deťom, dospelým aj rodinám
@@ -847,7 +849,7 @@ onBeforeUnmount(() => {
                             px-10
                             text-baige/70
 
-                            lg:px-0
+                            md:px-0
                         "
                     >
                         {{
@@ -862,14 +864,13 @@ onBeforeUnmount(() => {
                     class="
                         relative
                         flex
-                        min-h-[20rem]
-                        w-full
                         items-center
                         justify-center
                         overflow-x-clip
+                        w-full
 
-                        lg:min-h-[34rem]
-                        lg:overflow-visible
+                        md:min-h-[34rem]
+                        md:overflow-visible
                     "
                 >
                     <img
@@ -877,31 +878,25 @@ onBeforeUnmount(() => {
                         alt="Humanitas"
                         class="
                             block
-                            h-auto
+                            w-full
                             shrink-0
                             object-contain
-                            opacity-70
+                            opacity-50
 
-                            lg:max-h-[34rem]
-                            lg:w-full
-                            lg:max-w-[42rem]
-                            lg:opacity-40
-                        "
-                        style="
-                            width: 180vw;
-                            max-width: none;
+                            md:max-h-[34rem]
+                            md:w-full
+                            md:max-w-[42rem]
                         "
                     >
                 </div>
             </section>
 
-                        <!-- Services -->
+            <!-- Services -->
             <section
                 class="
                     mx-auto
                     flex
                     w-full
-                    max-w-[100rem]
                     flex-col
                     gap-7
                 "
@@ -909,29 +904,35 @@ onBeforeUnmount(() => {
                 <!-- Services heading -->
                 <div
                     class="
-                        mx-auto
                         flex
-                        w-full
-                        max-w-7xl
                         flex-col
+                        w-full
                         items-center
-                        gap-4
+                        gap-3
                         px-5
                         text-center
 
-                        lg:px-10
+                        md:px-10
 
                         xl:px-16
                     "
                 >
-                    <div>
+                    <div
+                        class="
+                            flex
+                            flex-col
+                            items-center
+                            gap-3
+                            text-center
+                        "
+                    >
                         <h2
                             class="
                                 text-xl
                                 font-bold
                                 text-baige
 
-                                lg:text-3xl
+                                md:text-2xl
                             "
                         >
                             Ponúkané služby
@@ -942,39 +943,12 @@ onBeforeUnmount(() => {
                                 text-regular
                                 mt-3
                                 max-w-md
-                                text-baige/75
+                                text-baige/70
                             "
                         >
                             Pozrite si, s čím sa na nás môžete
                             obrátiť.
                         </p>
-                    </div>
-
-                    <div
-                        class="
-                            hidden
-                            shrink-0
-
-                            lg:block
-                        "
-                    >
-                        <Button
-                            v-if="
-                                remainingServicesCount >
-                                0
-                            "
-                            :href="
-                                servicesUrl
-                            "
-                            :notification="
-                                remainingServicesCount
-                            "
-                            background-image=""
-                            background-color="#FBF9F3"
-                            text-color="#335940"
-                        >
-                            Ďalšie služby
-                        </Button>
                     </div>
                 </div>
 
@@ -1177,7 +1151,7 @@ onBeforeUnmount(() => {
                         class="
                             text-regular
                             text-center
-                            text-baige/60
+                            text-baige/70
                         "
                     >
                         Služby momentálne nie sú
@@ -1185,7 +1159,7 @@ onBeforeUnmount(() => {
                     </p>
                 </div>
 
-                <!-- Mobile service CTA -->
+                <!-- Service CTA -->
                 <div
                     class="
                         flex
@@ -1194,8 +1168,6 @@ onBeforeUnmount(() => {
                         gap-3
                         px-5
                         text-center
-
-                        lg:hidden
                     "
                 >
                     <p
@@ -1231,306 +1203,246 @@ onBeforeUnmount(() => {
                 </div>
             </section>
 
-<!-- FAQ + Team -->
-<section
-    class="
-        mx-auto
-        grid
-        w-full
-        max-w-7xl
-        grid-cols-1
-        gap-y-20
-        px-5
+            <!-- FAQ -->
+            <section
+                class="
+                    mx-auto
+                    grid
+                    w-full
+                    max-w-7xl
+                    grid-cols-1
+                    items-center
+                    gap-8
 
-        lg:items-stretch
-        lg:gap-x-12
-        lg:gap-y-0
-        lg:px-10
+                    md:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.5fr)_minmax(12rem,0.8fr)]
+                    md:gap-10
+                    md:px-10
 
-        xl:gap-x-16
-        xl:px-16
-    "
-    :class="
-        orderedEmployees.length
-            ? 'lg:grid-cols-2'
-            : 'lg:grid-cols-1'
-    "
->
-    <!-- FAQ + CTA column -->
-    <section
-        class="
-            min-w-0
+                    xl:gap-14
+                    xl:px-16
+                "
+            >
+                <!-- Column 1: FAQ copy -->
+                <div
+                    class="
+                        flex
+                        flex-col
+                        items-center
+                        gap-3
+                        text-center
+                    "
+                >
+                    <h2
+                        class="
+                            text-xl
+                            font-bold
+                            text-baige
 
-            lg:flex
-            lg:h-full
-            lg:flex-col
-            lg:justify-between
-        "
-    >
-        <!-- FAQ content -->
-        <div
-            class="
-                min-w-0
-            "
-        >
-            <!-- FAQ copy -->
+                            lg:text-2xl
+                        "
+                    >
+                        Časté otázky
+                    </h2>
+
+                    <p
+                        class="
+                            text-regular
+                            max-w-sm
+                            text-baige/70
+                        "
+                    >
+                        Všetko dôležité na jednom mieste.
+                    </p>
+                </div>
+
+                <!-- Column 2: FAQ cards -->
+                <div
+                    class="
+                        flex
+                        min-w-0
+                        justify-center
+                    "
+                >
+                    <FaqCarousel
+                        :items="
+                            faqItems
+                        "
+                        scroll-motion
+                    />
+                </div>
+
+                <!-- Column 3: FAQ CTA -->
+                <div
+                    class="
+                        flex
+                        flex-col
+                        items-center
+                        gap-3
+                        text-center
+
+                    "
+                >
+                    <p
+                        class="
+                            text-regular
+                            max-w-xs
+                            text-baige/70
+                        "
+                    >
+                        Nenašli ste odpoveď?                        
+                        <br>
+                        Radi vám pomôžeme osobne.
+                    </p>
+
+                    <div class="mt-3">
+                        <Button
+                            :href="
+                                contactUrl
+                            "
+                            background-image=""
+                            background-color="#FBF9F3"
+                            text-color="#335940"
+                        >
+                            Kontaktujte nás
+                        </Button>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- Team -->
             <div
                 class="
                     flex
                     flex-col
-                    items-center
-                    gap-3
-                    text-center
+                    gap-y-32
+
+                    md:flex-row
+                    md:items-center
+                    md:gap-x-12
+                    md:gap-y-0
+
+                    xl:gap-x-16
                 "
             >
-                <h2
+                <!-- Illustration -->
+                <section
                     class="
-                        text-xl
-                        font-bold
-                        text-baige
+                        relative
+                        flex
+                        h-[18rem]
+                        w-full
+                        shrink-0
+                        items-center
+                        justify-center
+                        overflow-hidden
 
-                        lg:text-2xl
+                        md:w-2/3
+                        md:overflow-visible
                     "
                 >
-                    Časté otázky
-                </h2>
+                    <img
+                        src="/images/humanitas_ruky.svg"
+                        alt="Humanitas"
+                        class="
+                            absolute
+                            left-1/2
+                            top-1/2
+                            h-auto
+                            max-w-none
+                            shrink-0
+                            -translate-x-1/2
+                            -translate-y-1/2
+                            rotate-[50deg]
+                            scale-[3]
+                            object-contain
+                            opacity-50
 
-                <p
+                            md:static
+                            md:mx-auto
+                            md:w-full
+                            md:max-w-[34rem]
+                            md:translate-x-0
+                            md:translate-y-0
+                            md:rotate-[50deg]
+                            md:scale-90
+                        "
+                    >
+                </section>
+
+                <!-- Team content -->
+                <section
+                    v-if="
+                        orderedEmployees.length
+                    "
                     class="
-                        text-regular
-                        max-w-sm
-                        text-baige/70
+                        relative
+                        z-10
+                        mx-auto
+                        w-full
+                        overflow-visible
+
+                        md:w-1/3
+                        md:min-w-0
                     "
                 >
-                    Všetko dôležité na jednom mieste.
-                </p>
+                    <!-- Team copy -->
+                    <div
+                        class="
+                            flex
+                            flex-col
+                            items-center
+                            gap-3
+                            text-center
+                            px-5
+                        "
+                    >
+                        <h2
+                            class="
+                                text-xl
+                                font-bold
+                                text-baige
+
+                                md:text-2xl
+                            "
+                        >
+                            Náš tím
+                        </h2>
+
+                        <p
+                            class="
+                                text-regular
+                                max-w-md
+                                text-baige/70
+                            "
+                        >
+                            Ľudia, na ktorých sa môžete
+                            obrátiť.
+                        </p>
+                    </div>
+
+                    <!-- Team carousel -->
+                    <div
+                        class="
+                            mx-auto
+                            mt-8
+                            min-w-0
+                            max-w-3xl
+                        "
+                    >
+                        <EmployeeCarousel
+                            :items="
+                                orderedEmployees
+                            "
+                            aria-label="Náš tím"
+                            scroll-motion
+                            @select="
+                                openEmployee
+                            "
+                        />
+                    </div>
+                </section>
             </div>
-
-            <!-- FAQ cards -->
-            <div
-                class="
-                    mt-8
-                    flex
-                    min-w-0
-                    justify-center
-                "
-            >
-                <FaqCarousel
-                    :items="
-                        faqItems
-                    "
-                    scroll-motion
-                />
-            </div>
-        </div>
-
-        <!-- Final CTA -->
-        <section
-            v-if="
-                orderedEmployees.length
-            "
-            class="
-                mx-auto
-                mt-12
-                flex
-                w-full
-                max-w-4xl
-                flex-col
-                items-center
-                justify-center
-                gap-3
-                px-5
-                pb-12
-                text-center
-
-                lg:mt-auto
-                lg:px-0
-                lg:pb-4
-                lg:pt-14
-            "
-        >
-            <h2
-                class="
-                    text-xl
-                    font-bold
-                    text-baige
-
-                    lg:text-2xl
-                "
-            >
-                Ako ďalej?
-            </h2>
-
-            <p
-                class="
-                    text-regular
-                    mt-2
-                    text-baige/70
-                "
-            >
-                Nájdite si cestu, ktorá vám vyhovuje.
-            </p>
-
-            <div
-                class="
-                    mt-5
-                    flex
-                    flex-wrap
-                    justify-center
-                    gap-3
-                "
-            >
-                <Button
-                    :href="
-                        contactUrl
-                    "
-                    background-image=""
-                    background-color="#FBF9F3"
-                    text-color="#335940"
-                >
-                    Kontaktujte nás
-                </Button>
-            </div>
-        </section>
-    </section>
-
-    <!-- Mobile illustration -->
-    <section
-        class="
-            relative
-            flex
-            h-[20rem]
-            w-full
-            justify-center
-            overflow-hidden
-
-            lg:hidden
-        "
-    >
-        <img
-            src="/images/humanitas_ruky.svg"
-            alt="Humanitas"
-            class="
-                absolute
-                left-1/2
-                top-1/2
-                h-auto
-                max-w-none
-                shrink-0
-                -translate-x-1/2
-                -translate-y-1/2
-                rotate-[50deg]
-                scale-[3]
-                object-contain
-            "
-        >
-    </section>
-
-    <!-- Team column -->
-    <section
-        v-if="
-            orderedEmployees.length
-        "
-        class="
-            relative
-            min-w-0
-            overflow-hidden
-
-            lg:h-full
-        "
-    >
-        <!-- Decorative illustration -->
-        <img
-            src="/images/humanitas_ruky.svg"
-            alt=""
-            aria-hidden="true"
-            draggable="false"
-            class="
-                pointer-events-none
-                absolute
-                bottom-[-8rem]
-                right-[-8rem]
-                z-0
-                hidden
-                h-auto
-                w-[34rem]
-                max-w-none
-                rotate-[20deg]
-                opacity-[0.08]
-
-                lg:block
-            "
-        >
-
-        <div
-            class="
-                relative
-                z-10
-                flex
-                h-full
-                min-w-0
-                flex-col
-            "
-        >
-            <!-- Team copy -->
-            <div
-                class="
-                    flex
-                    flex-col
-                    items-center
-                    gap-3
-                    text-center
-                "
-            >
-                <h2
-                    class="
-                        text-xl
-                        font-bold
-                        text-baige
-
-                        lg:text-2xl
-                    "
-                >
-                    Náš tím
-                </h2>
-
-                <p
-                    class="
-                        text-regular
-                        max-w-md
-                        text-baige/70
-                    "
-                >
-                    Ľudia, na ktorých sa môžete
-                    obrátiť.
-                </p>
-            </div>
-
-            <!-- Team carousel -->
-            <div
-                class="
-                    mt-8
-                    min-w-0
-
-                    lg:flex
-                    lg:flex-1
-                    lg:flex-col
-                "
-            >
-                <EmployeeCarousel
-                    :items="
-                        orderedEmployees
-                    "
-                    aria-label="Náš tím"
-                    scroll-motion
-                    @select="
-                        openEmployee
-                    "
-                />
-            </div>
-        </div>
-    </section>
-</section>
 
         </main>
 
@@ -1545,194 +1457,14 @@ onBeforeUnmount(() => {
         />
 
         <!-- Employee detail -->
-        <BottomSheet
+        <EmployeeBottomSheet
             v-model="
                 employeeSheetOpen
             "
-        >
-            <div
-                v-if="
-                    selectedEmployee
-                "
-                class="
-                    mx-auto
-                    w-full
-                    max-w-4xl
-                    pb-4
-                    pt-4
-
-                    sm:pb-12
-                    sm:pt-6
-                "
-            >
-                <div
-                    class="
-                        flex
-                        flex-col
-                        gap-6
-
-                        sm:flex-row
-                        sm:items-start
-                    "
-                >
-                    <!-- Employee photo -->
-                    <div
-                        class="
-                            shrink-0
-                        "
-                    >
-                        <img
-                            v-if="
-                                employeePhotoUrl(
-                                    selectedEmployee
-                                )
-                            "
-                            :src="
-                                employeePhotoUrl(
-                                    selectedEmployee
-                                )
-                            "
-                            :alt="
-                                employeeName(
-                                    selectedEmployee
-                                )
-                            "
-                            class="
-                                aspect-[3/4]
-                                w-full
-                                max-w-[11rem]
-                                rounded-[2rem]
-                                object-cover
-                                shadow-[var(--shadow-mid)]
-                            "
-                        >
-
-                        <div
-                            v-else
-                            class="
-                                flex
-                                aspect-[3/4]
-                                w-full
-                                max-w-[11rem]
-                                items-center
-                                justify-center
-                                rounded-[2rem]
-                                bg-green/15
-                            "
-                        >
-                            <span
-                                class="
-                                    font-heading
-                                    text-4xl
-                                    font-bold
-                                    text-green/30
-                                "
-                            >
-                                {{
-                                    employeeInitials(
-                                        selectedEmployee
-                                    )
-                                }}
-                            </span>
-                        </div>
-                    </div>
-
-                    <!-- Employee information -->
-                    <div
-                        class="
-                            min-w-0
-                            flex-1
-                        "
-                    >
-                        <div
-                            class="
-                                flex
-                                flex-col
-                                gap-3
-                            "
-                        >
-                            <!-- Name -->
-                            <h2
-                                class="
-                                    text-xl
-                                    font-bold
-                                    leading-[1.15]
-                                    text-green
-                                "
-                            >
-                                {{
-                                    employeeName(
-                                        selectedEmployee
-                                    )
-                                }}
-                            </h2>
-
-                            <!-- Positions -->
-                            <div
-                                v-if="
-                                    employeePositions(
-                                        selectedEmployee
-                                    ).length
-                                "
-                                class="
-                                    flex
-                                    flex-col
-                                    gap-3
-                                "
-                            >
-                                <div
-                                    v-for="
-                                        (
-                                            position,
-                                            index
-                                        ) in
-                                        employeePositions(
-                                            selectedEmployee
-                                        )
-                                    "
-                                    :key="
-                                        `position-${index}-${position}`
-                                    "
-                                    class="
-                                        border-l-2
-                                        border-green
-                                        pl-3
-                                    "
-                                >
-                                    <p
-                                        class="
-                                            text-regular
-                                            font-bold
-                                            leading-5
-                                            text-green
-                                        "
-                                    >
-                                        {{ position }}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <!-- Bio -->
-                            <p
-                                v-if="
-                                    selectedEmployee.bio
-                                "
-                                class="
-                                    text-regular
-                                    whitespace-pre-line
-                                    leading-[1.65]
-                                    text-green/75
-                                "
-                            >
-                                {{
-                                    selectedEmployee.bio
-                                }}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </BottomSheet>
+            :employee="
+                selectedEmployee
+            "
+        />
     </div>
 </template>
 

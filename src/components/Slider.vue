@@ -114,17 +114,26 @@ const virtualIndex =
 const suppressTransitions =
     ref(false);
 
-let normalizationTimer =
-    null;
-
-let normalizationFrame =
-    null;
-
 const CARD_ANGLE_GAP =
     14;
 
 const CLICK_DRAG_THRESHOLD =
     8;
+
+const MIN_CARD_WIDTH =
+    240;
+
+const MOBILE_CARD_GAP =
+    14;
+
+const TABLET_CARD_GAP =
+    20;
+
+const DESKTOP_CARD_GAP =
+    18;
+
+const DESKTOP_EDGE_PEEK =
+    24;
 
 const TRANSITION_DURATION =
     300;
@@ -138,31 +147,23 @@ const renderedItems = computed(() => {
         return [];
     }
 
-    return [
-        0,
-        1,
-        2
-    ].flatMap((copyIndex) => {
-        return props.items.map(
-            (
+    return props.items.map(
+        (
+            item,
+            originalIndex
+        ) => {
+            return {
                 item,
-                originalIndex
-            ) => {
-                return {
-                    item,
-                    copyIndex,
-                    originalIndex,
-
-                    renderKey:
-                        `${copyIndex}-${
-                            item?.id ??
-                            item?.slug ??
-                            originalIndex
-                        }`
-                };
-            }
-        );
-    });
+                originalIndex,
+                renderKey:
+                    `${
+                        item?.id ??
+                        item?.slug ??
+                        originalIndex
+                    }`
+            };
+        }
+    );
 });
 
 const currentIndex = computed(() => {
@@ -195,7 +196,7 @@ const isDesktop = computed(() => {
 
 const visibleSideCount = computed(() => {
     return isDesktop.value
-        ? 2
+    ? 2
         : 1;
 });
 
@@ -246,6 +247,50 @@ const wheelOffsetY = computed(() => {
     return 42;
 });
 
+const mobileCardStep = computed(() => {
+    const gap =
+        viewportWidth.value >= 768
+            ? TABLET_CARD_GAP
+            : MOBILE_CARD_GAP;
+
+    const measuredWidth =
+        Math.max(
+            cardWidth.value,
+            MIN_CARD_WIDTH
+        );
+
+    return Math.max(
+        measuredWidth + gap,
+        MIN_CARD_WIDTH + gap
+    );
+});
+
+const mobileAngleGap = computed(() => {
+    const radius = Math.max(
+        circleRadius.value,
+        1
+    );
+
+    const ratio = Math.min(
+        mobileCardStep.value /
+            (radius * 2),
+        0.999
+    );
+
+    const calculatedAngle =
+        2 *
+        Math.asin(ratio) *
+        (
+            180 /
+            Math.PI
+        );
+
+    return Math.max(
+        calculatedAngle,
+        CARD_ANGLE_GAP * 0.85
+    );
+});
+
 /*
  * Desktop spacing.
  *
@@ -255,23 +300,29 @@ const wheelOffsetY = computed(() => {
  */
 
 const desktopCardStep = computed(() => {
+    const measuredWidth =
+        Math.max(
+            cardWidth.value,
+            MIN_CARD_WIDTH
+        );
+
     const preferredStep =
-        cardWidth.value *
-        1.1;
+        measuredWidth +
+        DESKTOP_CARD_GAP;
 
-    const minimumStep =
-        cardWidth.value *
-        1.0;
-
-    const responsiveStep =
+    const maximumVisibleStep =
         sliderWidth.value /
-        4.15;
+            4 +
+        measuredWidth /
+            4 -
+        DESKTOP_EDGE_PEEK /
+            2;
 
     return Math.max(
-        minimumStep,
+        measuredWidth,
         Math.min(
             preferredStep,
-            responsiveStep
+            maximumVisibleStep
         )
     );
 });
@@ -325,11 +376,8 @@ function circularIndex(index) {
 function middleCopyIndex(
     originalIndex
 ) {
-    return (
-        cardCount.value +
-        circularIndex(
-            originalIndex
-        )
+    return circularIndex(
+        originalIndex
     );
 }
 
@@ -357,9 +405,32 @@ function initializeVirtualIndex() {
 function getCardPosition(
     renderIndex
 ) {
-    return (
+    const currentOriginalIndex =
+        currentIndex.value;
+
+    let delta =
         renderIndex -
-        virtualIndex.value +
+        currentOriginalIndex;
+
+    const halfCount =
+        cardCount.value / 2;
+
+    if (
+        delta >
+        halfCount
+    ) {
+        delta -=
+            cardCount.value;
+    } else if (
+        delta <
+        -halfCount
+    ) {
+        delta +=
+            cardCount.value;
+    }
+
+    return (
+        delta +
         dragProgress.value
     );
 }
@@ -369,8 +440,9 @@ function isCardSelectable(
 ) {
     return (
         Math.abs(
-            renderIndex -
-            virtualIndex.value
+            getCardPosition(
+                renderIndex
+            )
         ) <=
         visibleSideCount.value
     );
@@ -390,6 +462,32 @@ function isCardVisible(
         distance <
         visibleSideCount.value +
             0.8
+    );
+}
+
+function shouldRenderCard(
+    renderIndex
+) {
+    if (
+        cardCount.value <=
+        visibleSideCount.value *
+            2 +
+            3
+    ) {
+        return true;
+    }
+
+    const distance =
+        Math.abs(
+            getCardPosition(
+                renderIndex
+            )
+        );
+
+    return (
+        distance <=
+        visibleSideCount.value +
+            1.35
     );
 }
 
@@ -564,7 +662,7 @@ function getMobileCardStyle(
 
     const angleDegrees =
         position *
-        CARD_ANGLE_GAP;
+        mobileAngleGap.value;
 
     const angleRadians =
         angleDegrees *
@@ -656,109 +754,6 @@ function getCardStyle(
 }
 
 /*
- * Invisible normalization
- *
- * After entering the first or third copy,
- * we silently move to the equivalent card
- * in the middle copy. Since both positions
- * look exactly the same, the reset is invisible.
- */
-
-function clearNormalization() {
-    if (
-        normalizationTimer !==
-        null
-    ) {
-        window.clearTimeout(
-            normalizationTimer
-        );
-
-        normalizationTimer =
-            null;
-    }
-
-    if (
-        normalizationFrame !==
-        null
-    ) {
-        window.cancelAnimationFrame(
-            normalizationFrame
-        );
-
-        normalizationFrame =
-            null;
-    }
-}
-
-function normalizeVirtualIndex() {
-    if (
-        cardCount.value <=
-        1
-    ) {
-        return;
-    }
-
-    const lowerBoundary =
-        cardCount.value;
-
-    const upperBoundary =
-        cardCount.value *
-        2;
-
-    if (
-        virtualIndex.value >=
-            lowerBoundary &&
-        virtualIndex.value <
-            upperBoundary
-    ) {
-        return;
-    }
-
-    const normalizedIndex =
-        middleCopyIndex(
-            virtualIndex.value
-        );
-
-    suppressTransitions.value =
-        true;
-
-    virtualIndex.value =
-        normalizedIndex;
-
-    normalizationFrame =
-        window.requestAnimationFrame(
-            () => {
-                normalizationFrame =
-                    window.requestAnimationFrame(
-                        () => {
-                            suppressTransitions.value =
-                                false;
-
-                            normalizationFrame =
-                                null;
-                        }
-                    );
-            }
-        );
-}
-
-function scheduleNormalization() {
-    clearNormalization();
-
-    normalizationTimer =
-        window.setTimeout(
-            () => {
-                normalizationTimer =
-                    null;
-
-                normalizeVirtualIndex();
-            },
-            TRANSITION_DURATION +
-                30
-        );
-}
-
-/*
  * Navigation
  */
 
@@ -783,8 +778,6 @@ function moveToVirtualIndex(
 
     dragX.value =
         0;
-
-    scheduleNormalization();
 }
 
 function goNext() {
@@ -930,8 +923,6 @@ function handlePointerDown(
     ) {
         return;
     }
-
-    clearNormalization();
 
     updateMeasurements();
 
@@ -1162,8 +1153,6 @@ async function handleResize() {
 watch(
     () => props.items,
     async () => {
-        clearNormalization();
-
         suppressTransitions.value =
             true;
 
@@ -1175,16 +1164,12 @@ watch(
 
         updateMeasurements();
 
-        normalizationFrame =
-            window.requestAnimationFrame(
-                () => {
-                    suppressTransitions.value =
-                        false;
-
-                    normalizationFrame =
-                        null;
-                }
-            );
+        window.requestAnimationFrame(
+            () => {
+                suppressTransitions.value =
+                    false;
+            }
+        );
     },
     {
         deep: true
@@ -1219,8 +1204,6 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
     restoreSlider();
-
-    clearNormalization();
 
     window.removeEventListener(
         'resize',
@@ -1281,41 +1264,35 @@ onBeforeUnmount(() => {
                 handlePointerCancel
             "
         >
-            <div
+            <template
                 v-for="
-                    (
-                        renderedItem,
-                        renderIndex
-                    ) in
+                    renderedItem in
                     renderedItems
                 "
                 :key="
                     renderedItem.renderKey
                 "
+            >
+                <div
+                    v-if="
+                        shouldRenderCard(
+                            renderedItem.originalIndex
+                        )
+                    "
                 data-slider-card
                 class="
                     absolute
                     left-1/2
                     top-0
 
-                    w-[72vw]
-                    max-w-[27rem]
+                    w-[min(72vw,18rem)]
+                    min-w-[15rem]
 
                     [transform-origin:50%_0%]
 
                     transition-[transform,opacity]
                     duration-300
                     ease-[cubic-bezier(0.2,0.85,0.25,1)]
-
-                    sm:w-[66vw]
-
-                    md:w-[52vw]
-
-                    lg:min-w-[12.5rem]
-                    lg:w-[18vw]
-                    lg:max-w-[20rem]
-
-                    xl:w-[17vw]
 
                     [backface-visibility:hidden]
                     [will-change:transform,opacity]
@@ -1327,29 +1304,29 @@ onBeforeUnmount(() => {
 
                     'pointer-events-none':
                         !isCardSelectable(
-                            renderIndex
+                            renderedItem.originalIndex
                         ),
 
                     'cursor-pointer':
                         isCardSelectable(
-                            renderIndex
+                            renderedItem.originalIndex
                         )
                 }"
                 :style="
                     getCardStyle(
-                        renderIndex
+                        renderedItem.originalIndex
                     )
                 "
                 :aria-hidden="
                     !isCardVisible(
-                        renderIndex
+                        renderedItem.originalIndex
                     )
                 "
                 @click="
                     handleCardClick(
                         $event,
                         renderedItem,
-                        renderIndex
+                        renderedItem.originalIndex
                     )
                 "
             >
@@ -1368,8 +1345,8 @@ onBeforeUnmount(() => {
                             renderedItem.item
                         "
                         :active="
-                            renderIndex ===
-                            virtualIndex
+                            renderedItem.originalIndex ===
+                            currentIndex
                         "
                         :equal-height="
                             equalHeight
@@ -1379,9 +1356,6 @@ onBeforeUnmount(() => {
                         "
                         :background-color="
                             backgroundColor
-                        "
-                        :image-opacity="
-                            imageOpacity
                         "
                         :image-scale="
                             imageScale
@@ -1405,7 +1379,8 @@ onBeforeUnmount(() => {
                         </template>
                     </Card>
                 </div>
-            </div>
+                </div>
+            </template>
         </div>
 
         <!-- Desktop controls -->
@@ -1414,7 +1389,6 @@ onBeforeUnmount(() => {
                 cardCount > 1
             "
             class="
-                mt-5
                 hidden
                 w-full
                 items-center
@@ -1433,12 +1407,13 @@ onBeforeUnmount(() => {
                     px-10
                 "
             >
-                <!-- Previous -->
+
+                            <!-- Previous -->
                 <Button
                     type="button"
                     background-image=""
-                    background-color="#FBF9F3"
-                    text-color="#335940"
+                    background-color=""
+                    text-color="#FBF9F3"
                     aria-label="Predchádzajúca karta"
                     class="
                         flex
@@ -1463,6 +1438,7 @@ onBeforeUnmount(() => {
                         aria-hidden="true"
                     />
                 </Button>
+
 
                 <!-- Indicators -->
                 <div
@@ -1489,10 +1465,10 @@ onBeforeUnmount(() => {
                         "
                         type="button"
                         class="
-                            h-1.5
+                            h-[2px]
                             cursor-pointer
                             rounded-full
-                            bg-baige/35
+                            bg-baige/50
                             transition-[width,background-color,transform]
                             duration-300
                             ease-[cubic-bezier(0.22,1,0.36,1)]
@@ -1530,12 +1506,13 @@ onBeforeUnmount(() => {
                     />
                 </div>
 
+
                 <!-- Next -->
                 <Button
                     type="button"
                     background-image=""
-                    background-color="#FBF9F3"
-                    text-color="#335940"
+                    background-color=""
+                    text-color="#FBF9F3"
                     aria-label="Nasledujúca karta"
                     class="
                         flex

@@ -1116,8 +1116,7 @@ onBeforeUnmount(() => {
         ref="motionRoot"
         class="
             w-full
-            overflow-x-clip
-            overflow-y-visible
+            overflow-visible
         "
         :aria-label="
             ariaLabel
@@ -1127,15 +1126,17 @@ onBeforeUnmount(() => {
             class="
                 mx-auto
                 w-full
-                overflow-x-clip
-                overflow-y-visible
-                px-5
+                px-2
                 pb-8
                 pt-36
 
                 sm:pt-40
 
+                md:max-w-[42rem]
+                md:px-8
                 md:pt-44
+
+                lg:max-w-[48rem]
             "
         >
             <div
@@ -1187,16 +1188,16 @@ onBeforeUnmount(() => {
                         relative
                         col-start-1
                         row-start-1
-                        w-[62vw]
-                        max-w-[15.5rem]
+                        w-[56vw]
+                        max-w-[13.5rem]
                         justify-self-center
                         origin-[50%_92%]
                         [backface-visibility:hidden]
                         [will-change:transform]
 
-                        sm:w-[16rem]
+                        sm:w-[14rem]
 
-                        md:w-[17rem]
+                        md:w-[15rem]
                     "
                     :class="
                         getCardWrapperClasses(
@@ -1419,25 +1420,27 @@ onBeforeUnmount(() => {
                     items-center
                     justify-center
                     gap-3
+                    px-10
                 "
             >
-                <button
+                <!-- Previous -->
+                <Button
                     type="button"
-                    class="
-                        flex
-                        h-11
-                        w-11
-                        cursor-pointer
-                        items-center
-                        justify-center
-                        text-baige
-                        transition-transform
-                        duration-200
-                        hover:scale-110
-                        active:scale-95
-                    "
+                    background-image=""
+                    background-color=""
+                    text-color="#FBF9F3"
                     :aria-label="
                         previousLabel
+                    "
+                    class="
+                        flex
+                        size-11
+                        min-h-0
+                        min-w-0
+                        shrink-0
+                        items-center
+                        justify-center
+                        p-0
                     "
                     @click="
                         goPrevious
@@ -1446,18 +1449,24 @@ onBeforeUnmount(() => {
                     <i
                         class="
                             bi
-                            bi-chevron-left
+                            bi-arrow-left
+                            text-base
                         "
+                        aria-hidden="true"
                     />
-                </button>
+                </Button>
 
+                <!-- Indicators -->
                 <div
                     class="
                         flex
+                        min-w-20
                         items-center
                         justify-center
                         gap-2
                     "
+                    role="tablist"
+                    aria-label="Výber karty"
                 >
                     <button
                         v-for="
@@ -1472,12 +1481,20 @@ onBeforeUnmount(() => {
                         "
                         type="button"
                         class="
-                            h-1.5
+                            h-[2px]
                             cursor-pointer
                             rounded-full
-                            bg-baige/40
-                            transition-[width,background-color]
-                            duration-200
+                            bg-baige/50
+                            transition-[width,background-color,transform]
+                            duration-300
+                            ease-[cubic-bezier(0.22,1,0.36,1)]
+
+                            hover:scale-110
+
+                            focus-visible:outline
+                            focus-visible:outline-2
+                            focus-visible:outline-offset-4
+                            focus-visible:outline-baige/70
                         "
                         :class="
                             index ===
@@ -1486,8 +1503,13 @@ onBeforeUnmount(() => {
                                 : 'w-1.5'
                         "
                         :aria-label="
-                            `Zobraziť zamestnanca ${index + 1}`
+                            `Zobraziť kartu ${index + 1}`
                         "
+                        :aria-selected="
+                            index ===
+                            currentIndex
+                        "
+                        role="tab"
                         @click="
                             goTo(
                                 index
@@ -1496,23 +1518,24 @@ onBeforeUnmount(() => {
                     />
                 </div>
 
-                <button
+                <!-- Next -->
+                <Button
                     type="button"
-                    class="
-                        flex
-                        h-11
-                        w-11
-                        cursor-pointer
-                        items-center
-                        justify-center
-                        text-baige
-                        transition-transform
-                        duration-200
-                        hover:scale-110
-                        active:scale-95
-                    "
+                    background-image=""
+                    background-color=""
+                    text-color="#FBF9F3"
                     :aria-label="
                         nextLabel
+                    "
+                    class="
+                        flex
+                        size-11
+                        min-h-0
+                        min-w-0
+                        shrink-0
+                        items-center
+                        justify-center
+                        p-0
                     "
                     @click="
                         goNext
@@ -1521,10 +1544,12 @@ onBeforeUnmount(() => {
                     <i
                         class="
                             bi
-                            bi-chevron-right
+                            bi-arrow-right
+                            text-base
                         "
+                        aria-hidden="true"
                     />
-                </button>
+                </Button>
             </div>
         </div>
 
