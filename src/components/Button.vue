@@ -1,4 +1,12 @@
 <script setup>
+import {
+    computed
+} from 'vue';
+
+import {
+    RouterLink
+} from 'vue-router';
+
 const props = defineProps({
     backgroundImage: {
         type: String,
@@ -60,6 +68,27 @@ const emit = defineEmits([
     'click',
 ]);
 
+const isInternalLink = computed(() => {
+    if (
+        !props.href ||
+        props.target
+    ) {
+        return false;
+    }
+
+    return /^\//.test(props.href);
+});
+
+const componentTag = computed(() => {
+    if (!props.href) {
+        return 'button';
+    }
+
+    return isInternalLink.value
+        ? RouterLink
+        : 'a';
+});
+
 const handleClick = (event) => {
     if (props.disabled) {
         event.preventDefault();
@@ -73,11 +102,12 @@ const handleClick = (event) => {
 <template>
     <span class="relative inline-flex w-fit">
         <component
-            :is="href ? 'a' : 'button'"
-            :href="href || undefined"
-            :target="href ? target || undefined : undefined"
+            :is="componentTag"
+            :to="isInternalLink ? href : undefined"
+            :href="!isInternalLink ? href || undefined : undefined"
+            :target="!isInternalLink && href ? target || undefined : undefined"
             :rel="
-                href && target === '_blank'
+                !isInternalLink && href && target === '_blank'
                     ? 'noopener noreferrer'
                     : undefined
             "

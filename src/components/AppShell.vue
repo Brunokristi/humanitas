@@ -1,6 +1,8 @@
 <script setup>
 import {
     computed,
+    ref,
+    watch,
     onMounted,
     onUnmounted
 } from 'vue';
@@ -56,11 +58,37 @@ const isFullyExpanded = computed(() => {
     );
 });
 
-const isInitialLoading = computed(() => {
+const MIN_LOADER_DURATION_MS =
+    2500;
+
+const hasSeenInitialLoading =
+    ref(false);
+
+const isLoaderMinimumDurationDone =
+    ref(false);
+
+let loaderMinimumDurationTimer =
+    null;
+
+const isDataLoading = computed(() => {
     return (
         loading.value &&
         !company.value
     );
+});
+
+const isInitialLoading = computed(() => {
+    if (!hasSeenInitialLoading.value) {
+        return isDataLoading.value;
+    }
+
+    if (
+        !isLoaderMinimumDurationDone.value
+    ) {
+        return true;
+    }
+
+    return isDataLoading.value;
 });
 
 const hasFatalLoadError = computed(() => {
@@ -91,6 +119,45 @@ function handleMenuClick() {
     }
 }
 
+watch(
+    isDataLoading,
+    (nextIsDataLoading) => {
+        if (
+            !nextIsDataLoading ||
+            hasSeenInitialLoading.value
+        ) {
+            return;
+        }
+
+        hasSeenInitialLoading.value =
+            true;
+
+        isLoaderMinimumDurationDone.value =
+            false;
+
+        if (
+            loaderMinimumDurationTimer !==
+            null
+        ) {
+            window.clearTimeout(
+                loaderMinimumDurationTimer
+            );
+        }
+
+        loaderMinimumDurationTimer =
+            window.setTimeout(() => {
+                isLoaderMinimumDurationDone.value =
+                    true;
+
+                loaderMinimumDurationTimer =
+                    null;
+            }, MIN_LOADER_DURATION_MS);
+    },
+    {
+        immediate: true
+    }
+);
+
 onMounted(() => {
     initializeCookieConsent();
 
@@ -101,6 +168,18 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+    if (
+        loaderMinimumDurationTimer !==
+        null
+    ) {
+        window.clearTimeout(
+            loaderMinimumDurationTimer
+        );
+
+        loaderMinimumDurationTimer =
+            null;
+    }
+
     window.removeEventListener(
         'keydown',
         handleGlobalKeydown
@@ -139,204 +218,168 @@ onUnmounted(() => {
                 aria-hidden="true"
             />
 
-            <!-- Global loading state -->
-            <div
-                v-if="isInitialLoading"
-                class="
-                    flex
-                    flex-1
-                    flex-col
-                "
+            <Transition
+                name="shell-fade"
+                mode="out-in"
             >
+                <!-- Global loading state -->
                 <div
+                    v-if="isInitialLoading"
+                    key="loading"
                     class="
-                        relative
-                        h-[60px]
-                        w-full
-                        shrink-0
-                        px-5
+                        flex
+                        flex-1
+                        items-center
+                        justify-center
                     "
+                    aria-label="Načítavanie obsahu"
                 >
-                    <div
+                    <object
+                        data="/images/logo_animated.svg"
+                        type="image/svg+xml"
+                        aria-label="Humanitas"
                         class="
-                            mx-auto
-                            mt-5
-                            h-6
-                            w-56
-                            animate-pulse
-                            rounded-full
-                            bg-green/10
+                            h-auto
+                            w-[clamp(10rem,28vw,18rem)]
                         "
-                    />
+                    >
+                        Humanitas
+                    </object>
                 </div>
 
+                <!-- Global fatal error state -->
                 <main
+                    v-else-if="hasFatalLoadError"
+                    key="error"
                     class="
-                        relative
-                        z-20
                         flex
-                        w-full
                         flex-1
-                        items-start
+                        items-center
                         justify-center
-                        px-2
-
-                        sm:px-6
+                        px-5
+                        py-16
                     "
                 >
                     <section
                         class="
-                            mt-2
                             w-full
-                            min-h-[min(76dvh,780px)]
-                            space-y-5
-                            px-2
+                            max-w-2xl
+                            rounded-[2.2rem]
+                            border border-green/15
+                            bg-white/45
+                            px-6
+                            py-10
+                            text-center
+                            shadow-[var(--shadow-mid)]
+
+                            sm:px-10
                         "
-                        aria-label="Načítavanie obsahu"
                     >
-                        <div
-                            v-for="index in 3"
-                            :key="`loading-card-${index}`"
+                        <h1
                             class="
-                                h-[13.5rem]
-                                w-full
-                                animate-pulse
-                                rounded-[2.4rem]
-                                border border-green/10
-                                bg-green/5
+                                heading
+                                text-green
                             "
-                        />
+                        >
+                            Obsah sa nepodarilo načítať
+                        </h1>
+
+                        <p
+                            class="
+                                text-regular
+                                mt-5
+                                text-green/70
+                            "
+                        >
+                            {{ error }}
+                        </p>
+
+                        <div class="mt-8">
+                            <Button
+                                background-color="#FBF9F3"
+                                text-color="#335940"
+                                @click="publicSiteStore.reload"
+                            >
+                                Skúsiť znova
+                            </Button>
+                        </div>
                     </section>
                 </main>
 
+                <!-- App content -->
                 <div
+                    v-else
+                    key="content"
                     class="
-                        px-5
-                        pb-8
+                        flex
+                        flex-1
+                        flex-col
                     "
                 >
+                    <!-- Header -->
                     <div
                         class="
-                            mx-auto
-                            h-24
+                            relative
+                            h-[60px]
                             w-full
-                            max-w-4xl
-                            animate-pulse
-                            rounded-[2rem]
-                            bg-green/8
-                        "
-                    />
-                </div>
-            </div>
-
-            <!-- Global fatal error state -->
-            <main
-                v-else-if="hasFatalLoadError"
-                class="
-                    flex
-                    flex-1
-                    items-center
-                    justify-center
-                    px-5
-                    py-16
-                "
-            >
-                <section
-                    class="
-                        w-full
-                        max-w-2xl
-                        rounded-[2.2rem]
-                        border border-green/15
-                        bg-white/45
-                        px-6
-                        py-10
-                        text-center
-                        shadow-[var(--shadow-mid)]
-
-                        sm:px-10
-                    "
-                >
-                    <h1
-                        class="
-                            heading
-                            text-green
+                            shrink-0
                         "
                     >
-                        Obsah sa nepodarilo načítať
-                    </h1>
-
-                    <p
-                        class="
-                            text-regular
-                            mt-5
-                            text-green/70
-                        "
-                    >
-                        {{ error }}
-                    </p>
-
-                    <div class="mt-8">
-                        <Button
-                            background-color="#FBF9F3"
-                            text-color="#335940"
-                            @click="publicSiteStore.reload"
-                        >
-                            Skúsiť znova
-                        </Button>
+                        <AppHeader
+                            :show-menu="
+                                isFullyExpanded
+                            "
+                            :is-fixed="
+                                isFullyExpanded
+                            "
+                            @menu-click="
+                                handleMenuClick
+                            "
+                        />
                     </div>
-                </section>
-            </main>
 
-            <!-- App content -->
-            <template v-else>
-                <!-- Header -->
-                <div
-                    class="
-                        relative
-                        h-[60px]
-                        w-full
-                        shrink-0
-                    "
-                >
-                    <AppHeader
-                        :show-menu="
-                            isFullyExpanded
+                    <!-- Page cards -->
+                    <main
+                        class="
+                            relative
+                            z-20
+                            flex
+                            w-full
+                            flex-1
+                            items-start
+                            justify-center
+                            px-2
+
+                            sm:px-6
                         "
-                        :is-fixed="
-                            isFullyExpanded
-                        "
-                        @menu-click="
-                            handleMenuClick
-                        "
-                    />
+                    >
+                        <CardStage
+                            :pages="pages"
+                            :stack="stack"
+                        />
+                    </main>
+
+                    <!-- Footer -->
+                    <AppFooter />
+
+                    <CookieConsentSheet />
                 </div>
-
-                <!-- Page cards -->
-                <main
-                    class="
-                        relative
-                        z-20
-                        flex
-                        w-full
-                        flex-1
-                        items-start
-                        justify-center
-                        px-2
-
-                        sm:px-6
-                    "
-                >
-                    <CardStage
-                        :pages="pages"
-                        :stack="stack"
-                    />
-                </main>
-
-                <!-- Footer -->
-                <AppFooter />
-
-                <CookieConsentSheet />
-            </template>
+            </Transition>
         </div>
     </div>
 </template>
+
+<style scoped>
+.shell-fade-enter-active,
+.shell-fade-leave-active {
+    transition:
+        opacity 0.34s ease,
+        transform 0.34s ease;
+}
+
+.shell-fade-enter-from,
+.shell-fade-leave-to {
+    opacity: 0;
+    transform: translateY(6px);
+}
+</style>

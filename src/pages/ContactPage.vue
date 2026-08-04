@@ -1644,6 +1644,9 @@ onBeforeUnmount(() => {
                                 class="
                                     relative
                                 "
+                                :aria-busy="
+                                    isSubmitting
+                                "
                                 @submit.prevent="
                                     submit
                                 "
@@ -2081,6 +2084,34 @@ onBeforeUnmount(() => {
                                                 : 'Odoslať správu'
                                         }}
                                     </Button>
+                                </div>
+
+                                <div
+                                    v-if="
+                                        isSubmitting
+                                    "
+                                    class="
+                                        absolute
+                                        inset-0
+                                        z-30
+                                        flex
+                                        items-center
+                                        justify-center
+                                        bg-baige/95
+                                    "
+                                    aria-label="Odosielanie správy"
+                                >
+                                    <object
+                                        data="/images/logo_animated.svg"
+                                        type="image/svg+xml"
+                                        aria-label="Humanitas"
+                                        class="
+                                            h-auto
+                                            w-[clamp(8rem,18vw,12rem)]
+                                        "
+                                    >
+                                        Humanitas
+                                    </object>
                                 </div>
                             </form>
                         </div>

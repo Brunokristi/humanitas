@@ -658,6 +658,7 @@ const cardClass =
                 true,
 
             'touch-none':
+                hasHoverPointer.value &&
                 isPreviewMode.value &&
                 props.visual.interactive,
 
@@ -1113,6 +1114,12 @@ function onCardPointerDown(
         shouldIgnoreCardDragStart(
             event.target
         )
+    ) {
+        return
+    }
+
+    if (
+        !hasHoverPointer.value
     ) {
         return
     }

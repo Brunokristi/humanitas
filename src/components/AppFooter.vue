@@ -853,6 +853,7 @@ function handleCookiesClick() {
                             text-green/70
                             transition-opacity
                             hover:opacity-55
+                            cursor-pointer
                         "
                         @click="
                             handlePrivacyPolicyClick
@@ -868,6 +869,7 @@ function handleCookiesClick() {
                             text-green/70
                             transition-opacity
                             hover:opacity-55
+                            cursor-pointer
                         "
                         @click="
                             handleCookiesClick

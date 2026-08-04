@@ -52,6 +52,12 @@ function createCardStack({
     const closingAtTarget =
         ref(false)
 
+    const openingAtTarget =
+        ref(false)
+
+    const openingMeasureMode =
+        ref(false)
+
     const closingTopDone =
         ref(false)
 
@@ -102,7 +108,7 @@ function createCardStack({
         60
 
     const transitionDuration =
-        440
+        500
 
     const minimizeThreshold =
         130
@@ -119,6 +125,9 @@ function createCardStack({
     let pendingRouteOpenId =
         null
 
+    let pendingExpandedSwitchCardId =
+        null
+
     let isScrollLocked =
         false
 
@@ -133,6 +142,20 @@ function createCardStack({
 
     let openingOverlayAnimation =
         null
+
+    const userAgent =
+        typeof navigator !==
+            'undefined'
+            ? navigator.userAgent
+            : ''
+
+    const isSafariBrowser =
+        /Safari/i.test(
+            userAgent
+        ) &&
+        !/Chrome|Chromium|CriOS|Edg|OPR/i.test(
+            userAgent
+        )
 
     const reducedMotionQuery =
         window.matchMedia(
@@ -413,6 +436,15 @@ function createCardStack({
 
                 transition:
                     'none',
+
+                contain:
+                    'layout paint',
+
+                backfaceVisibility:
+                    'hidden',
+
+                WebkitBackfaceVisibility:
+                    'hidden',
 
                 willChange:
                     [
@@ -1050,6 +1082,12 @@ function createCardStack({
         closingAtTarget.value =
             false
 
+        openingAtTarget.value =
+            false
+
+        openingMeasureMode.value =
+            false
+
         closingTopDone.value =
             false
 
@@ -1106,20 +1144,25 @@ function createCardStack({
             sourceRect
         )
 
-        const openingVisual =
-            createOpeningOverlay(
-                sourceElement,
+        const sourceBox =
+            createBox(
                 sourceRect
             )
-
-        const overlay =
-            openingVisual.element
 
         openCardId.value =
             cardId
 
         phase.value =
             'opening'
+
+        openingAtTarget.value =
+            false
+
+        openingMeasureMode.value =
+            true
+
+        transitionBox.value =
+            null
 
         suppressTransition.value =
             true
@@ -1132,8 +1175,7 @@ function createCardStack({
             )
 
         if (
-            !expandedElement ||
-            !overlay
+            !expandedElement
         ) {
             finishOpening(
                 cardId,
@@ -1146,6 +1188,22 @@ function createCardStack({
         const targetRect =
             expandedElement
                 .getBoundingClientRect()
+
+        openingMeasureMode.value =
+            false
+
+        transitionBox.value = {
+            source:
+                sourceBox,
+
+            target:
+                createBox(
+                    targetRect
+                ),
+
+            updateRoute:
+                shouldUpdateRoute
+        }
 
         suppressTransition.value =
             false
@@ -1161,49 +1219,12 @@ function createCardStack({
             return
         }
 
-        openingOverlayAnimation =
-            overlay.animate(
-                [
-                    openingVisual
-                        .startFrame,
-
-                    {
-                        top:
-                            `${targetRect.top}px`,
-
-                        left:
-                            `${targetRect.left}px`,
-
-                        width:
-                            `${targetRect.width}px`,
-
-                        height:
-                            `${targetRect.height}px`,
-
-                        transform:
-                            'none',
-
-                        transformOrigin:
-                            'top left',
-
-                        borderRadius:
-                            '28px',
-
-                        boxShadow:
-                            'var(--shadow-strong)'
-                    }
-                ],
-                {
-                    duration:
-                        getTransitionMs(),
-
-                    easing:
-                        'cubic-bezier(0.22, 1, 0.36, 1)',
-
-                    fill:
-                        'both'
-                }
-            )
+        requestAnimationFrame(
+            () => {
+                openingAtTarget.value =
+                    true
+            }
+        )
 
         fallbackTimer =
             window.setTimeout(
@@ -1216,18 +1237,6 @@ function createCardStack({
                 getTransitionMs() +
                 100
             )
-
-        try {
-            await openingOverlayAnimation
-                .finished
-        } catch {
-            //
-        }
-
-        finishOpening(
-            cardId,
-            shouldUpdateRoute
-        )
     }
 
     function finishOpening(
@@ -1254,6 +1263,12 @@ function createCardStack({
         phase.value =
             'expanded'
 
+        openingAtTarget.value =
+            false
+
+        openingMeasureMode.value =
+            false
+
         transitionBox.value =
             null
 
@@ -1262,8 +1277,6 @@ function createCardStack({
 
         nextTick(
             () => {
-                cleanupOpeningOverlay()
-
                 isTransitioning.value =
                     false
 
@@ -1411,6 +1424,12 @@ function createCardStack({
         closingAtTarget.value =
             false
 
+        openingAtTarget.value =
+            false
+
+        openingMeasureMode.value =
+            false
+
         closingTopDone.value =
             false
 
@@ -1435,6 +1454,39 @@ function createCardStack({
         nextTick(
             () => {
                 rememberAllStackedRects()
+
+                const nextCardId =
+                    pendingExpandedSwitchCardId
+
+                if (
+                    nextCardId
+                ) {
+                    pendingExpandedSwitchCardId =
+                        null
+
+                    moveCardToFront(
+                        nextCardId
+                    )
+
+                    rememberAllStackedRects()
+
+                    requestAnimationFrame(
+                        () => {
+                            openCard(
+                                nextCardId,
+                                {
+                                    updateRoute:
+                                        false,
+
+                                    animate:
+                                        true
+                                }
+                            )
+                        }
+                    )
+
+                    return
+                }
 
                 requestAnimationFrame(
                     () => {
@@ -1486,8 +1538,6 @@ function createCardStack({
 
         clearPreviewEffectsTimer()
 
-        cleanupOpeningOverlay()
-
         const cardId =
             openCardId.value
 
@@ -1533,20 +1583,6 @@ function createCardStack({
 
             return
         }
-
-        /*
-         * Freeze the expanded card before moving
-         * the real card back into the stack.
-         *
-         * Only the overlay shell changes size.
-         * Its cloned page keeps the expanded size
-         * and is progressively clipped.
-         */
-        const overlay =
-            createClosingOverlay(
-                element,
-                sourceRect
-            )
 
         transitionBox.value = {
             source:
@@ -1594,7 +1630,6 @@ function createCardStack({
         if (
             phase.value !==
             'closing' ||
-            !overlay ||
             !transitionBox.value
         ) {
             return
@@ -1611,68 +1646,12 @@ function createCardStack({
             return
         }
 
-        const source =
-            transitionBox.value
-                .source
-
-        const target =
-            transitionBox.value
-                .target
-
-        openingOverlayAnimation =
-            overlay.animate(
-                [
-                    {
-                        top:
-                            `${source.top}px`,
-
-                        left:
-                            `${source.left}px`,
-
-                        width:
-                            `${source.width}px`,
-
-                        height:
-                            `${source.height}px`,
-
-                        borderRadius:
-                            '28px',
-
-                        boxShadow:
-                            'var(--shadow-strong)'
-                    },
-
-                    {
-                        top:
-                            `${target.top}px`,
-
-                        left:
-                            `${target.left}px`,
-
-                        width:
-                            `${target.width}px`,
-
-                        height:
-                            `${target.height}px`,
-
-                        borderRadius:
-                            '32px',
-
-                        boxShadow:
-                            'var(--shadow-soft)'
-                    }
-                ],
-                {
-                    duration:
-                        getTransitionMs(),
-
-                    easing:
-                        'cubic-bezier(0.22, 1, 0.36, 1)',
-
-                    fill:
-                        'both'
-                }
-            )
+        requestAnimationFrame(
+            () => {
+                closingAtTarget.value =
+                    true
+            }
+        )
 
         fallbackTimer =
             window.setTimeout(
@@ -1692,28 +1671,6 @@ function createCardStack({
                 getTransitionMs() +
                 100
             )
-
-        try {
-            await openingOverlayAnimation
-                .finished
-        } catch {
-            // The animation can be cancelled during cleanup.
-        }
-
-        if (
-            phase.value !==
-            'closing'
-        ) {
-            return
-        }
-
-        closingAtTarget.value =
-            true
-
-        finalizeMinimize({
-            updateRoute:
-                shouldUpdateRoute
-        })
     }
 
     function minimizeCard(
@@ -2010,6 +1967,82 @@ function createCardStack({
             if (
                 selected
             ) {
+                const openingBox =
+                    openingAtTarget.value
+                        ? transitionBox.value
+                            ?.target
+                        : transitionBox.value
+                            ?.source
+
+                if (
+                    openingMeasureMode.value
+                ) {
+                    return {
+                        isOpen:
+                            true,
+
+                        isOpening:
+                            true,
+
+                        isMinimizing:
+                            false,
+
+                        isDragging:
+                            false,
+
+                        interactive:
+                            false,
+
+                        previewEffectsReady:
+                            false,
+
+                        showExpandedControls:
+                            false,
+
+                        fixedBox:
+                            null,
+
+                        x:
+                            0,
+
+                        y:
+                            0,
+
+                        rotateDeg:
+                            0,
+
+                        scale:
+                            1,
+
+                        opacity:
+                            1,
+
+                        visibility:
+                            'hidden',
+
+                        zIndex:
+                            900,
+
+                        shadow:
+                            'var(--shadow-strong)',
+
+                        borderRadius:
+                            28,
+
+                        width:
+                            '100%',
+
+                        height:
+                            'auto',
+
+                        minHeight:
+                            'min(68dvh, 620px)',
+
+                        transitionMs:
+                            0
+                    }
+                }
+
                 return {
                     isOpen:
                         true,
@@ -2033,6 +2066,7 @@ function createCardStack({
                         false,
 
                     fixedBox:
+                        openingBox ??
                         null,
 
                     x:
@@ -2051,7 +2085,7 @@ function createCardStack({
                         1,
 
                     visibility:
-                        'hidden',
+                        'visible',
 
                     zIndex:
                         900,
@@ -2063,16 +2097,22 @@ function createCardStack({
                         28,
 
                     width:
-                        '100%',
+                        openingBox
+                            ? `${openingBox.width}px`
+                            : '100%',
 
                     height:
-                        'auto',
+                        openingBox
+                            ? `${openingBox.height}px`
+                            : 'auto',
 
                     minHeight:
                         'min(68dvh, 620px)',
 
                     transitionMs:
-                        0
+                        suppressTransition.value
+                            ? 0
+                            : getTransitionMs()
                 }
             }
 
@@ -2146,15 +2186,16 @@ function createCardStack({
             if (
                 selected
             ) {
-                /*
-                 * The real selected card already sits
-                 * in the final front stack position.
-                 * Keep it hidden while the frozen
-                 * overlay performs the close animation.
-                 */
+                const closingBox =
+                    closingAtTarget.value
+                        ? transitionBox.value
+                            ?.target
+                        : transitionBox.value
+                            ?.source
+
                 return {
                     isOpen:
-                        false,
+                        true,
 
                     isOpening:
                         false,
@@ -2175,6 +2216,7 @@ function createCardStack({
                         false,
 
                     fixedBox:
+                        closingBox ??
                         null,
 
                     x:
@@ -2189,29 +2231,34 @@ function createCardStack({
                         ),
 
                     opacity:
-                        0,
+                        1,
 
                     visibility:
-                        'hidden',
+                        'visible',
 
                     zIndex:
-                        cardCount -
-                        index,
+                        900,
 
                     shadow:
-                        'var(--shadow-soft)',
+                        'var(--shadow-strong)',
 
                     borderRadius:
                         32,
 
                     width:
-                        stackedCardDimensions.width,
+                        closingBox
+                            ? `${closingBox.width}px`
+                            : '100%',
 
                     height:
-                        stackedCardDimensions.height,
+                        closingBox
+                            ? `${closingBox.height}px`
+                            : 'auto',
 
                     transitionMs:
-                        0
+                        suppressTransition.value
+                            ? 0
+                            : getTransitionMs()
                 }
             }
 
@@ -2472,12 +2519,47 @@ function createCardStack({
         if (
             !card
         ) {
+            pendingExpandedSwitchCardId =
+                null
+
             if (
                 path ===
                 '/'
             ) {
                 resetTransitionState()
             }
+
+            return
+        }
+
+        if (
+            phase.value ===
+            'expanded' &&
+            openCardId.value &&
+            openCardId.value !==
+            card.id &&
+            !isTransitioning.value
+        ) {
+            pendingExpandedSwitchCardId =
+                card.id
+
+            beginClosing({
+                updateRoute:
+                    false
+            })
+
+            return
+        }
+
+        if (
+            phase.value ===
+            'closing' &&
+            openCardId.value &&
+            openCardId.value !==
+            card.id
+        ) {
+            pendingExpandedSwitchCardId =
+                card.id
 
             return
         }

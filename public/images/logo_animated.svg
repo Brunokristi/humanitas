@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg
+    xmlns="http://www.w3.org/2000/svg"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    width="220"
+    height="220"
+    viewBox="0 0 220 220"
+    role="img"
+    aria-label="Humanitas loader"
+>
+    <title>Humanitas loader</title>
+
+    <defs>
+        <!--
+            Smaller orbit radius keeps the HUMANITAS text
+            closer to the centre logo.
+        -->
+        <path
+            id="humanitasOrbit"
+            d="
+                M 110 62
+                A 48 48 0 1 1 110 158
+                A 48 48 0 1 1 110 62
+            "
+            fill="none"
+        />
+    </defs>
+
+    <style>
+        @import url(
+            "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&amp;display=swap"
+        );
+
+        .word {
+            fill: #335940;
+            font-family:
+                "Cormorant Garamond",
+                "Times New Roman",
+                serif;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+        }
+    </style>
+
+    <!-- Centre logo -->
+    <image
+        href="humanitas_logo.svg"
+        x="45"
+        y="45"
+        width="130"
+        height="130"
+        preserveAspectRatio="xMidYMid meet"
+    />
+
+    <!-- Rotating curved text -->
+    <g
+        id="orbitGroup"
+        transform="rotate(180 110 110)"
+    >
+        <text
+            class="word"
+            text-anchor="middle"
+        >
+            <textPath
+                href="#humanitasOrbit"
+                xlink:href="#humanitasOrbit"
+                startOffset="50%"
+            >
+                HUMANITAS
+            </textPath>
+        </text>
+    </g>
+
+    <script>
+        <![CDATA[
+            (() => {
+                const orbitGroup = document.getElementById('orbitGroup');
+
+                if (!orbitGroup) {
+                    return;
+                }
+
+                const reducedMotion = window.matchMedia(
+                    '(prefers-reduced-motion: reduce)'
+                );
+
+                const centreX = 110;
+                const centreY = 110;
+
+                /*
+                 * Duration of one complete round.
+                 * Increase for slower movement.
+                 */
+                const duration = 2500;
+
+                /*
+                 * Controls how strongly the text slows at the top.
+                 *
+                 * 0    = constant speed
+                 * 0.3  = subtle slowdown
+                 * 0.55 = noticeable, smooth slowdown
+                 * 0.8  = strong slowdown
+                 *
+                 * Keep this below 1.
+                 */
+                const slowdownStrength = 0.8;
+
+                let animationFrame = null;
+                let startedAt = null;
+
+                const render = (timestamp) => {
+                    if (reducedMotion.matches) {
+                        orbitGroup.setAttribute(
+                            'transform',
+                            `rotate(180 ${centreX} ${centreY})`
+                        );
+
+                        animationFrame = null;
+                        startedAt = null;
+
+                        return;
+                    }
+
+                    if (startedAt === null) {
+                        startedAt = timestamp;
+                    }
+
+                    const elapsed = timestamp - startedAt;
+                    const progress = (elapsed % duration) / duration;
+
+                    const phase = progress * Math.PI * 2;
+
+                    const adjustedPhase =
+                        phase
+                        - slowdownStrength * Math.sin(phase);
+
+                    const rotation =
+                        180
+                        + adjustedPhase * 180 / Math.PI;
+
+                    orbitGroup.setAttribute(
+                        'transform',
+                        `rotate(${rotation} ${centreX} ${centreY})`
+                    );
+
+                    animationFrame = requestAnimationFrame(render);
+                };
+
+                const startAnimation = () => {
+                    if (animationFrame !== null) {
+                        cancelAnimationFrame(animationFrame);
+                    }
+
+                    animationFrame = null;
+                    startedAt = null;
+
+                    if (reducedMotion.matches) {
+                        orbitGroup.setAttribute(
+                            'transform',
+                            `rotate(180 ${centreX} ${centreY})`
+                        );
+
+                        return;
+                    }
+
+                    animationFrame = requestAnimationFrame(render);
+                };
+
+                reducedMotion.addEventListener(
+                    'change',
+                    startAnimation
+                );
+
+                startAnimation();
+            })();
+        ]]>
+    </script>
+</svg>

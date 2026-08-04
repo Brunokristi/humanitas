@@ -89,24 +89,12 @@ function createCookieConsent() {
                 cookiePreferences.analytics
                     ? 'granted'
                     : 'denied',
-            ad_storage:
-                cookiePreferences.marketing
-                    ? 'granted'
-                    : 'denied',
-            ad_user_data:
-                cookiePreferences.marketing
-                    ? 'granted'
-                    : 'denied',
-            ad_personalization:
-                cookiePreferences.marketing
-                    ? 'granted'
-                    : 'denied',
+            ad_storage: 'denied',
+            ad_user_data: 'denied',
+            ad_personalization: 'denied',
             functionality_storage:
                 'granted',
-            personalization_storage:
-                cookiePreferences.marketing
-                    ? 'granted'
-                    : 'denied',
+            personalization_storage: 'denied',
             security_storage:
                 'granted'
         };
@@ -171,12 +159,14 @@ function createCookieConsent() {
             return;
         }
 
-        const nextPayload = {
-            ...googleConsentPayload(
+        const nextPayload =
+            googleConsentPayload(
                 cookiePreferences
-            ),
-            wait_for_update: 500
-        };
+            );
+
+        if (mode === 'default') {
+            nextPayload.wait_for_update = 500;
+        }
 
         gtag(
             'consent',
