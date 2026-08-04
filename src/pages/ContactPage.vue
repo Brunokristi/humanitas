@@ -10,6 +10,7 @@ import {
 import {
     useClinviaPublicSite
 } from '../composables/useClinviaPublicSite';
+import { usePageSeo } from '../composables/usePageSeo';
 
 import {
     useScrollMotion
@@ -35,6 +36,20 @@ const {
     motionRoot,
     motionStyle
 } = useScrollMotion();
+
+usePageSeo({
+    pageKey: 'contact',
+    breadcrumbs: [
+        {
+            name: 'Domov',
+            url: 'https://klinickapsychologiars.sk/'
+        },
+        {
+            name: 'Kontakt',
+            url: 'https://klinickapsychologiars.sk/kontakt'
+        }
+    ]
+});
 
 /*
  * Form
@@ -1434,16 +1449,50 @@ onBeforeUnmount(() => {
 
             "
         >
+            <section
+                class="
+                    mx-auto
+                    max-w-4xl
+                    text-center
+                "
+            >
+                <h1
+                    class="
+                        text-[clamp(2.1rem,4vw,4.25rem)]
+                        font-bold
+                        leading-[0.95]
+                        tracking-[-0.04em]
+                        text-baige
+                    "
+                >
+                    Kontaktujte Humanitas
+                </h1>
+
+                <p
+                    class="
+                        text-regular
+                        mx-auto
+                        mt-4
+                        max-w-2xl
+                        text-base
+                        text-baige/70
+                    "
+                >
+                    Ak sa chcete objednať, položiť otázku alebo sa poradiť o psychologických službách,
+                    napíšte nám alebo použite kontaktné údaje nižšie.
+                </p>
+            </section>
+
             <!-- Three-column contact layout -->
             <section
                 class="
-                    mt-14
+                    mt-12
                     grid
                     grid-cols-1
                     items-start
                     gap-10
 
-                    lg:mt-20
+                    lg:mt-16
                     lg:grid-cols-3
                     lg:gap-20
 

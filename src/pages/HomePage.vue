@@ -9,6 +9,7 @@ import {
 import { storeToRefs } from 'pinia';
 
 import { usePublicSiteStore } from '../stores/publicSite';
+import { usePageSeo } from '../composables/usePageSeo';
 
 import Button from '../components/Button.vue';
 import EmployeeCarousel from '../components/EmployeeCarousel.vue';
@@ -45,6 +46,16 @@ const servicesUrl =
 
 const contactUrl =
     '/kontakt';
+
+usePageSeo({
+    pageKey: 'home',
+    breadcrumbs: [
+        {
+            name: 'Domov',
+            url: 'https://klinickapsychologiars.sk/'
+        }
+    ]
+});
 
 /*
  * Hero

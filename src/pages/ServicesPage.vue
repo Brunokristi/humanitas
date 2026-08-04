@@ -12,6 +12,7 @@ import {
 import { storeToRefs } from 'pinia';
 
 import { usePublicSiteStore } from '../stores/publicSite';
+import { usePageSeo } from '../composables/usePageSeo';
 
 import {
     useScrollMotion
@@ -67,6 +68,20 @@ const {
 
 const contactUrl =
     '/kontakt';
+
+usePageSeo({
+    pageKey: 'services',
+    breadcrumbs: [
+        {
+            name: 'Domov',
+            url: 'https://klinickapsychologiars.sk/'
+        },
+        {
+            name: 'Služby',
+            url: 'https://klinickapsychologiars.sk/sluzby'
+        }
+    ]
+});
 
 const searchTerm =
     ref('');

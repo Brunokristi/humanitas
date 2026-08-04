@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { h } from 'vue'
 import { pages } from '../data/pages'
+import { PUBLIC_ROUTES } from '../seo/site'
 
 const EmptyRouteView = {
     name: 'EmptyRouteView',
@@ -11,9 +12,8 @@ const EmptyRouteView = {
 
 const routes = [
     {
-        path: '/',
-        name: 'stack',
-        component: EmptyRouteView
+        path: '/domov',
+        redirect: PUBLIC_ROUTES.home
     },
     ...pages.map((page) => ({
         path: page.route,
