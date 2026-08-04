@@ -2,6 +2,7 @@ import { ref } from 'vue'
 
 export function useSheetDrag(options = {}) {
     const {
+        intentThreshold = 8,
         onStart,
         onMove,
         onEnd,
@@ -11,21 +12,25 @@ export function useSheetDrag(options = {}) {
     const dragging = ref(false)
 
     let pointerId = null
+    let startX = 0
     let startY = 0
     let startTime = 0
     let lastY = 0
     let lastTime = 0
     let currentDistance = 0
     let currentVelocity = 0
+    let gestureClaimed = false
 
     function reset() {
         pointerId = null
+        startX = 0
         startY = 0
         startTime = 0
         lastY = 0
         lastTime = 0
         currentDistance = 0
         currentVelocity = 0
+        gestureClaimed = false
         dragging.value = false
     }
 
@@ -44,20 +49,30 @@ export function useSheetDrag(options = {}) {
         }
 
         pointerId = event.pointerId
+        startX = event.clientX
         startY = event.clientY
         startTime = event.timeStamp
         lastY = event.clientY
         lastTime = event.timeStamp
         currentDistance = 0
         currentVelocity = 0
+        gestureClaimed = false
         dragging.value = true
+    }
+
+    function claimGesture(event) {
+        if (gestureClaimed) {
+            return
+        }
+
+        gestureClaimed = true
 
         try {
             event.currentTarget?.setPointerCapture?.(
                 pointerId
             )
         } catch {
-            // Drag môže fungovať aj bez pointer capture.
+            // Safe fallback when capture is unavailable.
         }
     }
 
@@ -69,8 +84,31 @@ export function useSheetDrag(options = {}) {
             return
         }
 
-        const rawDistance = event.clientY - startY
-        const distance = Math.max(0, rawDistance)
+        const deltaX = event.clientX - startX
+        const deltaY = event.clientY - startY
+
+        if (!gestureClaimed) {
+            const passedThreshold =
+                Math.abs(deltaY) > intentThreshold ||
+                Math.abs(deltaX) > intentThreshold
+
+            if (!passedThreshold) {
+                return
+            }
+
+            const isVerticalIntent =
+                Math.abs(deltaY) > Math.abs(deltaX) * 1.25
+
+            if (!isVerticalIntent || deltaY < 0) {
+                reset()
+                onCancel?.()
+                return
+            }
+
+            claimGesture(event)
+        }
+
+        const distance = Math.max(0, deltaY)
 
         const deltaTime = Math.max(
             1,
@@ -103,12 +141,14 @@ export function useSheetDrag(options = {}) {
             return
         }
 
-        try {
-            event.currentTarget?.releasePointerCapture?.(
-                pointerId
-            )
-        } catch {
-            // Pointer capture nemusel byť vytvorený.
+        if (gestureClaimed) {
+            try {
+                event.currentTarget?.releasePointerCapture?.(
+                    pointerId
+                )
+            } catch {
+                // Ignore release failures.
+            }
         }
 
         const totalTime = Math.max(
@@ -120,18 +160,20 @@ export function useSheetDrag(options = {}) {
             currentDistance /
             totalTime
 
-        /*
-         * Použijeme vyššiu z okamžitej a priemernej
-         * rýchlosti. Rýchly flick tak funguje prirodzene.
-         */
         const releaseVelocity = Math.max(
             currentVelocity,
             averageVelocity
         )
 
         const finalDistance = currentDistance
+        const wasClaimed = gestureClaimed
 
         reset()
+
+        if (!wasClaimed) {
+            onCancel?.()
+            return
+        }
 
         onEnd?.({
             distance: finalDistance,
@@ -151,12 +193,14 @@ export function useSheetDrag(options = {}) {
             return
         }
 
-        try {
-            event.currentTarget?.releasePointerCapture?.(
-                pointerId
-            )
-        } catch {
-            // Pointer capture nemusel byť vytvorený.
+        if (gestureClaimed) {
+            try {
+                event.currentTarget?.releasePointerCapture?.(
+                    pointerId
+                )
+            } catch {
+                // Ignore release failures.
+            }
         }
 
         reset()

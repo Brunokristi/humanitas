@@ -22,6 +22,13 @@ import Button from '../components/Button.vue';
 import Card from '../components/Card.vue';
 import ServiceBottomSheet from '../components/ServiceBottomSheet.vue';
 
+defineProps({
+    expanded: {
+        type: Boolean,
+        default: false
+    }
+});
+
 const publicSiteStore =
     usePublicSiteStore();
 

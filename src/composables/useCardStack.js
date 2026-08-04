@@ -1,19 +1,100 @@
 import {
     computed,
     nextTick,
+    onBeforeUnmount,
+    reactive,
     ref,
     watch
-} from 'vue'
+} from 'vue';
 
-import {
-    useCardNavigation
-} from './useCardNavigation'
+import { useCardNavigation } from './useCardNavigation';
 
-import {
-    useSheetDrag
-} from './useSheetDrag'
+const OVERVIEW_RADIUS = 32;
+const EXPANDED_RADIUS = 40;
+const OVERVIEW_SNAP_DURATION = 320;
+const OVERVIEW_SNAP_EASING =
+    'cubic-bezier(0.22, 1, 0.36, 1)';
 
-let instance
+const MOBILE_OVERVIEW_TRANSFORMS = [
+    {
+        x: 0,
+        y: 88,
+        scale: 1,
+        zIndex: 30
+    },
+    {
+        x: 0,
+        y: 44,
+        scale: 0.972,
+        zIndex: 20
+    },
+    {
+        x: 0,
+        y: 0,
+        scale: 0.944,
+        zIndex: 10
+    }
+];
+
+const DESKTOP_OVERVIEW_TRANSFORMS = [
+    {
+        x: 0,
+        y: 104,
+        scale: 1,
+        zIndex: 30
+    },
+    {
+        x: 0,
+        y: 52,
+        scale: 0.972,
+        zIndex: 20
+    },
+    {
+        x: 0,
+        y: 0,
+        scale: 0.944,
+        zIndex: 10
+    }
+];
+
+const INTERACTIVE_SELECTOR = [
+    'a',
+    'button',
+    'input',
+    'textarea',
+    'select',
+    'label',
+    'iframe',
+    '[contenteditable="true"]',
+    '[data-no-drag]'
+].join(', ');
+
+function clamp(
+    value,
+    minimum,
+    maximum
+) {
+    return Math.min(
+        maximum,
+        Math.max(
+            minimum,
+            value
+        )
+    );
+}
+
+function normalizeRect(rect) {
+    if (!rect) {
+        return null;
+    }
+
+    return {
+        top: rect.top,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height
+    };
+}
 
 function createCardStack({
     pages,
@@ -23,2688 +104,1350 @@ function createCardStack({
     const navigation =
         useCardNavigation(
             pages
-        )
+        );
 
-    const defaultOrder =
-        pages.map(
-            (page) => {
-                return page.id
-            }
-        )
+    const state = reactive({
+        mode: 'overview',
+        activePageId: null,
+        overviewPageId:
+            pages[0]?.id ??
+            null,
+        interactionLocked: false,
+        transitionType: null,
+        transitionDirection: 1,
+        sharedPageId: null,
+        captureMode: null,
+        captureScrollY: 0,
+        captureRect: null
+    });
 
-    const cardOrder =
-        ref([
-            ...defaultOrder
-        ])
+    const cardOrder = ref(
+        pages.map((page) => {
+            return page.id;
+        })
+    );
 
-    const phase =
-        ref('stacked')
+    const viewportWidth = ref(
+        window.innerWidth ||
+        1280
+    );
 
-    const openCardId =
-        ref(null)
-
-    const isTransitioning =
-        ref(false)
-
-    const isExpandedDragging =
-        ref(false)
-
-    const closingAtTarget =
-        ref(false)
-
-    const openingAtTarget =
-        ref(false)
-
-    const openingMeasureMode =
-        ref(false)
-
-    const closingTopDone =
-        ref(false)
-
-    const closingLeftDone =
-        ref(false)
-
-    const closingWidthDone =
-        ref(false)
-
-    const closingHeightDone =
-        ref(false)
-
-    const expandedDragY =
-        ref(0)
-
-    const transitionBox =
-        ref(null)
-
-    const suppressTransition =
-        ref(false)
-
-    const suppressRouteSync =
-        ref(false)
-
-    const previewEffectsReady =
-        ref(true)
-
-    const mode = computed(() => {
-        if (
-            phase.value ===
-            'stacked' ||
-            phase.value ===
-            'closing'
-        ) {
-            return 'stacked'
-        }
-
-        return 'expanded'
-    })
-
-    const cardElements =
-        new Map()
-
-    const stackedRects =
-        new Map()
-
-    const stackedOffset =
-        60
-
-    const transitionDuration =
-        500
-
-    const minimizeThreshold =
-        130
-
-    const minimizeVelocityThreshold =
-        0.55
-
-    let fallbackTimer =
-        null
-
-    let previewEffectsTimer =
-        null
-
-    let pendingRouteOpenId =
-        null
-
-    let pendingExpandedSwitchCardId =
-        null
-
-    let isScrollLocked =
-        false
-
-    let previousHtmlOverflow =
-        ''
-
-    let previousBodyOverflow =
-        ''
-
-    let openingOverlayElement =
-        null
-
-    let openingOverlayAnimation =
-        null
-
-    const userAgent =
-        typeof navigator !==
-            'undefined'
-            ? navigator.userAgent
-            : ''
-
-    const isSafariBrowser =
-        /Safari/i.test(
-            userAgent
-        ) &&
-        !/Chrome|Chromium|CriOS|Edg|OPR/i.test(
-            userAgent
-        )
+    const viewportHeight = ref(
+        window.innerHeight ||
+        800
+    );
 
     const reducedMotionQuery =
         window.matchMedia(
             '(prefers-reduced-motion: reduce)'
-        )
+        );
 
-    const reducedMotion =
-        ref(
-            reducedMotionQuery.matches
-        )
+    const reducedMotion = ref(
+        reducedMotionQuery.matches
+    );
 
-    function handleReducedMotionChange(
-        event
-    ) {
-        reducedMotion.value =
-            event.matches
+    const stageElement = ref(null);
+    const overviewDragX = ref(0);
+    const overviewDragging = ref(false);
+
+    const overviewCardElements =
+        new Map();
+
+    const expandedCardElement =
+        ref(null);
+
+    const pageScrollPositions =
+        new Map();
+
+    let activeViewTransition =
+        null;
+
+    let suppressRouteSync =
+        false;
+
+    let suppressOverviewClickUntil =
+        0;
+
+    let overviewPointerId =
+        null;
+
+    let overviewStartX =
+        0;
+
+    let overviewStartY =
+        0;
+
+    let overviewLastX =
+        0;
+
+    let overviewLastTime =
+        0;
+
+    let overviewVelocity =
+        0;
+
+    let overviewGestureClaimed =
+        false;
+
+    const mode = computed(() => {
+        return state.mode ===
+            'overview'
+            ? 'stacked'
+            : 'expanded';
+    });
+
+    const isOverview = computed(() => {
+        return state.mode ===
+            'overview';
+    });
+
+    const activePage = computed(() => {
+        return pages.find((page) => {
+            return (
+                page.id ===
+                state.activePageId
+            );
+        }) ?? null;
+    });
+
+    function getHeaderHeight() {
+        const source =
+            stageElement.value ??
+            document.documentElement;
+
+        const value =
+            window
+                .getComputedStyle(
+                    source
+                )
+                .getPropertyValue(
+                    '--app-header-height'
+                );
+
+        const parsed =
+            Number.parseFloat(
+                value
+            );
+
+        return Number.isFinite(
+            parsed
+        )
+            ? parsed
+            : 60;
     }
 
-    reducedMotionQuery.addEventListener(
-        'change',
-        handleReducedMotionChange
-    )
+    function getStageRect() {
+        const rect =
+            normalizeRect(
+                stageElement.value
+                    ?.getBoundingClientRect()
+            );
 
-    function getTransitionMs() {
-        return reducedMotion.value
-            ? 0
-            : transitionDuration
-    }
-
-    function getStackedScale(
-        index
-    ) {
-        return Math.max(
-            0.9,
-            1 -
-            index *
-            0.035
-        )
-    }
-
-    /*
-     * The reusable motion engine now owns
-     * scroll movement.
-     *
-     * No additional layout compensation is
-     * required because the motion is temporary.
-     */
-    const stackBottomCompensation =
-        computed(() => {
-            return 0
-        })
-
-    function getIndex(
-        cardId
-    ) {
-        return cardOrder.value.indexOf(
-            cardId
-        )
-    }
-
-    function clearFallbackTimer() {
-        if (
-            fallbackTimer ===
-            null
-        ) {
-            return
+        if (rect) {
+            return rect;
         }
-
-        window.clearTimeout(
-            fallbackTimer
-        )
-
-        fallbackTimer =
-            null
-    }
-
-    function clearPreviewEffectsTimer() {
-        if (
-            previewEffectsTimer ===
-            null
-        ) {
-            return
-        }
-
-        window.clearTimeout(
-            previewEffectsTimer
-        )
-
-        previewEffectsTimer =
-            null
-    }
-
-    function cleanupOpeningOverlay() {
-        if (
-            openingOverlayAnimation
-        ) {
-            openingOverlayAnimation.cancel()
-
-            openingOverlayAnimation =
-                null
-        }
-
-        if (
-            openingOverlayElement
-        ) {
-            openingOverlayElement.remove()
-
-            openingOverlayElement =
-                null
-        }
-    }
-
-    function createOpeningOverlay(
-        sourceElement,
-        sourceRect
-    ) {
-        cleanupOpeningOverlay()
-
-        const overlay =
-            sourceElement.cloneNode(
-                true
-            )
-
-        const sourceStyles =
-            window.getComputedStyle(
-                sourceElement
-            )
-
-        const offsetParent =
-            sourceElement.offsetParent
-
-        let startTop =
-            sourceRect.top
-
-        let startLeft =
-            sourceRect.left
-
-        let startWidth =
-            sourceRect.width
-
-        let startHeight =
-            sourceRect.height
-
-        let startTransform =
-            'none'
-
-        let startTransformOrigin =
-            'top left'
-
-        if (
-            offsetParent instanceof
-            HTMLElement
-        ) {
-            const parentRect =
-                offsetParent
-                    .getBoundingClientRect()
-
-            startTop =
-                parentRect.top +
-                offsetParent.clientTop +
-                sourceElement.offsetTop -
-                offsetParent.scrollTop
-
-            startLeft =
-                parentRect.left +
-                offsetParent.clientLeft +
-                sourceElement.offsetLeft -
-                offsetParent.scrollLeft
-
-            startWidth =
-                sourceElement.offsetWidth
-
-            startHeight =
-                sourceElement.offsetHeight
-
-            startTransform =
-                sourceStyles.transform ===
-                    'none'
-                    ? 'none'
-                    : sourceStyles.transform
-
-            startTransformOrigin =
-                sourceStyles.transformOrigin
-        }
-
-        overlay.setAttribute(
-            'aria-hidden',
-            'true'
-        )
-
-        overlay.removeAttribute(
-            'tabindex'
-        )
-
-        overlay.classList.add(
-            'card-opening-overlay'
-        )
-
-        overlay
-            .querySelectorAll(
-                '[id]'
-            )
-            .forEach(
-                (element) => {
-                    element.removeAttribute(
-                        'id'
-                    )
-                }
-            )
-
-        overlay
-            .querySelectorAll(
-                [
-                    'button',
-                    'a',
-                    'input',
-                    'textarea',
-                    'select',
-                    '[tabindex]'
-                ].join(', ')
-            )
-            .forEach(
-                (element) => {
-                    element.setAttribute(
-                        'tabindex',
-                        '-1'
-                    )
-                }
-            )
-
-        Object.assign(
-            overlay.style,
-            {
-                position:
-                    'fixed',
-
-                top:
-                    `${startTop}px`,
-
-                left:
-                    `${startLeft}px`,
-
-                width:
-                    `${startWidth}px`,
-
-                height:
-                    `${startHeight}px`,
-
-                maxWidth:
-                    'none',
-
-                minHeight:
-                    '0',
-
-                margin:
-                    '0',
-
-                transform:
-                    startTransform,
-
-                transformOrigin:
-                    startTransformOrigin,
-
-                opacity:
-                    '1',
-
-                visibility:
-                    'visible',
-
-                zIndex:
-                    '9999',
-
-                overflow:
-                    'hidden',
-
-                pointerEvents:
-                    'none',
-
-                transition:
-                    'none',
-
-                contain:
-                    'layout paint',
-
-                backfaceVisibility:
-                    'hidden',
-
-                WebkitBackfaceVisibility:
-                    'hidden',
-
-                willChange:
-                    [
-                        'top',
-                        'left',
-                        'width',
-                        'height',
-                        'transform',
-                        'border-radius',
-                        'box-shadow'
-                    ].join(', '),
-
-                borderRadius:
-                    sourceStyles.borderRadius,
-
-                boxShadow:
-                    sourceStyles.boxShadow
-            }
-        )
-
-        document.body.appendChild(
-            overlay
-        )
-
-        openingOverlayElement =
-            overlay
 
         return {
-            element:
-                overlay,
-
-            startFrame: {
-                top:
-                    `${startTop}px`,
-
-                left:
-                    `${startLeft}px`,
-
-                width:
-                    `${startWidth}px`,
-
-                height:
-                    `${startHeight}px`,
-
-                transform:
-                    startTransform,
-
-                transformOrigin:
-                    startTransformOrigin,
-
-                borderRadius:
-                    sourceStyles.borderRadius,
-
-                boxShadow:
-                    sourceStyles.boxShadow
-            }
-        }
+            top:
+                getHeaderHeight(),
+            left: 0,
+            width:
+                viewportWidth.value,
+            height:
+                Math.max(
+                    1,
+                    viewportHeight.value -
+                    getHeaderHeight()
+                )
+        };
     }
 
-    function createClosingOverlay(
-        sourceElement,
-        sourceRect
-    ) {
-        cleanupOpeningOverlay()
+    function getExpandedViewportRect() {
+        const stageRect =
+            getStageRect();
 
-        /*
-         * The shell changes size and position.
-         *
-         * The cloned page inside keeps the exact
-         * expanded width and height, so its content
-         * is clipped instead of scaled or squeezed.
-         */
-        const shell =
-            document.createElement(
-                'div'
-            )
+        const headerHeight =
+            getHeaderHeight();
 
-        const content =
-            sourceElement.cloneNode(
-                true
-            )
-
-        const sourceStyles =
-            window.getComputedStyle(
-                sourceElement
-            )
-
-        shell.setAttribute(
-            'aria-hidden',
-            'true'
-        )
-
-        shell.classList.add(
-            'card-closing-overlay'
-        )
-
-        content.setAttribute(
-            'aria-hidden',
-            'true'
-        )
-
-        content.removeAttribute(
-            'tabindex'
-        )
-
-        content
-            .querySelectorAll(
-                '[id]'
-            )
-            .forEach(
-                (element) => {
-                    element.removeAttribute(
-                        'id'
-                    )
-                }
-            )
-
-        content
-            .querySelectorAll(
-                [
-                    'button',
-                    'a',
-                    'input',
-                    'textarea',
-                    'select',
-                    '[tabindex]'
-                ].join(', ')
-            )
-            .forEach(
-                (element) => {
-                    element.setAttribute(
-                        'tabindex',
-                        '-1'
-                    )
-                }
-            )
-
-        Object.assign(
-            shell.style,
-            {
-                position:
-                    'fixed',
-
-                top:
-                    `${sourceRect.top}px`,
-
-                left:
-                    `${sourceRect.left}px`,
-
-                width:
-                    `${sourceRect.width}px`,
-
-                height:
-                    `${sourceRect.height}px`,
-
-                maxWidth:
-                    'none',
-
-                minWidth:
-                    '0',
-
-                minHeight:
-                    '0',
-
-                margin:
-                    '0',
-
-                transform:
-                    'none',
-
-                transformOrigin:
-                    'top left',
-
-                opacity:
-                    '1',
-
-                visibility:
-                    'visible',
-
-                zIndex:
-                    '9999',
-
-                overflow:
-                    'hidden',
-
-                pointerEvents:
-                    'none',
-
-                transition:
-                    'none',
-
-                contain:
-                    'layout paint',
-
-                willChange:
-                    [
-                        'top',
-                        'left',
-                        'width',
-                        'height',
-                        'border-radius',
-                        'box-shadow'
-                    ].join(', '),
-
-                borderRadius:
-                    sourceStyles.borderRadius,
-
-                boxShadow:
-                    sourceStyles.boxShadow,
-
-                background:
-                    sourceStyles.background
-            }
-        )
-
-        Object.assign(
-            content.style,
-            {
-                position:
-                    'absolute',
-
-                top:
-                    '0',
-
-                left:
-                    '0',
-
-                right:
-                    'auto',
-
-                bottom:
-                    'auto',
-
-                width:
-                    `${sourceRect.width}px`,
-
-                height:
-                    `${sourceRect.height}px`,
-
-                maxWidth:
-                    'none',
-
-                minWidth:
-                    `${sourceRect.width}px`,
-
-                minHeight:
-                    `${sourceRect.height}px`,
-
-                margin:
-                    '0',
-
-                transform:
-                    'none',
-
-                transformOrigin:
-                    'top left',
-
-                opacity:
-                    '1',
-
-                visibility:
-                    'visible',
-
-                overflow:
-                    'visible',
-
-                pointerEvents:
-                    'none',
-
-                transition:
-                    'none'
-            }
-        )
-
-        shell.appendChild(
-            content
-        )
-
-        document.body.appendChild(
-            shell
-        )
-
-        openingOverlayElement =
-            shell
-
-        return shell
+        return {
+            top:
+                headerHeight,
+            left:
+                stageRect.left,
+            width:
+                stageRect.width,
+            height:
+                Math.max(
+                    1,
+                    viewportHeight.value -
+                    headerHeight
+                )
+        };
     }
 
-    function schedulePreviewEffectsEnable(
-        delay = 200
-    ) {
-        clearPreviewEffectsTimer()
-
-        previewEffectsTimer =
-            window.setTimeout(
-                () => {
-                    previewEffectsReady.value =
-                        true
-
-                    previewEffectsTimer =
-                        null
-                },
-                delay
-            )
+    function getOverviewTransforms() {
+        return viewportWidth.value <
+            768
+            ? MOBILE_OVERVIEW_TRANSFORMS
+            : DESKTOP_OVERVIEW_TRANSFORMS;
     }
 
-    function lockViewportScroll() {
+    function getOverviewMetrics() {
+        const stageRect =
+            getStageRect();
+
+        const isMobile =
+            viewportWidth.value <
+            768;
+
+        const cardWidth = isMobile
+            ? clamp(
+                stageRect.width -
+                16,
+                280,
+                430
+            )
+            : clamp(
+                stageRect.width *
+                0.74,
+                540,
+                860
+            );
+
+        const cardHeight = isMobile
+            ? clamp(
+                viewportHeight.value *
+                0.70,
+                470,
+                680
+            )
+            : clamp(
+                viewportHeight.value *
+                0.72,
+                540,
+                720
+            );
+
+        const transforms =
+            getOverviewTransforms();
+
+        const maximumY =
+            Math.max(
+                ...transforms.map(
+                    (transform) => {
+                        return transform.y;
+                    }
+                )
+            );
+
+        return {
+            cardWidth,
+            cardHeight,
+            baseLeft:
+                (
+                    stageRect.width -
+                    cardWidth
+                ) /
+                2,
+            stageHeight:
+                cardHeight +
+                maximumY +
+                8
+        };
+    }
+
+    const stageMinHeight = computed(() => {
         if (
-            isScrollLocked
+            state.mode ===
+            'overview'
         ) {
-            return
+            return `${getOverviewMetrics().stageHeight}px`;
         }
 
-        previousHtmlOverflow =
-            document
-                .documentElement
-                .style
-                .overflow
+        return 'calc(100dvh - var(--app-header-height, 0px))';
+    });
 
-        previousBodyOverflow =
-            document
-                .body
-                .style
-                .overflow
-
-        document
-            .documentElement
-            .style
-            .overflow =
-            'hidden'
-
-        document
-            .body
-            .style
-            .overflow =
-            'hidden'
-
-        isScrollLocked =
-            true
+    function getPageIndex(pageId) {
+        return cardOrder.value.indexOf(
+            pageId
+        );
     }
 
-    function unlockViewportScroll() {
-        if (
-            !isScrollLocked
-        ) {
-            return
-        }
+    function getOverviewSlot(cardId) {
+        const count =
+            cardOrder.value.length;
 
-        document
-            .documentElement
-            .style
-            .overflow =
-            previousHtmlOverflow
+        const activeIndex =
+            getPageIndex(
+                state.overviewPageId ??
+                cardOrder.value[0]
+            );
 
-        document
-            .body
-            .style
-            .overflow =
-            previousBodyOverflow
-
-        isScrollLocked =
-            false
-    }
-
-    function moveCardToFront(
-        cardId
-    ) {
-        const index =
-            cardOrder.value.indexOf(
+        const cardIndex =
+            getPageIndex(
                 cardId
-            )
+            );
 
         if (
-            index <= 0
+            count <= 0 ||
+            activeIndex < 0 ||
+            cardIndex < 0
         ) {
-            return
+            return 0;
         }
 
-        const nextOrder = [
-            ...cardOrder.value
-        ]
-
-        nextOrder.splice(
-            index,
-            1
-        )
-
-        nextOrder.unshift(
-            cardId
-        )
-
-        cardOrder.value =
-            nextOrder
+        return (
+            cardIndex -
+            activeIndex +
+            count
+        ) % count;
     }
 
-    function registerCardElement(
+    function getOverviewVisual(cardId) {
+        const metrics =
+            getOverviewMetrics();
+
+        const slot =
+            clamp(
+                getOverviewSlot(
+                    cardId
+                ),
+                0,
+                2
+            );
+
+        const transform =
+            getOverviewTransforms()[slot];
+
+        const dragStrength =
+            slot === 0
+                ? 1
+                : slot === 1
+                    ? 0.62
+                    : 0.38;
+
+        return {
+            width:
+                `${metrics.cardWidth}px`,
+            height:
+                `${metrics.cardHeight}px`,
+            baseLeft:
+                `${metrics.baseLeft}px`,
+            x:
+                transform.x +
+                overviewDragX.value *
+                dragStrength,
+            y:
+                transform.y,
+            scale:
+                transform.scale,
+            opacity: 1,
+            zIndex:
+                transform.zIndex,
+            borderRadius:
+                OVERVIEW_RADIUS,
+            interactive:
+                !state.interactionLocked,
+            transitionMs:
+                overviewDragging.value ||
+                    reducedMotion.value
+                    ? 0
+                    : OVERVIEW_SNAP_DURATION,
+            transitionEasing:
+                OVERVIEW_SNAP_EASING
+        };
+    }
+
+    function cardPath(cardId) {
+        return navigation
+            .getPathByCardId(
+                cardId
+            );
+    }
+
+    function registerStageElement(element) {
+        stageElement.value =
+            element ??
+            null;
+    }
+
+    function registerOverviewCardElement(
         cardId,
         element
     ) {
-        if (
-            !cardId
-        ) {
-            return
+        if (!cardId) {
+            return;
         }
 
-        if (
-            !element
-        ) {
-            cardElements.delete(
+        if (!element) {
+            overviewCardElements.delete(
                 cardId
-            )
+            );
 
-            return
+            return;
         }
 
-        cardElements.set(
+        overviewCardElements.set(
             cardId,
             element
-        )
+        );
     }
 
-    function rememberStackedRect(
-        cardId,
-        element = null
+    function registerExpandedCardElement(
+        element
     ) {
-        if (
-            !cardId ||
-            phase.value !==
-            'stacked'
-        ) {
-            return
-        }
-
-        const targetElement =
-            element ||
-            cardElements.get(
-                cardId
-            )
-
-        if (
-            !targetElement
-        ) {
-            return
-        }
-
-        stackedRects.set(
-            cardId,
-            targetElement
-                .getBoundingClientRect()
-        )
+        expandedCardElement.value =
+            element ??
+            null;
     }
 
-    function rememberAllStackedRects() {
-        if (
-            phase.value !==
-            'stacked'
-        ) {
-            return
-        }
-
-        cardOrder.value.forEach(
-            (cardId) => {
-                rememberStackedRect(
-                    cardId,
-                    cardElements.get(
-                        cardId
-                    )
-                )
-            }
-        )
-    }
-
-    function getStackedRect(
+    function captureScrollPosition(
         cardId
     ) {
-        return (
-            stackedRects.get(
+        if (!cardId) {
+            return;
+        }
+
+        pageScrollPositions.set(
+            cardId,
+            window.scrollY ??
+            window.pageYOffset ??
+            0
+        );
+    }
+
+    function restoreScrollPosition(
+        cardId
+    ) {
+        const scrollTop =
+            pageScrollPositions.get(
                 cardId
             ) ??
-            null
-        )
+            0;
+
+        window.requestAnimationFrame(() => {
+            window.scrollTo({
+                top:
+                    scrollTop,
+                left: 0,
+                behavior: 'auto'
+            });
+        });
     }
 
-    function createBox(
-        rect
-    ) {
-        return {
-            top:
-                rect.top,
+    function setTransitionType(type) {
+        state.transitionType =
+            type;
 
-            left:
-                rect.left,
+        if (type) {
+            document.documentElement
+                .dataset
+                .humanitasTransition =
+                type;
 
-            width:
-                rect.width,
-
-            height:
-                rect.height
+            return;
         }
+
+        delete document
+            .documentElement
+            .dataset
+            .humanitasTransition;
     }
 
-    function getStackedCardDimensions() {
-        return {
-            width:
-                '100%',
+    function supportsViewTransitions() {
+        return (
+            typeof document
+                .startViewTransition ===
+            'function'
+        );
+    }
 
-            height:
-                'min(68dvh, 620px)'
+    function stopActiveViewTransition() {
+        if (!activeViewTransition) {
+            return;
         }
-    }
 
-    function getStackedTopCardSize(
-        referenceRect = null
-    ) {
-        const isMobileViewport =
-            window.innerWidth <
-            640
-
-        const width =
-            referenceRect?.width ??
-            (
-                isMobileViewport
-                    ? Math.min(
-                        window.innerWidth *
-                        0.92,
-                        680
-                    )
-                    : Math.max(
-                        0,
-                        window.innerWidth -
-                        48
-                    )
-            )
-
-        const height =
-            Math.min(
-                window.innerHeight *
-                0.68,
-                620
-            )
-
-        return {
-            width,
-            height
+        try {
+            activeViewTransition
+                .skipTransition?.();
+        } catch {
+            // The transition may already be complete.
         }
+
+        activeViewTransition =
+            null;
     }
 
-    function normalizeClosingTargetBox(
-        rect
-    ) {
+    async function pushRoute(path) {
         if (
-            !rect
-        ) {
-            return null
-        }
-
-        const canonical =
-            getStackedTopCardSize(
-                rect
-            )
-
-        const centerX =
-            rect.left +
-            rect.width /
-            2
-
-        const bottom =
-            rect.top +
-            rect.height
-
-        return {
-            top:
-                bottom -
-                canonical.height,
-
-            left:
-                centerX -
-                canonical.width /
-                2,
-
-            width:
-                canonical.width,
-
-            height:
-                canonical.height
-        }
-    }
-
-    function pushRoute(
-        path
-    ) {
-        if (
+            !path ||
             route.path ===
             path
         ) {
-            return
+            return;
         }
 
-        suppressRouteSync.value =
-            true
+        suppressRouteSync =
+            true;
 
-        router
-            .push(
+        try {
+            await router.push(
                 path
-            )
-            .finally(
-                () => {
-                    suppressRouteSync.value =
-                        false
-                }
-            )
+            );
+        } finally {
+            suppressRouteSync =
+                false;
+        }
     }
 
-    function resetTransitionState() {
-        clearFallbackTimer()
+    function clearTransitionState() {
+        state.interactionLocked =
+            false;
+        state.sharedPageId =
+            null;
+        state.captureMode =
+            null;
+        state.captureScrollY =
+            0;
+        state.captureRect =
+            null;
 
-        clearPreviewEffectsTimer()
-
-        cleanupOpeningOverlay()
-
-        unlockViewportScroll()
-
-        phase.value =
-            'stacked'
-
-        openCardId.value =
+        setTransitionType(
             null
+        );
 
-        isTransitioning.value =
-            false
-
-        isExpandedDragging.value =
-            false
-
-        closingAtTarget.value =
-            false
-
-        openingAtTarget.value =
-            false
-
-        openingMeasureMode.value =
-            false
-
-        closingTopDone.value =
-            false
-
-        closingLeftDone.value =
-            false
-
-        closingWidthDone.value =
-            false
-
-        closingHeightDone.value =
-            false
-
-        expandedDragY.value =
-            0
-
-        transitionBox.value =
-            null
-
-        previewEffectsReady.value =
-            true
+        activeViewTransition =
+            null;
     }
 
-    async function beginOpening(
+    async function runImmediateUpdate(
+        callback
+    ) {
+        await callback();
+        await nextTick();
+    }
+
+    async function openFromOverview(
         cardId,
-        sourceElement,
-        shouldUpdateRoute = true
+        {
+            updateRoute = true,
+            animate = true
+        } = {}
     ) {
         if (
             !cardId ||
-            !sourceElement ||
-            phase.value !==
-            'stacked' ||
-            isTransitioning.value
+            state.mode !==
+            'overview' ||
+            state.interactionLocked
         ) {
-            return
+            return;
         }
 
-        isTransitioning.value =
-            true
-
-        clearFallbackTimer()
-
-        clearPreviewEffectsTimer()
-
-        previewEffectsReady.value =
-            false
-
-        const sourceRect =
-            sourceElement
-                .getBoundingClientRect()
-
-        stackedRects.set(
-            cardId,
-            sourceRect
-        )
-
-        const sourceBox =
-            createBox(
-                sourceRect
-            )
-
-        openCardId.value =
-            cardId
-
-        phase.value =
-            'opening'
-
-        openingAtTarget.value =
-            false
-
-        openingMeasureMode.value =
-            true
-
-        transitionBox.value =
-            null
-
-        suppressTransition.value =
-            true
-
-        await nextTick()
-
-        const expandedElement =
-            cardElements.get(
+        const targetPath =
+            cardPath(
                 cardId
-            )
+            );
 
-        if (
-            !expandedElement
-        ) {
-            finishOpening(
-                cardId,
-                shouldUpdateRoute
-            )
+        state.interactionLocked =
+            true;
+        state.sharedPageId =
+            cardId;
+        state.captureMode =
+            'opening';
+        state.captureScrollY =
+            0;
+        state.captureRect =
+            getExpandedViewportRect();
 
-            return
-        }
+        setTransitionType(
+            'open'
+        );
 
-        const targetRect =
-            expandedElement
-                .getBoundingClientRect()
+        const update = async () => {
+            state.mode =
+                'expanded';
+            state.activePageId =
+                cardId;
+            state.overviewPageId =
+                cardId;
 
-        openingMeasureMode.value =
-            false
+            window.scrollTo({
+                top: 0,
+                left: 0,
+                behavior: 'auto'
+            });
 
-        transitionBox.value = {
-            source:
-                sourceBox,
-
-            target:
-                createBox(
-                    targetRect
-                ),
-
-            updateRoute:
-                shouldUpdateRoute
-        }
-
-        suppressTransition.value =
-            false
-
-        if (
-            reducedMotion.value
-        ) {
-            finishOpening(
-                cardId,
-                shouldUpdateRoute
-            )
-
-            return
-        }
-
-        requestAnimationFrame(
-            () => {
-                openingAtTarget.value =
-                    true
+            if (updateRoute) {
+                await pushRoute(
+                    targetPath
+                );
             }
-        )
 
-        fallbackTimer =
-            window.setTimeout(
-                () => {
-                    finishOpening(
-                        cardId,
-                        shouldUpdateRoute
-                    )
-                },
-                getTransitionMs() +
-                100
-            )
+            await nextTick();
+        };
+
+        if (
+            !animate ||
+            reducedMotion.value ||
+            !supportsViewTransitions()
+        ) {
+            await runImmediateUpdate(
+                update
+            );
+
+            clearTransitionState();
+
+            return;
+        }
+
+        stopActiveViewTransition();
+
+        const transition =
+            document.startViewTransition(
+                update
+            );
+
+        activeViewTransition =
+            transition;
+
+        try {
+            await transition.ready;
+
+            /*
+             * The browser has captured the fixed-height
+             * expanded card. The real DOM can now return
+             * to natural document height while the frozen
+             * transition pixels continue animating.
+             */
+            state.captureMode =
+                null;
+            state.captureRect =
+                null;
+
+            await nextTick();
+
+            await transition.finished;
+        } catch {
+            // A skipped transition still leaves the new state active.
+        } finally {
+            clearTransitionState();
+        }
     }
 
-    function finishOpening(
-        cardId =
-            openCardId.value,
+    async function closeToOverview({
+        updateRoute = true,
+        animate = true
+    } = {}) {
+        const cardId =
+            state.activePageId;
 
-        shouldUpdateRoute =
-            true
-    ) {
         if (
-            phase.value !==
-            'opening' ||
-            openCardId.value !==
+            !cardId ||
+            state.mode !==
+            'expanded' ||
+            state.interactionLocked
+        ) {
+            return;
+        }
+
+        captureScrollPosition(
             cardId
+        );
+
+        state.interactionLocked =
+            true;
+        state.sharedPageId =
+            cardId;
+        state.captureMode =
+            'closing';
+        state.captureScrollY =
+            window.scrollY ??
+            0;
+        state.captureRect =
+            getExpandedViewportRect();
+        state.overviewPageId =
+            cardId;
+
+        setTransitionType(
+            'close'
+        );
+
+        /*
+         * Apply the fixed viewport capture before the old
+         * snapshot is taken. nextTick resolves before the
+         * browser paints another frame, so the user never
+         * sees the temporary capture layout directly.
+         */
+        await nextTick();
+
+        const update = async () => {
+            state.mode =
+                'overview';
+            state.activePageId =
+                null;
+            state.captureMode =
+                null;
+            state.captureScrollY =
+                0;
+            state.captureRect =
+                null;
+
+            window.scrollTo({
+                top: 0,
+                left: 0,
+                behavior: 'auto'
+            });
+
+            if (updateRoute) {
+                await pushRoute('/');
+            }
+
+            await nextTick();
+        };
+
+        if (
+            !animate ||
+            reducedMotion.value ||
+            !supportsViewTransitions()
         ) {
-            return
+            await runImmediateUpdate(
+                update
+            );
+
+            clearTransitionState();
+
+            return;
         }
 
-        clearFallbackTimer()
+        stopActiveViewTransition();
 
-        suppressTransition.value =
-            true
+        const transition =
+            document.startViewTransition(
+                update
+            );
 
-        phase.value =
-            'expanded'
+        activeViewTransition =
+            transition;
 
-        openingAtTarget.value =
-            false
-
-        openingMeasureMode.value =
-            false
-
-        transitionBox.value =
-            null
-
-        previewEffectsReady.value =
-            false
-
-        nextTick(
-            () => {
-                isTransitioning.value =
-                    false
-
-                requestAnimationFrame(
-                    () => {
-                        suppressTransition.value =
-                            false
-                    }
-                )
-
-                if (
-                    !shouldUpdateRoute
-                ) {
-                    return
-                }
-
-                const path =
-                    navigation
-                        .getPathByCardId(
-                            cardId
-                        )
-
-                if (
-                    path
-                ) {
-                    pushRoute(
-                        path
-                    )
-                }
-            }
-        )
+        try {
+            await transition.finished;
+        } catch {
+            // A skipped transition still leaves the overview active.
+        } finally {
+            clearTransitionState();
+        }
     }
 
-    function openCard(
-        cardId,
+    function getSwitchDirection(
+        currentCardId,
+        targetCardId
+    ) {
+        const currentIndex =
+            getPageIndex(
+                currentCardId
+            );
+
+        const targetIndex =
+            getPageIndex(
+                targetCardId
+            );
+
+        return targetIndex >=
+            currentIndex
+            ? 1
+            : -1;
+    }
+
+    async function switchExpandedPage(
+        targetCardId,
+        {
+            updateRoute = true,
+            animate = true
+        } = {}
+    ) {
+        const currentCardId =
+            state.activePageId;
+
+        if (
+            !currentCardId ||
+            !targetCardId ||
+            currentCardId ===
+            targetCardId ||
+            state.interactionLocked
+        ) {
+            return;
+        }
+
+        captureScrollPosition(
+            currentCardId
+        );
+
+        state.interactionLocked =
+            true;
+        state.transitionDirection =
+            getSwitchDirection(
+                currentCardId,
+                targetCardId
+            );
+        state.sharedPageId =
+            null;
+
+        setTransitionType(
+            state.transitionDirection >
+                0
+                ? 'switch-forward'
+                : 'switch-backward'
+        );
+
+        const update = async () => {
+            state.activePageId =
+                targetCardId;
+            state.overviewPageId =
+                targetCardId;
+
+            const targetScroll =
+                pageScrollPositions.get(
+                    targetCardId
+                ) ??
+                0;
+
+            window.scrollTo({
+                top:
+                    targetScroll,
+                left: 0,
+                behavior: 'auto'
+            });
+
+            if (updateRoute) {
+                await pushRoute(
+                    cardPath(
+                        targetCardId
+                    )
+                );
+            }
+
+            await nextTick();
+        };
+
+        if (
+            !animate ||
+            reducedMotion.value ||
+            !supportsViewTransitions()
+        ) {
+            await runImmediateUpdate(
+                update
+            );
+
+            clearTransitionState();
+
+            return;
+        }
+
+        stopActiveViewTransition();
+
+        const transition =
+            document.startViewTransition(
+                update
+            );
+
+        activeViewTransition =
+            transition;
+
+        try {
+            await transition.finished;
+        } catch {
+            // A skipped transition still commits the target page.
+        } finally {
+            clearTransitionState();
+        }
+    }
+
+    function navigateToPage(
+        pageId,
         options = {}
     ) {
-        if (
-            !cardId
-        ) {
-            return
-        }
-
-        const {
-            updateRoute:
-            shouldUpdateRoute =
-            true,
-
-            sourceElement =
-            null,
-
-            animate =
-            true
-        } = options
-
-        const element =
-            sourceElement ||
-            cardElements.get(
-                cardId
-            )
-
-        if (
-            phase.value !==
-            'stacked' ||
-            isTransitioning.value
-        ) {
-            return
+        if (!pageId) {
+            return;
         }
 
         if (
-            animate &&
-            element &&
-            !reducedMotion.value
+            state.mode ===
+            'overview'
         ) {
-            beginOpening(
-                cardId,
-                element,
-                shouldUpdateRoute
-            )
+            openFromOverview(
+                pageId,
+                options
+            );
 
-            return
+            return;
         }
 
-        resetTransitionState()
+        switchExpandedPage(
+            pageId,
+            options
+        );
+    }
 
-        openCardId.value =
-            cardId
+    function navigateToPath(
+        path,
+        options = {}
+    ) {
+        const page =
+            navigation.getCardByPath(
+                path
+            );
 
-        phase.value =
-            'expanded'
-
-        if (
-            !shouldUpdateRoute
-        ) {
-            return
-        }
-
-        const path =
-            navigation
-                .getPathByCardId(
-                    cardId
-                )
-
-        if (
-            path
-        ) {
+        if (!page) {
             pushRoute(
                 path
-            )
+            );
+
+            return;
         }
-    }
 
-    function finalizeMinimize(
-        options = {}
-    ) {
-        const {
-            updateRoute:
-            shouldUpdateRoute =
-            true
-        } = options
-
-        clearFallbackTimer()
-
-        clearPreviewEffectsTimer()
-
-        cleanupOpeningOverlay()
-
-        unlockViewportScroll()
-
-        suppressTransition.value =
-            true
-
-        isTransitioning.value =
-            false
-
-        phase.value =
-            'stacked'
-
-        openCardId.value =
-            null
-
-        isExpandedDragging.value =
-            false
-
-        closingAtTarget.value =
-            false
-
-        openingAtTarget.value =
-            false
-
-        openingMeasureMode.value =
-            false
-
-        closingTopDone.value =
-            false
-
-        closingLeftDone.value =
-            false
-
-        closingWidthDone.value =
-            false
-
-        closingHeightDone.value =
-            false
-
-        expandedDragY.value =
-            0
-
-        transitionBox.value =
-            null
-
-        previewEffectsReady.value =
-            false
-
-        nextTick(
-            () => {
-                rememberAllStackedRects()
-
-                const nextCardId =
-                    pendingExpandedSwitchCardId
-
-                if (
-                    nextCardId
-                ) {
-                    pendingExpandedSwitchCardId =
-                        null
-
-                    moveCardToFront(
-                        nextCardId
-                    )
-
-                    rememberAllStackedRects()
-
-                    requestAnimationFrame(
-                        () => {
-                            openCard(
-                                nextCardId,
-                                {
-                                    updateRoute:
-                                        false,
-
-                                    animate:
-                                        true
-                                }
-                            )
-                        }
-                    )
-
-                    return
-                }
-
-                requestAnimationFrame(
-                    () => {
-                        suppressTransition.value =
-                            false
-                    }
-                )
-
-                schedulePreviewEffectsEnable()
-
-                if (
-                    shouldUpdateRoute &&
-                    route.path !==
-                    '/'
-                ) {
-                    pushRoute(
-                        '/'
-                    )
-                }
+        navigateToPage(
+            page.id,
+            {
+                updateRoute: true,
+                animate: true,
+                ...options
             }
-        )
-    }
-
-    async function beginClosing(
-        options = {}
-    ) {
-        const {
-            updateRoute:
-            shouldUpdateRoute =
-            true
-        } = options
-
-        if (
-            phase.value !==
-            'expanded' ||
-            !openCardId.value ||
-            isExpandedDragging.value ||
-            isTransitioning.value
-        ) {
-            return
-        }
-
-        isTransitioning.value =
-            true
-
-        lockViewportScroll()
-
-        clearFallbackTimer()
-
-        clearPreviewEffectsTimer()
-
-        const cardId =
-            openCardId.value
-
-        const element =
-            cardElements.get(
-                cardId
-            )
-
-        const sourceRect =
-            element
-                ?.getBoundingClientRect() ??
-            null
-
-        const topCardId =
-            cardOrder.value[
-            0
-            ] ??
-            cardId
-
-        const topSlotRect =
-            getStackedRect(
-                topCardId
-            ) ||
-            getStackedRect(
-                cardId
-            )
-
-        const normalizedTargetBox =
-            normalizeClosingTargetBox(
-                topSlotRect
-            )
-
-        if (
-            !element ||
-            !sourceRect ||
-            !topSlotRect ||
-            !normalizedTargetBox
-        ) {
-            finalizeMinimize({
-                updateRoute:
-                    shouldUpdateRoute
-            })
-
-            return
-        }
-
-        transitionBox.value = {
-            source:
-                createBox(
-                    sourceRect
-                ),
-
-            target:
-                normalizedTargetBox,
-
-            updateRoute:
-                shouldUpdateRoute
-        }
-
-        moveCardToFront(
-            cardId
-        )
-
-        expandedDragY.value =
-            0
-
-        isExpandedDragging.value =
-            false
-
-        closingAtTarget.value =
-            false
-
-        closingTopDone.value =
-            false
-
-        closingLeftDone.value =
-            false
-
-        closingWidthDone.value =
-            false
-
-        closingHeightDone.value =
-            false
-
-        phase.value =
-            'closing'
-
-        await nextTick()
-
-        if (
-            phase.value !==
-            'closing' ||
-            !transitionBox.value
-        ) {
-            return
-        }
-
-        if (
-            reducedMotion.value
-        ) {
-            finalizeMinimize({
-                updateRoute:
-                    shouldUpdateRoute
-            })
-
-            return
-        }
-
-        requestAnimationFrame(
-            () => {
-                closingAtTarget.value =
-                    true
-            }
-        )
-
-        fallbackTimer =
-            window.setTimeout(
-                () => {
-                    if (
-                        phase.value !==
-                        'closing'
-                    ) {
-                        return
-                    }
-
-                    finalizeMinimize({
-                        updateRoute:
-                            shouldUpdateRoute
-                    })
-                },
-                getTransitionMs() +
-                100
-            )
+        );
     }
 
     function minimizeCard(
         options = {}
     ) {
-        if (
-            reducedMotion.value
-        ) {
-            if (
-                openCardId.value
-            ) {
-                moveCardToFront(
-                    openCardId.value
-                )
-            }
-
-            finalizeMinimize(
-                options
-            )
-
-            return
-        }
-
-        beginClosing(
+        return closeToOverview(
             options
-        )
-    }
-
-    const sheetDrag =
-        useSheetDrag({
-            onStart() {
-                if (
-                    phase.value !==
-                    'expanded' ||
-                    !openCardId.value ||
-                    !cardElements.get(
-                        openCardId.value
-                    )
-                ) {
-                    return false
-                }
-
-                if (
-                    window.scrollY >
-                    8
-                ) {
-                    return false
-                }
-
-                clearFallbackTimer()
-
-                isExpandedDragging.value =
-                    true
-
-                expandedDragY.value =
-                    0
-
-                return true
-            },
-
-            onMove({
-                distance
-            }) {
-                if (
-                    !isExpandedDragging.value
-                ) {
-                    return
-                }
-
-                expandedDragY.value =
-                    Math.max(
-                        0,
-                        distance
-                    )
-            },
-
-            onEnd({
-                distance,
-                velocity
-            }) {
-                if (
-                    !isExpandedDragging.value
-                ) {
-                    return
-                }
-
-                isExpandedDragging.value =
-                    false
-
-                const shouldMinimize =
-                    distance >=
-                    minimizeThreshold ||
-                    velocity >=
-                    minimizeVelocityThreshold
-
-                if (
-                    shouldMinimize
-                ) {
-                    beginClosing()
-
-                    return
-                }
-
-                expandedDragY.value =
-                    0
-            },
-
-            onCancel() {
-                isExpandedDragging.value =
-                    false
-
-                expandedDragY.value =
-                    0
-            }
-        })
-
-    function handleTransitionEnd(
-        event
-    ) {
-        if (
-            event.target !==
-            event.currentTarget ||
-            phase.value !==
-            'closing'
-        ) {
-            return
-        }
-
-        if (
-            event.propertyName ===
-            'top'
-        ) {
-            closingTopDone.value =
-                true
-        }
-
-        if (
-            event.propertyName ===
-            'left'
-        ) {
-            closingLeftDone.value =
-                true
-        }
-
-        if (
-            event.propertyName ===
-            'width'
-        ) {
-            closingWidthDone.value =
-                true
-        }
-
-        if (
-            event.propertyName ===
-            'height'
-        ) {
-            closingHeightDone.value =
-                true
-        }
-
-        if (
-            !closingTopDone.value ||
-            !closingLeftDone.value ||
-            !closingWidthDone.value ||
-            !closingHeightDone.value
-        ) {
-            return
-        }
-
-        const shouldUpdateRoute =
-            transitionBox.value
-                ?.updateRoute ??
-            true
-
-        finalizeMinimize({
-            updateRoute:
-                shouldUpdateRoute
-        })
-    }
-
-    function getCardVisual(
-        cardId
-    ) {
-        const index =
-            getIndex(
-                cardId
-            )
-
-        const cardCount =
-            cardOrder.value.length
-
-        const selected =
-            openCardId.value ===
-            cardId
-
-        const stackedCardDimensions =
-            getStackedCardDimensions()
-
-        const maxStackOffset =
-            Math.max(
-                0,
-                cardCount -
-                1
-            ) *
-            stackedOffset
-
-        const stackedBaseY =
-            maxStackOffset -
-            index *
-            stackedOffset
-
-        if (
-            phase.value ===
-            'stacked'
-        ) {
-            return {
-                isOpen:
-                    false,
-
-                isOpening:
-                    false,
-
-                isMinimizing:
-                    false,
-
-                isDragging:
-                    false,
-
-                interactive:
-                    true,
-
-                previewEffectsReady:
-                    previewEffectsReady.value,
-
-                showExpandedControls:
-                    false,
-
-                fixedBox:
-                    null,
-
-                x:
-                    0,
-
-                y:
-                    stackedBaseY,
-
-                scale:
-                    getStackedScale(
-                        index
-                    ),
-
-                motionBaseRotation:
-                    0,
-
-                motionSeed:
-                    index,
-
-                opacity:
-                    1,
-
-                visibility:
-                    'visible',
-
-                zIndex:
-                    cardCount -
-                    index,
-
-                shadow:
-                    index ===
-                        0
-                        ? 'var(--shadow-mid)'
-                        : 'var(--shadow-soft)',
-
-                borderRadius:
-                    32,
-
-                width:
-                    stackedCardDimensions.width,
-
-                height:
-                    stackedCardDimensions.height,
-
-                transitionMs:
-                    suppressTransition.value
-                        ? 0
-                        : getTransitionMs()
-            }
-        }
-
-        if (
-            phase.value ===
-            'opening'
-        ) {
-            if (
-                selected
-            ) {
-                const openingBox =
-                    openingAtTarget.value
-                        ? transitionBox.value
-                            ?.target
-                        : transitionBox.value
-                            ?.source
-
-                if (
-                    openingMeasureMode.value
-                ) {
-                    return {
-                        isOpen:
-                            true,
-
-                        isOpening:
-                            true,
-
-                        isMinimizing:
-                            false,
-
-                        isDragging:
-                            false,
-
-                        interactive:
-                            false,
-
-                        previewEffectsReady:
-                            false,
-
-                        showExpandedControls:
-                            false,
-
-                        fixedBox:
-                            null,
-
-                        x:
-                            0,
-
-                        y:
-                            0,
-
-                        rotateDeg:
-                            0,
-
-                        scale:
-                            1,
-
-                        opacity:
-                            1,
-
-                        visibility:
-                            'hidden',
-
-                        zIndex:
-                            900,
-
-                        shadow:
-                            'var(--shadow-strong)',
-
-                        borderRadius:
-                            28,
-
-                        width:
-                            '100%',
-
-                        height:
-                            'auto',
-
-                        minHeight:
-                            'min(68dvh, 620px)',
-
-                        transitionMs:
-                            0
-                    }
-                }
-
-                return {
-                    isOpen:
-                        true,
-
-                    isOpening:
-                        true,
-
-                    isMinimizing:
-                        false,
-
-                    isDragging:
-                        false,
-
-                    interactive:
-                        false,
-
-                    previewEffectsReady:
-                        false,
-
-                    showExpandedControls:
-                        false,
-
-                    fixedBox:
-                        openingBox ??
-                        null,
-
-                    x:
-                        0,
-
-                    y:
-                        0,
-
-                    rotateDeg:
-                        0,
-
-                    scale:
-                        1,
-
-                    opacity:
-                        1,
-
-                    visibility:
-                        'visible',
-
-                    zIndex:
-                        900,
-
-                    shadow:
-                        'var(--shadow-strong)',
-
-                    borderRadius:
-                        28,
-
-                    width:
-                        openingBox
-                            ? `${openingBox.width}px`
-                            : '100%',
-
-                    height:
-                        openingBox
-                            ? `${openingBox.height}px`
-                            : 'auto',
-
-                    minHeight:
-                        'min(68dvh, 620px)',
-
-                    transitionMs:
-                        suppressTransition.value
-                            ? 0
-                            : getTransitionMs()
-                }
-            }
-
-            return {
-                isOpen:
-                    false,
-
-                isOpening:
-                    true,
-
-                isMinimizing:
-                    false,
-
-                isDragging:
-                    false,
-
-                interactive:
-                    false,
-
-                previewEffectsReady:
-                    false,
-
-                showExpandedControls:
-                    false,
-
-                fixedBox:
-                    null,
-
-                x:
-                    0,
-
-                y:
-                    stackedBaseY,
-
-                scale:
-                    getStackedScale(
-                        index
-                    ),
-
-                opacity:
-                    0,
-
-                visibility:
-                    'hidden',
-
-                zIndex:
-                    cardCount -
-                    index,
-
-                shadow:
-                    'var(--shadow-soft)',
-
-                borderRadius:
-                    32,
-
-                width:
-                    stackedCardDimensions.width,
-
-                height:
-                    stackedCardDimensions.height,
-
-                transitionMs:
-                    0
-            }
-        }
-
-        if (
-            phase.value ===
-            'closing'
-        ) {
-            if (
-                selected
-            ) {
-                const closingBox =
-                    closingAtTarget.value
-                        ? transitionBox.value
-                            ?.target
-                        : transitionBox.value
-                            ?.source
-
-                return {
-                    isOpen:
-                        true,
-
-                    isOpening:
-                        false,
-
-                    isMinimizing:
-                        true,
-
-                    isDragging:
-                        false,
-
-                    interactive:
-                        false,
-
-                    previewEffectsReady:
-                        false,
-
-                    showExpandedControls:
-                        false,
-
-                    fixedBox:
-                        closingBox ??
-                        null,
-
-                    x:
-                        0,
-
-                    y:
-                        stackedBaseY,
-
-                    scale:
-                        getStackedScale(
-                            index
-                        ),
-
-                    opacity:
-                        1,
-
-                    visibility:
-                        'visible',
-
-                    zIndex:
-                        900,
-
-                    shadow:
-                        'var(--shadow-strong)',
-
-                    borderRadius:
-                        32,
-
-                    width:
-                        closingBox
-                            ? `${closingBox.width}px`
-                            : '100%',
-
-                    height:
-                        closingBox
-                            ? `${closingBox.height}px`
-                            : 'auto',
-
-                    transitionMs:
-                        suppressTransition.value
-                            ? 0
-                            : getTransitionMs()
-                }
-            }
-
-            return {
-                isOpen:
-                    false,
-
-                isOpening:
-                    false,
-
-                isMinimizing:
-                    true,
-
-                isDragging:
-                    false,
-
-                interactive:
-                    false,
-
-                previewEffectsReady:
-                    false,
-
-                showExpandedControls:
-                    false,
-
-                fixedBox:
-                    null,
-
-                x:
-                    0,
-
-                y:
-                    stackedBaseY,
-
-                scale:
-                    getStackedScale(
-                        index
-                    ),
-
-                opacity:
-                    1,
-
-                visibility:
-                    'visible',
-
-                zIndex:
-                    cardCount -
-                    index,
-
-                shadow:
-                    index ===
-                        0
-                        ? 'var(--shadow-mid)'
-                        : 'var(--shadow-soft)',
-
-                borderRadius:
-                    32,
-
-                width:
-                    stackedCardDimensions.width,
-
-                height:
-                    stackedCardDimensions.height,
-
-                transitionMs:
-                    0
-            }
-        }
-
-        if (
-            !selected
-        ) {
-            return {
-                isOpen:
-                    false,
-
-                isOpening:
-                    false,
-
-                isMinimizing:
-                    false,
-
-                isDragging:
-                    false,
-
-                interactive:
-                    false,
-
-                previewEffectsReady:
-                    false,
-
-                showExpandedControls:
-                    false,
-
-                fixedBox:
-                    null,
-
-                x:
-                    0,
-
-                y:
-                    stackedBaseY,
-
-                scale:
-                    1,
-
-                opacity:
-                    0,
-
-                visibility:
-                    'hidden',
-
-                zIndex:
-                    cardCount -
-                    index,
-
-                shadow:
-                    'var(--shadow-soft)',
-
-                borderRadius:
-                    32,
-
-                width:
-                    stackedCardDimensions.width,
-
-                height:
-                    stackedCardDimensions.height,
-
-                transitionMs:
-                    0
-            }
-        }
-
-        const dragProgress =
-            Math.min(
-                1,
-                expandedDragY.value /
-                260
-            )
-
-        return {
-            isOpen:
-                true,
-
-            isOpening:
-                false,
-
-            isMinimizing:
-                false,
-
-            isDragging:
-                isExpandedDragging.value,
-
-            dragProgress,
-
-            interactive:
-                true,
-
-            previewEffectsReady:
-                false,
-
-            showExpandedControls:
-                true,
-
-            fixedBox:
-                null,
-
-            x:
-                0,
-
-            y:
-                expandedDragY.value,
-
-            rotateDeg:
-                dragProgress *
-                -1.25,
-
-            scale:
-                1 -
-                dragProgress *
-                0.045,
-
-            opacity:
-                1,
-
-            visibility:
-                'visible',
-
-            zIndex:
-                900,
-
-            shadow:
-                dragProgress >
-                    0
-                    ? [
-                        '0 36px 78px rgba(31, 55, 43, 0.34)',
-                        '0 14px 34px rgba(31, 55, 43, 0.24)'
-                    ].join(', ')
-                    : 'var(--shadow-strong)',
-
-            borderRadius:
-                28 +
-                dragProgress *
-                4,
-
-            width:
-                '100%',
-
-            height:
-                'auto',
-
-            minHeight:
-                'min(68dvh, 620px)',
-
-            transitionMs:
-                suppressTransition.value ||
-                    isExpandedDragging.value
-                    ? 0
-                    : getTransitionMs()
-        }
+        );
     }
 
     function handleCardActivate(
-        cardId,
-        sourceElement =
-            null
+        cardId
     ) {
         if (
-            phase.value !==
-            'stacked' ||
-            isTransitioning.value
+            Date.now() <
+            suppressOverviewClickUntil
         ) {
-            return
+            return;
         }
 
-        openCard(
+        if (
+            state.mode !==
+            'overview' ||
+            state.interactionLocked
+        ) {
+            return;
+        }
+
+        openFromOverview(
             cardId,
             {
-                sourceElement
+                updateRoute: true,
+                animate: true
             }
-        )
+        );
     }
 
-    function syncFromRoute(
-        path
+    function resetOverviewGesture() {
+        overviewPointerId =
+            null;
+        overviewStartX =
+            0;
+        overviewStartY =
+            0;
+        overviewLastX =
+            0;
+        overviewLastTime =
+            0;
+        overviewVelocity =
+            0;
+        overviewGestureClaimed =
+            false;
+        overviewDragging.value =
+            false;
+    }
+
+    function handleOverviewPointerDown(
+        event
     ) {
         if (
-            suppressRouteSync.value
+            state.mode !==
+            'overview' ||
+            state.interactionLocked ||
+            (
+                event.button !==
+                undefined &&
+                event.button !==
+                0
+            ) ||
+            event.target?.closest?.(
+                INTERACTIVE_SELECTOR
+            )
         ) {
-            return
+            return;
         }
 
-        const card =
+        overviewPointerId =
+            event.pointerId;
+        overviewStartX =
+            event.clientX;
+        overviewStartY =
+            event.clientY;
+        overviewLastX =
+            event.clientX;
+        overviewLastTime =
+            event.timeStamp;
+        overviewVelocity =
+            0;
+        overviewGestureClaimed =
+            false;
+    }
+
+    function handleOverviewPointerMove(
+        event
+    ) {
+        if (
+            overviewPointerId ===
+            null ||
+            event.pointerId !==
+            overviewPointerId
+        ) {
+            return;
+        }
+
+        const deltaX =
+            event.clientX -
+            overviewStartX;
+
+        const deltaY =
+            event.clientY -
+            overviewStartY;
+
+        if (!overviewGestureClaimed) {
+            const passedThreshold =
+                Math.abs(deltaX) >
+                8 ||
+                Math.abs(deltaY) >
+                8;
+
+            if (!passedThreshold) {
+                return;
+            }
+
+            const horizontalIntent =
+                Math.abs(deltaX) >
+                Math.abs(deltaY) *
+                1.2;
+
+            if (!horizontalIntent) {
+                resetOverviewGesture();
+
+                return;
+            }
+
+            overviewGestureClaimed =
+                true;
+            overviewDragging.value =
+                true;
+
+            try {
+                event.currentTarget
+                    ?.setPointerCapture?.(
+                        overviewPointerId
+                    );
+            } catch {
+                // Pointer capture is optional.
+            }
+        }
+
+        event.preventDefault();
+
+        const elapsed =
+            Math.max(
+                1,
+                event.timeStamp -
+                overviewLastTime
+            );
+
+        overviewVelocity =
+            (
+                event.clientX -
+                overviewLastX
+            ) /
+            elapsed;
+
+        overviewLastX =
+            event.clientX;
+        overviewLastTime =
+            event.timeStamp;
+
+        overviewDragX.value =
+            clamp(
+                deltaX,
+                -120,
+                120
+            );
+    }
+
+    function finishOverviewGesture(
+        event
+    ) {
+        if (
+            overviewPointerId ===
+            null ||
+            event.pointerId !==
+            overviewPointerId
+        ) {
+            return;
+        }
+
+        if (
+            overviewGestureClaimed
+        ) {
+            try {
+                event.currentTarget
+                    ?.releasePointerCapture?.(
+                        overviewPointerId
+                    );
+            } catch {
+                // Pointer capture may already be released.
+            }
+        }
+
+        const distance =
+            overviewDragX.value;
+
+        const shouldChange =
+            Math.abs(distance) >=
+            54 ||
+            Math.abs(
+                overviewVelocity
+            ) >=
+            0.38;
+
+        if (
+            overviewGestureClaimed &&
+            shouldChange
+        ) {
+            const activeIndex =
+                getPageIndex(
+                    state.overviewPageId
+                );
+
+            const direction =
+                distance < 0
+                    ? 1
+                    : -1;
+
+            const nextIndex =
+                (
+                    activeIndex +
+                    direction +
+                    cardOrder.value.length
+                ) %
+                cardOrder.value.length;
+
+            state.overviewPageId =
+                cardOrder.value[
+                nextIndex
+                ];
+
+            suppressOverviewClickUntil =
+                Date.now() +
+                360;
+        }
+
+        overviewDragX.value =
+            0;
+
+        resetOverviewGesture();
+    }
+
+    function handleOverviewPointerUp(
+        event
+    ) {
+        finishOverviewGesture(
+            event
+        );
+    }
+
+    function handleOverviewPointerCancel(
+        event
+    ) {
+        if (
+            overviewPointerId !==
+            null &&
+            event.pointerId !==
+            overviewPointerId
+        ) {
+            return;
+        }
+
+        overviewDragX.value =
+            0;
+
+        resetOverviewGesture();
+    }
+
+    function syncFromRoute(path) {
+        if (suppressRouteSync) {
+            return;
+        }
+
+        const page =
             navigation.getCardByPath(
                 path
-            )
+            );
 
-        if (
-            !card
-        ) {
-            pendingExpandedSwitchCardId =
-                null
-
+        if (!page) {
             if (
-                path ===
-                '/'
+                path === '/' &&
+                state.mode ===
+                'expanded'
             ) {
-                resetTransitionState()
+                closeToOverview({
+                    updateRoute: false,
+                    animate: true
+                });
             }
 
-            return
+            return;
         }
 
         if (
-            phase.value ===
-            'expanded' &&
-            openCardId.value &&
-            openCardId.value !==
-            card.id &&
-            !isTransitioning.value
+            state.mode ===
+            'overview'
         ) {
-            pendingExpandedSwitchCardId =
-                card.id
-
-            beginClosing({
-                updateRoute:
-                    false
-            })
-
-            return
-        }
-
-        if (
-            phase.value ===
-            'closing' &&
-            openCardId.value &&
-            openCardId.value !==
-            card.id
-        ) {
-            pendingExpandedSwitchCardId =
-                card.id
-
-            return
-        }
-
-        if (
-            phase.value ===
-            'stacked' &&
-            !getStackedRect(
-                card.id
-            ) &&
-            pendingRouteOpenId !==
-            card.id
-        ) {
-            pendingRouteOpenId =
-                card.id
-
-            requestAnimationFrame(
-                () => {
-                    pendingRouteOpenId =
-                        null
-
-                    if (
-                        route.path !==
-                        path
-                    ) {
-                        return
-                    }
-
-                    moveCardToFront(
-                        card.id
-                    )
-
-                    rememberAllStackedRects()
-
-                    openCard(
-                        card.id,
-                        {
-                            updateRoute:
-                                false,
-
-                            animate:
-                                false
-                        }
-                    )
+            openFromOverview(
+                page.id,
+                {
+                    updateRoute: false,
+                    animate: false
                 }
-            )
+            );
 
-            return
+            return;
         }
 
         if (
-            phase.value ===
-            'stacked'
+            state.activePageId !==
+            page.id
         ) {
-            moveCardToFront(
-                card.id
-            )
-
-            rememberAllStackedRects()
+            switchExpandedPage(
+                page.id,
+                {
+                    updateRoute: false,
+                    animate: true
+                }
+            );
         }
+    }
 
-        openCard(
-            card.id,
+    const initialRoutePage =
+        navigation.getCardByPath(
+            route.path
+        );
+
+    if (initialRoutePage) {
+        state.mode =
+            'expanded';
+        state.activePageId =
+            initialRoutePage.id;
+        state.overviewPageId =
+            initialRoutePage.id;
+    }
+
+    const stopRouteWatch =
+        watch(
+            () => route.path,
+            syncFromRoute,
             {
-                updateRoute:
-                    false,
-
-                animate:
-                    false
+                immediate: false
             }
-        )
+        );
+
+    function handleReducedMotionChange(
+        event
+    ) {
+        reducedMotion.value =
+            event.matches;
     }
 
     function handleResize() {
-        if (
-            phase.value ===
-            'stacked'
-        ) {
-            rememberAllStackedRects()
-        }
+        viewportWidth.value =
+            window.innerWidth ||
+            1280;
+
+        viewportHeight.value =
+            window.innerHeight ||
+            800;
     }
+
+    reducedMotionQuery
+        .addEventListener(
+            'change',
+            handleReducedMotionChange
+        );
 
     window.addEventListener(
         'resize',
-        handleResize
-    )
-
-    watch(
-        () =>
-            route.path,
-
-        syncFromRoute,
-
+        handleResize,
         {
-            immediate:
-                true
+            passive: true
         }
-    )
+    );
+
+    onBeforeUnmount(() => {
+        stopRouteWatch();
+        stopActiveViewTransition();
+
+        reducedMotionQuery
+            .removeEventListener(
+                'change',
+                handleReducedMotionChange
+            );
+
+        window.removeEventListener(
+            'resize',
+            handleResize
+        );
+
+        setTransitionType(
+            null
+        );
+    });
 
     return {
-        phase,
+        state,
         mode,
+        isOverview,
+        activePage,
         cardOrder,
-        openCardId,
-        isTransitioning,
-        isExpandedDragging,
-        expandedDragY,
         reducedMotion,
-        stackBottomCompensation,
-
-        registerCardElement,
-        rememberStackedRect,
-        rememberAllStackedRects,
-
+        overviewDragging,
+        stageMinHeight,
+        getOverviewVisual,
+        registerStageElement,
+        registerOverviewCardElement,
+        registerExpandedCardElement,
         handleCardActivate,
-        getCardVisual,
-        openCard,
+        handleOverviewPointerDown,
+        handleOverviewPointerMove,
+        handleOverviewPointerUp,
+        handleOverviewPointerCancel,
+        navigateToPage,
+        navigateToPath,
         minimizeCard,
-        handleTransitionEnd,
-
-        handleExpandedHandlePointerDown:
-            sheetDrag.handlePointerDown,
-
-        handleExpandedHandlePointerMove:
-            sheetDrag.handlePointerMove,
-
-        handleExpandedHandlePointerUp:
-            sheetDrag.handlePointerUp,
-
-        handleExpandedHandlePointerCancel:
-            sheetDrag.handlePointerCancel
-    }
+        restoreScrollPosition,
+        expandedRadius:
+            EXPANDED_RADIUS
+    };
 }
 
-export function useCardStack(
-    params
-) {
-    if (
-        !instance
-    ) {
-        instance =
-            createCardStack(
-                params
-            )
-    }
-
-    return instance
+export function useCardStack(params) {
+    return createCardStack(
+        params
+    );
 }

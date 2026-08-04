@@ -1,10 +1,11 @@
 <script setup>
 import {
     computed,
-    ref,
-    watch,
     onMounted,
-    onUnmounted
+    onUnmounted,
+    provide,
+    ref,
+    watch
 } from 'vue';
 
 import { storeToRefs } from 'pinia';
@@ -38,7 +39,9 @@ const {
     company,
     loading,
     error
-} = storeToRefs(publicSiteStore);
+} = storeToRefs(
+    publicSiteStore
+);
 
 const stack =
     useCardStack({
@@ -47,16 +50,18 @@ const stack =
         route
     });
 
+provide(
+    'humanitasNavigateToPath',
+    (path) => {
+        stack.navigateToPath(
+            path
+        );
+    }
+);
+
 const {
     initializeCookieConsent
 } = useCookieConsent();
-
-const isFullyExpanded = computed(() => {
-    return (
-        stack.mode.value ===
-        'expanded'
-    );
-});
 
 const MIN_LOADER_DURATION_MS =
     2500;
@@ -69,6 +74,9 @@ const isLoaderMinimumDurationDone =
 
 let loaderMinimumDurationTimer =
     null;
+
+let previousScrollbarGutter =
+    '';
 
 const isDataLoading = computed(() => {
     return (
@@ -105,15 +113,6 @@ function handleGlobalKeydown(event) {
             'Escape' &&
         stack.mode.value ===
             'expanded'
-    ) {
-        stack.minimizeCard();
-    }
-}
-
-function handleMenuClick() {
-    if (
-        stack.mode.value ===
-        'expanded'
     ) {
         stack.minimizeCard();
     }
@@ -161,6 +160,16 @@ watch(
 onMounted(() => {
     initializeCookieConsent();
 
+    previousScrollbarGutter =
+        document.documentElement
+            .style
+            .scrollbarGutter;
+
+    document.documentElement
+        .style
+        .scrollbarGutter =
+        'stable';
+
     window.addEventListener(
         'keydown',
         handleGlobalKeydown
@@ -184,11 +193,15 @@ onUnmounted(() => {
         'keydown',
         handleGlobalKeydown
     );
+
+    document.documentElement
+        .style
+        .scrollbarGutter =
+        previousScrollbarGutter;
 });
 </script>
 
 <template>
-    <!-- Full viewport background -->
     <div
         class="
             min-h-[100dvh]
@@ -196,8 +209,8 @@ onUnmounted(() => {
             bg-baige
             text-green
         "
+        style="--app-header-height: 60px;"
     >
-        <!-- Centered site container -->
         <div
             class="
                 relative
@@ -209,26 +222,16 @@ onUnmounted(() => {
                 flex-col
             "
         >
-            <div
-                class="
-                    pointer-events-none
-                    absolute
-                    inset-0
-                "
-                aria-hidden="true"
-            />
-
             <Transition
                 name="shell-fade"
                 mode="out-in"
             >
-                <!-- Global loading state -->
                 <div
                     v-if="isInitialLoading"
                     key="loading"
                     class="
                         flex
-                        flex-1
+                        min-h-[100dvh]
                         items-center
                         justify-center
                     "
@@ -247,13 +250,12 @@ onUnmounted(() => {
                     </object>
                 </div>
 
-                <!-- Global fatal error state -->
                 <main
                     v-else-if="hasFatalLoadError"
                     key="error"
                     class="
                         flex
-                        flex-1
+                        min-h-[100dvh]
                         items-center
                         justify-center
                         px-5
@@ -265,7 +267,8 @@ onUnmounted(() => {
                             w-full
                             max-w-2xl
                             rounded-[2.2rem]
-                            border border-green/15
+                            border
+                            border-green/15
                             bg-white/45
                             px-6
                             py-10
@@ -298,7 +301,9 @@ onUnmounted(() => {
                             <Button
                                 background-color="#FBF9F3"
                                 text-color="#335940"
-                                @click="publicSiteStore.reload"
+                                @click="
+                                    publicSiteStore.reload
+                                "
                             >
                                 Skúsiť znova
                             </Button>
@@ -306,39 +311,30 @@ onUnmounted(() => {
                     </section>
                 </main>
 
-                <!-- App content -->
                 <div
                     v-else
                     key="content"
                     class="
                         flex
-                        flex-1
+                        min-h-[100dvh]
                         flex-col
                     "
                 >
-                    <!-- Header -->
+                    <!--
+                        The header is permanently sticky and owns
+                        a separate view-transition layer. It never
+                        participates in card zoom geometry, so the
+                        logo cannot shift during open or close.
+                    -->
                     <div
-                        class="
-                            relative
-                            h-[60px]
-                            w-full
-                            shrink-0
-                        "
+                        class="app-shell-header"
                     >
                         <AppHeader
-                            :show-menu="
-                                isFullyExpanded
-                            "
-                            :is-fixed="
-                                isFullyExpanded
-                            "
-                            @menu-click="
-                                handleMenuClick
-                            "
+                            :show-menu="false"
+                            :is-fixed="false"
                         />
                     </div>
 
-                    <!-- Page cards -->
                     <main
                         class="
                             relative
@@ -359,7 +355,6 @@ onUnmounted(() => {
                         />
                     </main>
 
-                    <!-- Footer -->
                     <AppFooter />
 
                     <CookieConsentSheet />
@@ -370,16 +365,354 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+.app-shell-header {
+    position: sticky;
+    top: 0;
+    z-index: 500;
+    width: 100%;
+    height: 60px;
+    flex-shrink: 0;
+    background: #fbf9f3;
+    isolation: isolate;
+    view-transition-name: humanitas-header;
+}
+
 .shell-fade-enter-active,
 .shell-fade-leave-active {
     transition:
-        opacity 0.34s ease,
-        transform 0.34s ease;
+        opacity 0.24s ease;
 }
 
 .shell-fade-enter-from,
 .shell-fade-leave-to {
     opacity: 0;
-    transform: translateY(6px);
+}
+</style>
+
+<style>
+/*
+ * The browser creates frozen compositor snapshots for these
+ * transitions. No live page layout is scaled frame by frame.
+ */
+::view-transition-group(humanitas-header) {
+    animation: none !important;
+    z-index: 10000;
+}
+
+::view-transition-old(humanitas-header),
+::view-transition-new(humanitas-header) {
+    animation: none !important;
+    mix-blend-mode: normal;
+}
+
+::view-transition-group(humanitas-page-surface) {
+    overflow: clip;
+    border-radius: 40px;
+    box-shadow: var(--shadow-strong);
+    z-index: 9000;
+}
+
+::view-transition-image-pair(humanitas-page-surface) {
+    isolation: isolate;
+    overflow: clip;
+    border-radius: inherit;
+}
+
+::view-transition-old(humanitas-page-surface),
+::view-transition-new(humanitas-page-surface) {
+    height: 100%;
+    mix-blend-mode: normal;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+::view-transition-group(humanitas-page-menu) {
+    z-index: 9100;
+}
+
+::view-transition-old(humanitas-page-menu),
+::view-transition-new(humanitas-page-menu) {
+    mix-blend-mode: normal;
+}
+
+html[data-humanitas-transition='open']
+::view-transition-group(humanitas-page-surface) {
+    animation-duration: 460ms;
+    animation-timing-function:
+        cubic-bezier(
+            0.16,
+            1,
+            0.3,
+            1
+        );
+}
+
+html[data-humanitas-transition='close']
+::view-transition-group(humanitas-page-surface) {
+    animation-duration: 420ms;
+    animation-timing-function:
+        cubic-bezier(
+            0.22,
+            1,
+            0.36,
+            1
+        );
+}
+
+html[data-humanitas-transition='open']
+::view-transition-old(humanitas-page-surface) {
+    animation:
+        humanitas-open-old
+        460ms
+        linear
+        both;
+}
+
+html[data-humanitas-transition='open']
+::view-transition-new(humanitas-page-surface) {
+    animation:
+        humanitas-open-new
+        460ms
+        linear
+        both;
+}
+
+html[data-humanitas-transition='close']
+::view-transition-old(humanitas-page-surface) {
+    animation:
+        humanitas-close-old
+        420ms
+        linear
+        both;
+}
+
+html[data-humanitas-transition='close']
+::view-transition-new(humanitas-page-surface) {
+    animation:
+        humanitas-close-new
+        420ms
+        linear
+        both;
+}
+
+html[data-humanitas-transition='open']
+::view-transition-old(root),
+html[data-humanitas-transition='open']
+::view-transition-new(root),
+html[data-humanitas-transition='close']
+::view-transition-old(root),
+html[data-humanitas-transition='close']
+::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+}
+
+html[data-humanitas-transition='switch-forward']
+::view-transition-old(root) {
+    animation:
+        humanitas-switch-forward-old
+        310ms
+        cubic-bezier(
+            0.32,
+            0.72,
+            0,
+            1
+        )
+        both;
+}
+
+html[data-humanitas-transition='switch-forward']
+::view-transition-new(root) {
+    animation:
+        humanitas-switch-forward-new
+        310ms
+        cubic-bezier(
+            0.32,
+            0.72,
+            0,
+            1
+        )
+        both;
+}
+
+html[data-humanitas-transition='switch-backward']
+::view-transition-old(root) {
+    animation:
+        humanitas-switch-backward-old
+        310ms
+        cubic-bezier(
+            0.32,
+            0.72,
+            0,
+            1
+        )
+        both;
+}
+
+html[data-humanitas-transition='switch-backward']
+::view-transition-new(root) {
+    animation:
+        humanitas-switch-backward-new
+        310ms
+        cubic-bezier(
+            0.32,
+            0.72,
+            0,
+            1
+        )
+        both;
+}
+
+@keyframes humanitas-open-old {
+    0%,
+    52% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes humanitas-open-new {
+    0%,
+    24% {
+        opacity: 0;
+    }
+
+    76%,
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes humanitas-close-old {
+    0%,
+    42% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes humanitas-close-new {
+    0%,
+    18% {
+        opacity: 0;
+    }
+
+    70%,
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes humanitas-switch-forward-old {
+    from {
+        transform:
+            translate3d(
+                0,
+                0,
+                0
+            )
+            scale(1);
+        opacity: 1;
+    }
+
+    to {
+        transform:
+            translate3d(
+                -24%,
+                0,
+                0
+            )
+            scale(0.965);
+        opacity: 0.72;
+    }
+}
+
+@keyframes humanitas-switch-forward-new {
+    from {
+        transform:
+            translate3d(
+                100%,
+                0,
+                0
+            )
+            scale(0.99);
+        opacity: 1;
+    }
+
+    to {
+        transform:
+            translate3d(
+                0,
+                0,
+                0
+            )
+            scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes humanitas-switch-backward-old {
+    from {
+        transform:
+            translate3d(
+                0,
+                0,
+                0
+            )
+            scale(1);
+        opacity: 1;
+    }
+
+    to {
+        transform:
+            translate3d(
+                24%,
+                0,
+                0
+            )
+            scale(0.965);
+        opacity: 0.72;
+    }
+}
+
+@keyframes humanitas-switch-backward-new {
+    from {
+        transform:
+            translate3d(
+                -100%,
+                0,
+                0
+            )
+            scale(0.99);
+        opacity: 1;
+    }
+
+    to {
+        transform:
+            translate3d(
+                0,
+                0,
+                0
+            )
+            scale(1);
+        opacity: 1;
+    }
+}
+
+@media (
+    prefers-reduced-motion:
+    reduce
+) {
+    ::view-transition-group(*),
+    ::view-transition-old(*),
+    ::view-transition-new(*) {
+        animation-duration: 1ms !important;
+    }
 }
 </style>

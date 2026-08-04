@@ -126,29 +126,45 @@ video {
 
 .page-card {
   width: min(94vw, 860px);
-  height: min(74dvh, 760px);
+  height: auto;
+  min-height: min(74dvh, 760px);
   backface-visibility: hidden;
   transform: translateZ(0);
 }
 
-.page-card.is-expanded {
-  width: min(94vw, 860px);
+.page-card--overview {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+}
+
+.page-card--transition {
+  position: fixed;
+}
+
+.page-card--expanded,
+.page-card--switch-layer {
+  position: relative;
+  width: 100%;
+  min-height: calc(100dvh - var(--app-header-height, 0px));
   height: auto;
-  min-height: min(74dvh, 760px);
-  overflow: visible;
+}
+
+.page-card--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.page-preview-layer {
+  pointer-events: none;
+  user-select: none;
 }
 
 @media (max-width: 768px) {
   .page-card {
     width: min(95vw, 760px);
-    height: min(76dvh, 740px);
-  }
-
-  .page-card.is-expanded {
-    width: min(95vw, 760px);
     height: auto;
     min-height: min(76dvh, 740px);
-    border-radius: 1.7rem;
   }
 }
 
@@ -162,11 +178,6 @@ video {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-}
-
-.card-opening-overlay {
-  contain: layout paint style;
-  backface-visibility: hidden;
 }
 
 .scroll-motion {

@@ -1,11 +1,8 @@
 <script setup>
 import {
-    computed
+    computed,
+    inject
 } from 'vue';
-
-import {
-    RouterLink
-} from 'vue-router';
 
 const props = defineProps({
     backgroundImage: {
@@ -68,6 +65,11 @@ const emit = defineEmits([
     'click',
 ]);
 
+const navigateToPath = inject(
+    'humanitasNavigateToPath',
+    null
+);
+
 const isInternalLink = computed(() => {
     if (
         !props.href ||
@@ -84,15 +86,39 @@ const componentTag = computed(() => {
         return 'button';
     }
 
-    return isInternalLink.value
-        ? RouterLink
-        : 'a';
+    return 'a';
 });
+
+function shouldInterceptInternalClick(event) {
+    if (!isInternalLink.value) {
+        return false;
+    }
+
+    if (typeof navigateToPath !== 'function') {
+        return false;
+    }
+
+    if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+    ) {
+        return false;
+    }
+
+    return true;
+}
 
 const handleClick = (event) => {
     if (props.disabled) {
         event.preventDefault();
         return;
+    }
+
+    if (shouldInterceptInternalClick(event)) {
+        event.preventDefault();
+        navigateToPath(props.href);
     }
 
     emit('click', event);
@@ -103,11 +129,12 @@ const handleClick = (event) => {
     <span class="relative inline-flex w-fit">
         <component
             :is="componentTag"
-            :to="isInternalLink ? href : undefined"
-            :href="!isInternalLink ? href || undefined : undefined"
-            :target="!isInternalLink && href ? target || undefined : undefined"
+            :href="href || undefined"
+            :target="href && !isInternalLink ? target || undefined : undefined"
             :rel="
-                !isInternalLink && href && target === '_blank'
+                href &&
+                !isInternalLink &&
+                target === '_blank'
                     ? 'noopener noreferrer'
                     : undefined
             "

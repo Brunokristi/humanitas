@@ -181,129 +181,34 @@ const company = computed(() => {
 });
 
 /*
- * Address
+ * Address and maps
  */
 
-const branchAddressParts =
-    computed(() => {
-        const address =
-            branch.value?.address;
+const GOOGLE_MAPS_ADDRESS =
+    'Hviezdoslavova 440/8, 979 01 Rimavská Sobota';
 
-        if (!address) {
-            return [];
-        }
-
-        if (
-            address.lines?.length
-        ) {
-            return address.lines;
-        }
-
-        const line1 =
-            address.line1 ??
-            address.line_1;
-
-        const line2 =
-            address.line2 ??
-            address.line_2;
-
-        const postalCode =
-            address.postalCode ??
-            address.postal_code;
-
-        return [
-            [
-                line1,
-                line2
-            ]
-                .filter(Boolean)
-                .join(' '),
-
-            [
-                postalCode,
-                address.city
-            ]
-                .filter(Boolean)
-                .join(' '),
-
-            address.country
-        ].filter(Boolean);
-    });
-
-const branchAddress = computed(() => {
-    return branchAddressParts.value
-        .join(', ');
-});
-
-const latitude = computed(() => {
-    return (
-        branch.value
-            ?.location
-            ?.latitude ??
-        branch.value?.latitude ??
-        null
-    );
-});
-
-const longitude = computed(() => {
-    return (
-        branch.value
-            ?.location
-            ?.longitude ??
-        branch.value?.longitude ??
-        null
-    );
-});
-
-/*
- * Maps
- */
+const GOOGLE_MAPS_SHARED_URL =
+    'https://maps.app.goo.gl/ZiLiSj7zcNqTfon48';
 
 const googleMapsQuery =
     computed(() => {
-        if (
-            latitude.value !== null &&
-            longitude.value !== null
-        ) {
-            return (
-                `${latitude.value},${longitude.value}`
-            );
-        }
-
-        return (
-            branchAddress.value ||
-            null
-        );
+        return GOOGLE_MAPS_ADDRESS;
     });
 
 const googleMapsUrl =
     computed(() => {
-        if (!googleMapsQuery.value) {
-            return null;
-        }
-
-        return (
-            'https://www.google.com/maps/search/' +
-            '?api=1&query=' +
-            encodeURIComponent(
-                googleMapsQuery.value
-            )
-        );
+        return GOOGLE_MAPS_SHARED_URL;
     });
 
 const googleMapsEmbedUrl =
     computed(() => {
-        if (!googleMapsQuery.value) {
-            return null;
-        }
-
         return (
             'https://www.google.com/maps?' +
             'q=' +
             encodeURIComponent(
                 googleMapsQuery.value
             ) +
-            '&z=16&output=embed'
+            '&z=17&output=embed'
         );
     });
 
@@ -369,27 +274,16 @@ const contacts = computed(() => {
         }
     }
 
-    if (
-        branchAddress.value
-    ) {
-        result.push({
-            type: 'address',
-            label: 'Adresa',
-            value:
-                branchAddress.value
-        });
-    }
+    result.push({
+        type: 'address',
+        label: 'Adresa',
+        value:
+            GOOGLE_MAPS_ADDRESS
+    });
 
     return result;
 });
 
-const openingHours = computed(() => {
-    return (
-        branch.value?.openingHours ??
-        branch.value?.opening_hours ??
-        []
-    );
-});
 
 /*
  * Contact endpoint
@@ -573,112 +467,6 @@ function formCardMotionStyle() {
     );
 }
 
-function openingHoursCardMotionStyle() {
-    return motionStyle(
-        0.2
-    );
-}
-
-/*
- * Opening hours
- */
-
-function openingHoursDayLabel(
-    entry
-) {
-    if (entry.label) {
-        return entry.label;
-    }
-
-    const day =
-        entry.dayOfWeek ??
-        entry.day_of_week ??
-        entry.day;
-
-    return {
-        1: 'Pondelok',
-        2: 'Utorok',
-        3: 'Streda',
-        4: 'Štvrtok',
-        5: 'Piatok',
-        6: 'Sobota',
-        7: 'Nedeľa',
-
-        monday:
-            'Pondelok',
-
-        tuesday:
-            'Utorok',
-
-        wednesday:
-            'Streda',
-
-        thursday:
-            'Štvrtok',
-
-        friday:
-            'Piatok',
-
-        saturday:
-            'Sobota',
-
-        sunday:
-            'Nedeľa'
-    }[day] ??
-        day ??
-        '';
-}
-
-function openingHoursLabel(
-    entry
-) {
-    if (
-        entry.isClosed ||
-        entry.is_closed
-    ) {
-        return 'Zatvorené';
-    }
-
-    if (entry.schedule) {
-        return entry.schedule;
-    }
-
-    const intervals =
-        entry.intervals ??
-        [];
-
-    if (!intervals.length) {
-        return 'Neuvedené';
-    }
-
-    return intervals
-        .map((interval) => {
-            const opensAt =
-                interval.opensAt ??
-                interval.opens_at;
-
-            const closesAt =
-                interval.closesAt ??
-                interval.closes_at;
-
-            if (
-                !opensAt ||
-                !closesAt
-            ) {
-                return null;
-            }
-
-            return (
-                `${String(opensAt)
-                    .slice(0, 5)}` +
-                ' – ' +
-                `${String(closesAt)
-                    .slice(0, 5)}`
-            );
-        })
-        .filter(Boolean)
-        .join(', ');
-}
 
 /*
  * Animated message suggestion
@@ -1318,130 +1106,14 @@ onBeforeUnmount(() => {
     <div
         ref="motionRoot"
     >
-        <!-- Loading -->
-        <div
-            v-if="loading"
-            class="
-                mx-auto
-                w-full
-                max-w-[100rem]
-                px-5
-                py-10
-
-                lg:px-10
-
-                xl:px-16
-            "
-        >
-            <div
-                class="
-                    mx-auto
-                    max-w-xl
-                    space-y-4
-                    text-center
-                "
-            >
-                <div
-                    class="
-                        mx-auto
-                        h-10
-                        w-56
-                        animate-pulse
-                        rounded-full
-                        bg-baige/10
-                    "
-                />
-
-                <div
-                    class="
-                        h-5
-                        w-full
-                        animate-pulse
-                        rounded-full
-                        bg-baige/10
-                    "
-                />
-            </div>
-
-            <div
-                class="
-                    mt-16
-                    grid
-                    grid-cols-1
-                    gap-8
-
-                    lg:grid-cols-3
-                "
-            >
-                <div
-                    v-for="index in 3"
-                    :key="index"
-                    class="
-                        h-[34rem]
-                        animate-pulse
-                        rounded-[2.7rem]
-                        bg-baige/10
-                    "
-                />
-            </div>
-        </div>
-
-        <!-- Error -->
-        <div
-            v-else-if="error"
-            class="
-                mx-auto
-                max-w-xl
-                px-5
-                py-16
-                text-center
-            "
-        >
-            <h1
-                class="
-                    text-xl
-                    font-bold
-                    text-baige
-                "
-            >
-                Obsah sa nepodarilo načítať
-            </h1>
-
-            <p
-                class="
-                    text-regular
-                    mt-5
-                    text-baige/65
-                "
-            >
-                {{ error }}
-            </p>
-
-            <div
-                class="
-                    mt-8
-                "
-            >
-                <Button
-                    background-image=""
-                    background-color="#FBF9F3"
-                    text-color="#335940"
-                    @click="load"
-                >
-                    Skúsiť znova
-                </Button>
-            </div>
-        </div>
-
-        <!-- Page -->
         <main
-            v-else
             class="
                 mx-auto
                 w-full
                 px-5
                 pb-20
                 pt-5
+                
 
                 lg:px-15
                 lg:pb-28
@@ -1449,51 +1121,20 @@ onBeforeUnmount(() => {
 
             "
         >
+            <!-- Two-column contact layout -->
             <section
                 class="
                     mx-auto
-                    max-w-4xl
-                    text-center
-                "
-            >
-                <h1
-                    class="
-                        text-[clamp(2.1rem,4vw,4.25rem)]
-                        font-bold
-                        leading-[0.95]
-                        tracking-[-0.04em]
-                        text-baige
-                    "
-                >
-                    Kontaktujte Humanitas
-                </h1>
-
-                <p
-                    class="
-                        text-regular
-                        mx-auto
-                        mt-4
-                        max-w-2xl
-                        text-base
-                        text-baige/70
-                    "
-                >
-                    Ak sa chcete objednať, položiť otázku alebo sa poradiť o psychologických službách,
-                    napíšte nám alebo použite kontaktné údaje nižšie.
-                </p>
-            </section>
-
-            <!-- Three-column contact layout -->
-            <section
-                class="
                     mt-12
                     grid
+                    w-full
+                    max-w-6xl
                     grid-cols-1
                     items-start
-                    gap-10
-
+                    space-y-32
+                    
                     lg:mt-16
-                    lg:grid-cols-3
+                    lg:grid-cols-2
                     lg:gap-20
 
                 "
@@ -1502,8 +1143,8 @@ onBeforeUnmount(() => {
                 <section>
                     <div
                         class="
-                            mb-7
                             text-center
+                            mb-7
                         "
                     >
                         <h2
@@ -2395,108 +2036,6 @@ onBeforeUnmount(() => {
                     </p>
                 </article>
 
-                <!-- Column 3: Opening hours -->
-                <article
-                    class="
-                        min-w-0
-                    "
-                >
-                    <div
-                        class="
-                            mb-7
-                            text-center
-                        "
-                    >
-                        <h2
-                            class="
-                                text-xl
-                                font-bold
-                                text-baige
-                            "
-                        >
-                            Otváracie hodiny
-                        </h2>
-
-                        <p
-                            class="
-                                text-regular
-                                mt-2
-                                text-sm
-                                text-baige/60
-                            "
-                        >
-                            Kedy nás môžete zastihnúť.
-                        </p>
-                    </div>
-
-                    <div
-                        v-if="
-                            openingHours.length
-                        "
-                        class="
-                            overflow-hidden
-                            p-0
-                            text-baige/60
-                        "
-                    >
-                        <div
-                            v-for="
-                                entry in
-                                openingHours
-                            "
-                            :key="
-                                `${entry.dayOfWeek || entry.day_of_week || entry.day}-${openingHoursLabel(entry)}`
-                            "
-                            class="
-                                grid
-                                min-h-12
-                                grid-cols-[minmax(0,1fr)_auto]
-                                items-center
-                                gap-6
-                            "
-                        >
-                            <p
-                                class="
-                                    text-regular
-                                    text-baige/60
-                                "
-                            >
-                                {{
-                                    openingHoursDayLabel(
-                                        entry
-                                    )
-                                }}
-                            </p>
-
-                            <p
-                                class="
-                                    text-regular
-                                    text-right
-                                    font-bold
-                                    text-baige
-                                "
-                            >
-                                {{
-                                    openingHoursLabel(
-                                        entry
-                                    )
-                                }}
-                            </p>
-                        </div>
-                    </div>
-
-                    <p
-                        v-else
-                        class="
-                            text-regular
-                            text-center
-                            text-baige/50
-                        "
-                    >
-                        Otváracie hodiny momentálne
-                        nie sú uvedené.
-                    </p>
-                </article>
             </section>
         </main>
     </div>

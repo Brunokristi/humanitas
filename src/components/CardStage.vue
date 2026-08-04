@@ -1,6 +1,9 @@
 <script setup>
-import { computed } from 'vue'
-import PageCard from './PageCard.vue'
+import {
+    computed
+} from 'vue';
+
+import PageCard from './PageCard.vue';
 
 const props = defineProps({
     pages: {
@@ -12,119 +15,228 @@ const props = defineProps({
         type: Object,
         required: true
     }
-})
+});
 
 const renderedCards = computed(() => {
-    const ids = [
-        ...props.stack.cardOrder.value
-    ].reverse()
-
-    return ids
+    return props.stack.cardOrder.value
         .map((id) => {
-            return props.pages.find((page) => {
-                return page.id === id
-            })
+            return props.pages.find(
+                (page) => {
+                    return page.id === id;
+                }
+            );
         })
-        .filter(Boolean)
-})
+        .filter(Boolean);
+});
 
-const stackBottomCompensation = computed(() => {
-    return props.stack
-        .stackBottomCompensation
-        ?.value ?? 0
-})
+const activeCard = computed(() => {
+    return props.pages.find(
+        (page) => {
+            return (
+                page.id ===
+                props.stack.state
+                    .activePageId
+            );
+        }
+    ) ?? null;
+});
 
-const cardStageStyle = computed(() => {
-    if (props.stack.mode.value === 'expanded') {
-        return {}
-    }
+const isOverview = computed(() => {
+    return props.stack.isOverview.value;
+});
 
+const stageStyle = computed(() => {
     return {
-        paddingBottom:
-            `${stackBottomCompensation.value}px`
-    }
-})
+        minHeight:
+            props.stack
+                .stageMinHeight
+                .value,
+        height:
+            isOverview.value
+                ? props.stack
+                    .stageMinHeight
+                    .value
+                : 'auto'
+    };
+});
 
-function activateCard(cardId, element) {
-    props.stack.handleCardActivate(
-        cardId,
+function setStageElement(element) {
+    props.stack.registerStageElement(
         element
-    )
+    );
 }
 
-function handleCardElementChange(payload) {
-    props.stack.registerCardElement(
-        payload.cardId,
-        payload.element
-    )
+function activateCard(cardId) {
+    props.stack.handleCardActivate(
+        cardId
+    );
+}
 
-    if (
-        props.stack.mode.value === 'stacked' &&
-        payload.element
-    ) {
-        props.stack.rememberStackedRect(
-            payload.cardId,
-            payload.element
-        )
-    }
+function setOverviewCardElement(
+    cardId,
+    element
+) {
+    props.stack
+        .registerOverviewCardElement(
+            cardId,
+            element
+        );
+}
+
+function setExpandedCardElement(
+    element
+) {
+    props.stack
+        .registerExpandedCardElement(
+            element
+        );
 }
 </script>
 
 <template>
     <section
-        class="card-stage relative w-full"
-        :class="
-            stack.mode.value === 'expanded'
-                ? 'mt-2 h-auto overflow-visible'
-                : 'mt-2 min-h-[min(76dvh,780px)] overflow-visible'
+        :ref="setStageElement"
+        class="card-stage"
+        :class="{
+            'card-stage--overview':
+                isOverview,
+            'card-stage--expanded':
+                !isOverview,
+            'card-stage--dragging':
+                stack.overviewDragging.value
+        }"
+        :style="stageStyle"
+        aria-label="Stránky Humanitas"
+        @pointerdown="
+            stack.handleOverviewPointerDown
         "
-        :style="cardStageStyle"
-        aria-label="Card interface"
+        @pointermove="
+            stack.handleOverviewPointerMove
+        "
+        @pointerup="
+            stack.handleOverviewPointerUp
+        "
+        @pointercancel="
+            stack.handleOverviewPointerCancel
+        "
     >
-        <PageCard
-            v-for="card in renderedCards"
-            :key="card.id"
-            :card="card"
-            :mode="stack.mode.value"
-            :visual="stack.getCardVisual(card.id)"
-            :reduced-motion="stack.reducedMotion.value"
-            @activate="
-                activateCard(
-                    card.id,
-                    $event
-                )
-            "
-            @handle-pointer-down="
-                stack.handleExpandedHandlePointerDown(
-                    $event
-                )
-            "
-            @handle-pointer-move="
-                stack.handleExpandedHandlePointerMove(
-                    $event
-                )
-            "
-            @handle-pointer-up="
-                stack.handleExpandedHandlePointerUp(
-                    $event
-                )
-            "
-            @handle-pointer-cancel="
-                stack.handleExpandedHandlePointerCancel(
-                    $event
-                )
-            "
-            @minimize="
-                stack.minimizeCard()
-            "
-            @transition-end="
-                stack.handleTransitionEnd(
-                    $event
-                )
-            "
-            @card-element-change="
-                handleCardElementChange
-            "
-        />
+        <div
+            v-if="isOverview"
+            class="card-stage__overview"
+        >
+            <PageCard
+                v-for="card in renderedCards"
+                :key="card.id"
+                :card="card"
+                variant="preview"
+                :visual="
+                    stack.getOverviewVisual(
+                        card.id
+                    )
+                "
+                :interactive="
+                    !stack.state
+                        .interactionLocked
+                "
+                :shared="
+                    stack.state
+                        .sharedPageId ===
+                    card.id
+                "
+                @activate="
+                    activateCard(
+                        card.id
+                    )
+                "
+                @element-change="
+                    setOverviewCardElement(
+                        card.id,
+                        $event
+                    )
+                "
+            />
+        </div>
+
+        <div
+            v-else-if="activeCard"
+            class="card-stage__expanded"
+        >
+            <PageCard
+                :key="activeCard.id"
+                :card="activeCard"
+                variant="expanded"
+                :interactive="
+                    !stack.state
+                        .interactionLocked
+                "
+                :shared="
+                    stack.state
+                        .sharedPageId ===
+                    activeCard.id
+                "
+                :capture-mode="
+                    stack.state.captureMode
+                "
+                :capture-rect="
+                    stack.state.captureRect
+                "
+                :capture-scroll-y="
+                    stack.state.captureScrollY
+                "
+                @minimize="
+                    stack.minimizeCard()
+                "
+                @element-change="
+                    setExpandedCardElement
+                "
+            />
+        </div>
     </section>
 </template>
+
+<style scoped>
+.card-stage {
+    position: relative;
+    width: 100%;
+    padding: 0;
+    isolation: isolate;
+}
+
+.card-stage__overview {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.card-stage--overview {
+    overflow: clip;
+    touch-action: pan-y;
+    cursor: grab;
+    user-select: none;
+}
+
+.card-stage--overview.card-stage--dragging {
+    cursor: grabbing;
+}
+
+.card-stage__expanded {
+    position: relative;
+    width: 100%;
+    min-height:
+        calc(
+            100dvh -
+            var(--app-header-height, 0px)
+        );
+}
+
+.card-stage--expanded {
+    overflow: visible;
+    touch-action: auto;
+}
+
+@supports not (overflow: clip) {
+    .card-stage--overview {
+        overflow: hidden;
+    }
+}
+</style>
