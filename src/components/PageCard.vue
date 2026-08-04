@@ -309,7 +309,7 @@ function handleControlClick() {
 <template>
     <article
         :ref="setRootElement"
-        class="page-card bg-green text-baige shadow-[var(--shadow-mid)]"
+        class="page-card bg-green text-baige shadow-[var(--shadow-strong)]"
         :class="{
             'page-card--preview':
                 isPreview,
@@ -449,7 +449,7 @@ function handleControlClick() {
 
 .page-card-menu__divider {
     display: block;
-    width: 1px;
+    width: 2px;
     height: 1.1rem;
     margin-left: 0.75rem;
     flex-shrink: 0;

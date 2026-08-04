@@ -42,6 +42,56 @@ const {
     publicSiteStore
 );
 
+const scrollMotionEnabled =
+    ref(true);
+
+if (
+    typeof navigator !==
+    'undefined'
+) {
+    const userAgent =
+        navigator.userAgent;
+
+    const platform =
+        navigator.platform ??
+        '';
+
+    const maxTouchPoints =
+        navigator.maxTouchPoints ??
+        0;
+
+    const isIosFamily =
+        /iP(hone|ad|od)/i.test(
+            userAgent
+        ) ||
+        (
+            platform ===
+                'MacIntel' &&
+            maxTouchPoints > 1
+        );
+
+    const isSafariEngine =
+        /Safari/i.test(
+            userAgent
+        ) &&
+        !/CriOS|FxiOS|EdgiOS|OPiOS|Chrome|Chromium/i.test(
+            userAgent
+        );
+
+    /*
+     * iOS Safari can visibly glitch while
+     * combining momentum horizontal scrolling
+     * with per-card transform updates.
+     */
+    if (
+        isIosFamily &&
+        isSafariEngine
+    ) {
+        scrollMotionEnabled.value =
+            false;
+    }
+}
+
 /*
  * Horizontal card motion.
  *
@@ -53,6 +103,11 @@ const {
     motionRoot
 } = useScrollMotion({
     axis: 'x',
+
+    selector:
+        scrollMotionEnabled.value
+            ? '[data-scroll-motion]'
+            : '[data-scroll-motion-disabled]',
 
     sourceSelector:
         '[data-scroll-motion-source]',
@@ -2041,28 +2096,59 @@ onBeforeUnmount(() => {
                                 <!-- Horizontal motion wrapper -->
                                 <div
                                     class="
-                                        scroll-motion
                                         h-full
                                         w-full
                                     "
-                                    data-scroll-motion
+                                    :class="{
+                                        'scroll-motion':
+                                            scrollMotionEnabled
+                                    }"
+                                    :data-scroll-motion="
+                                        scrollMotionEnabled
+                                            ? ''
+                                            : undefined
+                                    "
                                     :data-motion-seed="
-                                        serviceMotionSeed(
-                                            serviceIndex,
-                                            groupIndex
-                                        )
+                                        scrollMotionEnabled
+                                            ? serviceMotionSeed(
+                                                serviceIndex,
+                                                groupIndex
+                                            )
+                                            : undefined
                                     "
                                     :data-base-rotation="
-                                        serviceCardBaseRotation(
-                                            serviceIndex,
-                                            groupIndex
-                                        )
+                                        scrollMotionEnabled
+                                            ? serviceCardBaseRotation(
+                                                serviceIndex,
+                                                groupIndex
+                                            )
+                                            : undefined
                                     "
-                                    data-rotation-mode="offset"
-                                    data-motion-strength="1"
-                                    data-straighten-strength="0.96"
-                                    data-max-x="16"
-                                    data-max-scale="0.005"
+                                    :data-rotation-mode="
+                                        scrollMotionEnabled
+                                            ? 'offset'
+                                            : undefined
+                                    "
+                                    :data-motion-strength="
+                                        scrollMotionEnabled
+                                            ? 1
+                                            : undefined
+                                    "
+                                    :data-straighten-strength="
+                                        scrollMotionEnabled
+                                            ? 0.96
+                                            : undefined
+                                    "
+                                    :data-max-x="
+                                        scrollMotionEnabled
+                                            ? 16
+                                            : undefined
+                                    "
+                                    :data-max-scale="
+                                        scrollMotionEnabled
+                                            ? 0.005
+                                            : undefined
+                                    "
                                 >
                                     <Card
                                         :item="

@@ -273,7 +273,7 @@ onUnmounted(() => {
                             px-6
                             py-10
                             text-center
-                            shadow-[var(--shadow-mid)]
+                            shadow-[var(--shadow-strong)]
 
                             sm:px-10
                         "
@@ -320,12 +320,6 @@ onUnmounted(() => {
                         flex-col
                     "
                 >
-                    <!--
-                        The header is permanently sticky and owns
-                        a separate view-transition layer. It never
-                        participates in card zoom geometry, so the
-                        logo cannot shift during open or close.
-                    -->
                     <div
                         class="app-shell-header"
                     >
@@ -345,6 +339,7 @@ onUnmounted(() => {
                             items-start
                             justify-center
                             px-2
+                            overflow-visible
 
                             sm:px-6
                         "
@@ -368,13 +363,10 @@ onUnmounted(() => {
 .app-shell-header {
     position: sticky;
     top: 0;
-    z-index: 500;
     width: 100%;
     height: 60px;
     flex-shrink: 0;
-    background: #fbf9f3;
-    isolation: isolate;
-    view-transition-name: humanitas-header;
+    background: transparent;
 }
 
 .shell-fade-enter-active,
@@ -394,16 +386,6 @@ onUnmounted(() => {
  * The browser creates frozen compositor snapshots for these
  * transitions. No live page layout is scaled frame by frame.
  */
-::view-transition-group(humanitas-header) {
-    animation: none !important;
-    z-index: 10000;
-}
-
-::view-transition-old(humanitas-header),
-::view-transition-new(humanitas-header) {
-    animation: none !important;
-    mix-blend-mode: normal;
-}
 
 ::view-transition-group(humanitas-page-surface) {
     overflow: clip;

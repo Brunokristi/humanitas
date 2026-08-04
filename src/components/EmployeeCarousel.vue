@@ -10,6 +10,8 @@ import {
     useScrollMotion
 } from '../composables/useScrollMotion';
 
+import Button from './Button.vue';
+
 const emit = defineEmits([
     'select'
 ]);

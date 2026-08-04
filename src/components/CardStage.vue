@@ -199,7 +199,6 @@ function setExpandedCardElement(
     position: relative;
     width: 100%;
     padding: 0;
-    isolation: isolate;
 }
 
 .card-stage__overview {
@@ -209,7 +208,6 @@ function setExpandedCardElement(
 }
 
 .card-stage--overview {
-    overflow: clip;
     touch-action: pan-y;
     cursor: grab;
     user-select: none;

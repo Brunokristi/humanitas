@@ -42,6 +42,11 @@ const props = defineProps({
         default: '#FBF9F3'
     },
 
+    imageOpacity: {
+        type: Number,
+        default: 0.2
+    },
+
     imageScale: {
         type: Number,
         default: 2.8
