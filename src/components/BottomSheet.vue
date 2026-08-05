@@ -26,12 +26,7 @@ const props = defineProps({
     draggable: {
         type: Boolean,
         default: true
-    },
-
-        showCloseButton: {
-            type: Boolean,
-            default: true
-        }
+    }
 });
 
 const emit = defineEmits([
@@ -170,7 +165,10 @@ const gesturePreviousTime =
 const gestureVelocity =
     ref(0);
 
-const activePointerId =
+const activeTouchIdentifier =
+    ref(null);
+
+const mousePointerId =
     ref(null);
 
 /*
@@ -493,7 +491,10 @@ function resetGestureState() {
     gestureVelocity.value =
         0;
 
-    activePointerId.value =
+    activeTouchIdentifier.value =
+        null;
+
+    mousePointerId.value =
         null;
 
     isDragging.value =
@@ -948,9 +949,7 @@ function updateGesture(
             );
     }
 
-    if (event.cancelable) {
-        event.preventDefault();
-    }
+    event.preventDefault();
 
     gestureVelocity.value =
         gestureVelocity.value *
@@ -1031,15 +1030,120 @@ function cancelGesture() {
 
 /*
 |--------------------------------------------------------------------------
-| Pointer dragging
+| Touch gestures
+|--------------------------------------------------------------------------
+*/
+
+function findTouch(
+    touchList,
+    identifier
+) {
+    return Array.from(
+        touchList
+    ).find((touch) => {
+        return (
+            touch.identifier ===
+            identifier
+        );
+    }) ?? null;
+}
+
+function handleTouchStart(event) {
+    if (
+        event.touches.length !==
+        1
+    ) {
+        return;
+    }
+
+    const touch =
+        event.touches[0];
+
+    const started =
+        startGesture(
+            touch.clientY,
+            event.target,
+            'touch'
+        );
+
+    if (!started) {
+        return;
+    }
+
+    activeTouchIdentifier.value =
+        touch.identifier;
+}
+
+function handleTouchMove(event) {
+    if (
+        gestureSource.value !==
+            'touch' ||
+        activeTouchIdentifier.value ===
+            null
+    ) {
+        return;
+    }
+
+    const touch =
+        findTouch(
+            event.touches,
+            activeTouchIdentifier.value
+        );
+
+    if (!touch) {
+        return;
+    }
+
+    updateGesture(
+        touch.clientY,
+        event
+    );
+}
+
+function handleTouchEnd(event) {
+    if (
+        gestureSource.value !==
+            'touch'
+    ) {
+        return;
+    }
+
+    const endedTouch =
+        findTouch(
+            event.changedTouches,
+            activeTouchIdentifier.value
+        );
+
+    if (!endedTouch) {
+        return;
+    }
+
+    finishGesture();
+}
+
+function handleTouchCancel() {
+    if (
+        gestureSource.value !==
+            'touch'
+    ) {
+        return;
+    }
+
+    cancelGesture();
+}
+
+/*
+|--------------------------------------------------------------------------
+| Mouse dragging
 |--------------------------------------------------------------------------
 */
 
 function handlePointerDown(event) {
     if (
-        event.pointerType ===
-            'mouse' &&
-        event.button !== 0
+        event.pointerType !==
+            'mouse' ||
+        event.button !==
+            0
     ) {
         return;
     }
@@ -1048,14 +1152,14 @@ function handlePointerDown(event) {
         startGesture(
             event.clientY,
             event.target,
-            'pointer'
+            'mouse'
         );
 
     if (!started) {
         return;
     }
 
-    activePointerId.value =
+    mousePointerId.value =
         event.pointerId;
 
     try {
@@ -1071,8 +1175,8 @@ function handlePointerDown(event) {
 function handlePointerMove(event) {
     if (
         gestureSource.value !==
-            'pointer' ||
-        activePointerId.value !==
+            'mouse' ||
+        mousePointerId.value !==
             event.pointerId
     ) {
         return;
@@ -1100,8 +1204,8 @@ function releasePointerCapture(
 function handlePointerUp(event) {
     if (
         gestureSource.value !==
-            'pointer' ||
-        activePointerId.value !==
+            'mouse' ||
+        mousePointerId.value !==
             event.pointerId
     ) {
         return;
@@ -1117,9 +1221,7 @@ function handlePointerUp(event) {
 function handlePointerCancel(event) {
     if (
         gestureSource.value !==
-            'pointer' ||
-        activePointerId.value !==
-            event.pointerId
+            'mouse'
     ) {
         return;
     }
@@ -1289,6 +1391,18 @@ onBeforeUnmount(() => {
                 sheetStyle
             "
             @click.stop
+            @touchstart="
+                handleTouchStart
+            "
+            @touchmove="
+                handleTouchMove
+            "
+            @touchend="
+                handleTouchEnd
+            "
+            @touchcancel="
+                handleTouchCancel
+            "
             @pointerdown="
                 handlePointerDown
             "
@@ -1337,7 +1451,6 @@ onBeforeUnmount(() => {
 
             <!-- Desktop close button -->
             <button
-                    v-if="showCloseButton"
                 type="button"
                 class="
                     absolute

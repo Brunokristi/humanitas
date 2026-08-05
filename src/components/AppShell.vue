@@ -1,6 +1,7 @@
 <script setup>
 import {
     computed,
+    nextTick,
     onMounted,
     onUnmounted,
     provide,
@@ -66,13 +67,28 @@ const {
 const MIN_LOADER_DURATION_MS =
     2500;
 
+const ERROR_REVEAL_DELAY_MS =
+    180;
+
 const hasSeenInitialLoading =
     ref(false);
 
 const isLoaderMinimumDurationDone =
     ref(false);
 
+const loaderObject =
+    ref(null);
+
+const isErrorContentVisible =
+    ref(false);
+
 let loaderMinimumDurationTimer =
+    null;
+
+let errorRevealTimer =
+    null;
+
+let loaderErrorTransitionTimer =
     null;
 
 let previousScrollbarGutter =
@@ -85,7 +101,60 @@ const isDataLoading = computed(() => {
     );
 });
 
+const isTestingLoadError = computed(() => {
+    if (!import.meta.env.DEV) {
+        return false;
+    }
+
+    return (
+        route.query.testLoadError ===
+        '1'
+    );
+});
+
+const hasFatalLoadError = computed(() => {
+    return (
+        Boolean(error.value) &&
+        !company.value &&
+        !loading.value
+    );
+});
+
+const shouldShowFatalLoadError = computed(() => {
+    return (
+        hasFatalLoadError.value ||
+        isTestingLoadError.value
+    );
+});
+
+const displayedFatalLoadError = computed(() => {
+    if (isTestingLoadError.value) {
+        return 'Toto je testovacia chyba načítania.';
+    }
+
+    if (
+        typeof error.value ===
+        'string'
+    ) {
+        return error.value;
+    }
+
+    if (
+        error.value?.message
+    ) {
+        return error.value.message;
+    }
+
+    return 'Skontrolujte svoje internetové pripojenie a skúste to znova.';
+});
+
 const isInitialLoading = computed(() => {
+    if (
+        shouldShowFatalLoadError.value
+    ) {
+        return false;
+    }
+
     if (!hasSeenInitialLoading.value) {
         return isDataLoading.value;
     }
@@ -99,11 +168,10 @@ const isInitialLoading = computed(() => {
     return isDataLoading.value;
 });
 
-const hasFatalLoadError = computed(() => {
+const shouldShowLoaderScreen = computed(() => {
     return (
-        Boolean(error.value) &&
-        !company.value &&
-        !loading.value
+        isInitialLoading.value ||
+        shouldShowFatalLoadError.value
     );
 });
 
@@ -116,6 +184,215 @@ function handleGlobalKeydown(event) {
     ) {
         stack.minimizeCard();
     }
+}
+
+function getLoaderSvgRoot() {
+    const objectElement =
+        loaderObject.value;
+
+    if (!objectElement) {
+        return null;
+    }
+
+    try {
+        return (
+            objectElement
+                .contentDocument
+                ?.documentElement ??
+            null
+        );
+    } catch (loaderAccessError) {
+        console.error(
+            'The loader SVG could not be accessed.',
+            loaderAccessError
+        );
+
+        return null;
+    }
+}
+
+function setLoaderState(state) {
+    const validStates = [
+        'loading',
+        'success',
+        'error'
+    ];
+
+    const nextState =
+        validStates.includes(state)
+            ? state
+            : 'loading';
+
+    const svgRoot =
+        getLoaderSvgRoot();
+
+    if (!svgRoot) {
+        return false;
+    }
+
+    svgRoot.dataset.state =
+        nextState;
+
+    svgRoot.setAttribute(
+        'aria-label',
+        nextState === 'loading'
+            ? 'Humanitas loading'
+            : nextState === 'success'
+                ? 'Completed successfully'
+                : 'An error occurred'
+    );
+
+    svgRoot.dispatchEvent(
+        new CustomEvent(
+            'loader-state',
+            {
+                detail: nextState
+            }
+        )
+    );
+
+    return true;
+}
+
+function handleLoaderReady() {
+    window.requestAnimationFrame(() => {
+        if (
+            shouldShowFatalLoadError.value
+        ) {
+            queueLoaderErrorState();
+
+            return;
+        }
+
+        setLoaderState(
+            'loading'
+        );
+    });
+}
+
+function clearErrorRevealTimer() {
+    if (
+        errorRevealTimer ===
+        null
+    ) {
+        return;
+    }
+
+    window.clearTimeout(
+        errorRevealTimer
+    );
+
+    errorRevealTimer =
+        null;
+}
+
+function clearLoaderErrorTransitionTimer() {
+    if (
+        loaderErrorTransitionTimer ===
+        null
+    ) {
+        return;
+    }
+
+    window.clearTimeout(
+        loaderErrorTransitionTimer
+    );
+
+    loaderErrorTransitionTimer =
+        null;
+}
+
+function showErrorContent() {
+    clearErrorRevealTimer();
+
+    isErrorContentVisible.value =
+        false;
+
+    errorRevealTimer =
+        window.setTimeout(() => {
+            isErrorContentVisible.value =
+                true;
+
+            errorRevealTimer =
+                null;
+        }, ERROR_REVEAL_DELAY_MS);
+}
+
+function queueLoaderErrorState() {
+    clearLoaderErrorTransitionTimer();
+    clearErrorRevealTimer();
+
+    isErrorContentVisible.value =
+        false;
+
+    setLoaderState(
+        'loading'
+    );
+
+    loaderErrorTransitionTimer =
+        window.setTimeout(() => {
+            loaderErrorTransitionTimer =
+                null;
+
+            setLoaderState(
+                'error'
+            );
+
+            showErrorContent();
+        }, MIN_LOADER_DURATION_MS);
+}
+
+async function applyLoaderState() {
+    await nextTick();
+
+    if (
+        shouldShowFatalLoadError.value
+    ) {
+        queueLoaderErrorState();
+
+        return;
+    }
+
+    clearLoaderErrorTransitionTimer();
+    clearErrorRevealTimer();
+
+    isErrorContentVisible.value =
+        false;
+
+    setLoaderState(
+        'loading'
+    );
+}
+
+async function retryLoad() {
+    clearLoaderErrorTransitionTimer();
+    clearErrorRevealTimer();
+
+    isErrorContentVisible.value =
+        false;
+
+    setLoaderState(
+        'loading'
+    );
+
+    if (
+        isTestingLoadError.value
+    ) {
+        const nextQuery = {
+            ...route.query
+        };
+
+        delete nextQuery
+            .testLoadError;
+
+        await router.replace({
+            query: nextQuery
+        });
+
+        return;
+    }
+
+    await publicSiteStore.reload();
 }
 
 watch(
@@ -157,6 +434,16 @@ watch(
     }
 );
 
+watch(
+    shouldShowFatalLoadError,
+    () => {
+        applyLoaderState();
+    },
+    {
+        immediate: true
+    }
+);
+
 onMounted(() => {
     initializeCookieConsent();
 
@@ -188,6 +475,9 @@ onUnmounted(() => {
         loaderMinimumDurationTimer =
             null;
     }
+
+    clearLoaderErrorTransitionTimer();
+    clearErrorRevealTimer();
 
     window.removeEventListener(
         'keydown',
@@ -227,89 +517,111 @@ onUnmounted(() => {
                 mode="out-in"
             >
                 <div
-                    v-if="isInitialLoading"
-                    key="loading"
+                    v-if="shouldShowLoaderScreen"
+                    key="loader-screen"
                     class="
                         flex
                         min-h-[100dvh]
-                        items-center
-                        justify-center
-                    "
-                    aria-label="Načítavanie obsahu"
-                >
-                    <object
-                        data="/images/logo_animated.svg"
-                        type="image/svg+xml"
-                        aria-label="Humanitas"
-                        class="
-                            h-auto
-                            w-[clamp(10rem,28vw,18rem)]
-                        "
-                    >
-                        Humanitas
-                    </object>
-                </div>
-
-                <main
-                    v-else-if="hasFatalLoadError"
-                    key="error"
-                    class="
-                        flex
-                        min-h-[100dvh]
+                        flex-col
                         items-center
                         justify-center
                         px-5
                         py-16
                     "
+                    :aria-label="
+                        shouldShowFatalLoadError
+                            ? 'Obsah sa nepodarilo načítať'
+                            : 'Načítavanie obsahu'
+                    "
                 >
-                    <section
+                    <object
+                        ref="loaderObject"
+                        data="/humanitas_loader_states.svg"
+                        type="image/svg+xml"
+                        aria-label="Humanitas"
                         class="
-                            w-full
-                            max-w-2xl
-                            rounded-[2.2rem]
-                            border
-                            border-green/15
-                            bg-white/45
-                            px-6
-                            py-10
-                            text-center
-                            shadow-[var(--shadow-strong)]
+                            h-auto
+                            w-[clamp(10rem,28vw,18rem)]
+                            shrink-0
+                        "
+                        @load="handleLoaderReady"
+                    >
+                        Humanitas
+                    </object>
 
-                            sm:px-10
+                    <div
+                        class="
+                            flex
+                            h-48
+                            w-full
+                            max-w-xl
+                            shrink-0
+                            items-start
+                            justify-center
+                            pt-1
                         "
                     >
-                        <h1
+                        <div
                             class="
-                                heading
-                                text-green
+                                error-content
+                                flex
+                                w-full
+                                flex-col
+                                items-center
+                                text-center
+                            "
+                            :class="{
+                                'error-content--visible':
+                                    shouldShowFatalLoadError &&
+                                    isErrorContentVisible
+                            }"
+                            :aria-hidden="
+                                !shouldShowFatalLoadError ||
+                                !isErrorContentVisible
                             "
                         >
-                            Obsah sa nepodarilo načítať
-                        </h1>
-
-                        <p
-                            class="
-                                text-regular
-                                mt-5
-                                text-green/70
-                            "
-                        >
-                            {{ error }}
-                        </p>
-
-                        <div class="mt-8">
-                            <Button
-                                background-color="#FBF9F3"
-                                text-color="#335940"
-                                @click="
-                                    publicSiteStore.reload
+                            <h1
+                                class="
+                                    text-xl
+                                    font-bold
+                                    text-green
                                 "
                             >
-                                Skúsiť znova
-                            </Button>
+                                Stránku sa nepodarilo načítať
+                            </h1>
+
+                            <p
+                                class="
+                                    text-regular
+                                    mt-4
+                                    max-w-lg
+                                    text-green/70
+                                "
+                            >
+                                {{
+                                    displayedFatalLoadError
+                                }}
+                            </p>
+
+                            <div class="mt-7">
+                                <Button
+                                    background-color="#335940"
+                                    background-image=""
+                                    text-color="#FBF9F3"
+                                    :tabindex="
+                                        shouldShowFatalLoadError &&
+                                        isErrorContentVisible
+                                            ? 0
+                                            : -1
+                                    "
+                                    @click="retryLoad"
+                                >
+                                    Skúsiť znova
+                                </Button>
+                            </div>
                         </div>
-                    </section>
-                </main>
+                    </div>
+                </div>
 
                 <div
                     v-else
@@ -338,8 +650,8 @@ onUnmounted(() => {
                             flex-1
                             items-start
                             justify-center
-                            px-2
                             overflow-visible
+                            px-2
 
                             sm:px-6
                         "
@@ -378,6 +690,87 @@ onUnmounted(() => {
 .shell-fade-enter-from,
 .shell-fade-leave-to {
     opacity: 0;
+}
+
+.error-content {
+    pointer-events: none;
+    visibility: hidden;
+    opacity: 0;
+    filter: blur(5px);
+
+    transform:
+        translateY(14px)
+        scale(0.98);
+
+    transition:
+        opacity 520ms
+            cubic-bezier(
+                0.22,
+                1,
+                0.36,
+                1
+            ),
+        transform 700ms
+            cubic-bezier(
+                0.16,
+                1,
+                0.3,
+                1
+            ),
+        filter 600ms
+            cubic-bezier(
+                0.22,
+                1,
+                0.36,
+                1
+            ),
+        visibility 0s linear 700ms;
+}
+
+.error-content--visible {
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    filter: blur(0);
+
+    transform:
+        translateY(0)
+        scale(1);
+
+    transition:
+        opacity 520ms
+            cubic-bezier(
+                0.22,
+                1,
+                0.36,
+                1
+            ),
+        transform 700ms
+            cubic-bezier(
+                0.16,
+                1,
+                0.3,
+                1
+            ),
+        filter 600ms
+            cubic-bezier(
+                0.22,
+                1,
+                0.36,
+                1
+            ),
+        visibility 0s linear 0s;
+}
+
+@media (
+    prefers-reduced-motion:
+    reduce
+) {
+    .shell-fade-enter-active,
+    .shell-fade-leave-active,
+    .error-content {
+        transition-duration: 1ms;
+    }
 }
 </style>
 
