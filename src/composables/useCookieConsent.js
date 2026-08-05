@@ -308,10 +308,6 @@ function createCookieConsent() {
     }
 
     function closeSettings() {
-        if (!hasStoredConsent.value) {
-            return;
-        }
-
         isSheetOpen.value = false;
     }
 

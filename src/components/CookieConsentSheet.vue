@@ -45,7 +45,7 @@ const isOpen = computed({
 });
 
 const canDismiss = computed(() => {
-    return hasStoredConsent.value;
+    return true;
 });
 
 watch(
@@ -99,9 +99,6 @@ function handleSavePreferences() {
             canDismiss
         "
         :draggable="
-            canDismiss
-        "
-        :show-close-button="
             canDismiss
         "
     >

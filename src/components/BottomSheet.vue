@@ -3,6 +3,7 @@ import {
     computed,
     nextTick,
     onBeforeUnmount,
+    onMounted,
     ref,
     watch
 } from 'vue';
@@ -26,6 +27,11 @@ const props = defineProps({
     draggable: {
         type: Boolean,
         default: true
+    },
+
+    showCloseButton: {
+        type: Boolean,
+        default: false
     }
 });
 
@@ -34,58 +40,43 @@ const emit = defineEmits([
     'close'
 ]);
 
+defineExpose({
+    forceOpen,
+    requestClose,
+    openSheet,
+    animateClose,
+    finishClose
+});
+
 /*
 |--------------------------------------------------------------------------
-| Easy controls
+| Settings
 |--------------------------------------------------------------------------
 */
 
 const SHEET_SETTINGS = Object.freeze({
     openDuration: 560,
     closeDuration: 420,
-    snapDuration: 430,
+    snapDuration: 380,
+
+    closeDistanceRatio: 0.2,
+    closeDistanceMinimum: 100,
+    closeDistanceMaximum: 180,
+
+    closeVelocity: 0.48,
+    minimumFlickDistance: 35,
+
+    gestureActivationDistance: 6,
+
+    upwardResistance: 16,
+    closedOffset: 32,
 
     /*
-     * Drag distance required before the sheet closes.
-     *
-     * Stronger gesture:
-     * ratio: 0.34
-     * minimum: 210
-     *
-     * Easier gesture:
-     * ratio: 0.22
-     * minimum: 140
+     * Tailwind's xl breakpoint begins at 1280px.
+     * The handle and swipe therefore remain enabled
+     * on mobile and tablet widths.
      */
-    closeDistanceRatio: 0.34,
-    closeDistanceMinimum: 210,
-    closeDistanceMaximum: 240,
-
-    /*
-     * A fast downward flick can also close it.
-     *
-     * Higher = stronger flick required.
-     */
-    closeVelocity: 0.85,
-
-    /*
-     * Even a fast flick must first travel this far.
-     * This prevents accidental closures from taps.
-     */
-    minimumFlickDistance: 80,
-
-    /*
-     * The sheet does not begin following the finger
-     * until the movement exceeds this distance.
-     */
-    gestureActivationDistance: 14,
-
-    upwardResistance: 18,
-    closedOffset: 40,
-
-    /*
-     * Dragging is enabled below the desktop breakpoint.
-     */
-    dragMaximumViewportWidth: 1023
+    dragMaximumViewportWidth: 1279
 });
 
 const animationEase =
@@ -118,22 +109,25 @@ const translateY =
 const sheetHeight =
     ref(1);
 
-const isDragging =
-    ref(false);
-
-const isAnimating =
-    ref(false);
-
 const transitionEnabled =
-    ref(false);
-
-const reducedMotion =
     ref(false);
 
 const currentDuration =
     ref(
         SHEET_SETTINGS.openDuration
     );
+
+const isDragging =
+    ref(false);
+
+const isAnimating =
+    ref(false);
+
+const isClosing =
+    ref(false);
+
+const reducedMotion =
+    ref(false);
 
 /*
 |--------------------------------------------------------------------------
@@ -148,6 +142,9 @@ const gestureActivated =
     ref(false);
 
 const gestureStartedInContent =
+    ref(false);
+
+const gestureStartedOnHandle =
     ref(false);
 
 const gestureStartY =
@@ -168,7 +165,7 @@ const gestureVelocity =
 const activeTouchIdentifier =
     ref(null);
 
-const mousePointerId =
+const activePointerId =
     ref(null);
 
 /*
@@ -180,11 +177,32 @@ const mousePointerId =
 let motionTimer =
     null;
 
+let mounted =
+    false;
+
+let boundTouchElement =
+    null;
+
 let previousBodyOverflow =
     '';
 
 let previousHtmlOverflow =
     '';
+
+let previousBodyPosition =
+    '';
+
+let previousBodyTop =
+    '';
+
+let previousBodyWidth =
+    '';
+
+let lockedScrollY =
+    0;
+
+let pageScrollIsLocked =
+    false;
 
 /*
 |--------------------------------------------------------------------------
@@ -209,8 +227,7 @@ const dragProgress = computed(() => {
 const backdropOpacity = computed(() => {
     return Math.max(
         0,
-        1 -
-            dragProgress.value
+        1 - dragProgress.value
     );
 });
 
@@ -264,25 +281,19 @@ const handleStyle = computed(() => {
 
     return {
         transform:
-            `scaleX(${
-                1 +
-                progress *
-                    0.14
-            })`,
+            `scaleX(${1 + progress * 0.16})`,
 
         opacity:
             Math.max(
-                0.65,
-                1 -
-                    progress *
-                        0.2
+                0.55,
+                0.78 - progress * 0.18
             )
     };
 });
 
 /*
 |--------------------------------------------------------------------------
-| Timer helpers
+| Motion helpers
 |--------------------------------------------------------------------------
 */
 
@@ -302,7 +313,9 @@ function clearMotionTimer() {
         null;
 }
 
-function motionDuration(duration) {
+function getMotionDuration(
+    duration
+) {
     return reducedMotion.value
         ? 0
         : duration;
@@ -331,8 +344,7 @@ function finishMotion(
 
                 callback();
             },
-            duration +
-                40
+            duration + 50
         );
 }
 
@@ -348,52 +360,202 @@ function measureSheet() {
             ?.getBoundingClientRect();
 
     sheetHeight.value =
-        rect?.height ||
-        window.innerHeight;
+        Math.max(
+            rect?.height ?? 0,
+            1
+        );
 }
 
-function closedPosition() {
-    return Math.max(
+function getClosedPosition() {
+    return (
         sheetHeight.value +
-            SHEET_SETTINGS.closedOffset,
-
-        window.innerHeight +
-            SHEET_SETTINGS.closedOffset
+        SHEET_SETTINGS.closedOffset
     );
 }
 
 /*
 |--------------------------------------------------------------------------
-| Page scroll locking
+| Page scroll
 |--------------------------------------------------------------------------
 */
 
 function lockPageScroll() {
+    if (
+        pageScrollIsLocked
+    ) {
+        return;
+    }
+
+    pageScrollIsLocked =
+        true;
+
+    lockedScrollY =
+        window.scrollY;
+
     previousBodyOverflow =
-        document.body.style.overflow;
+        document.body.style
+            .overflow;
 
     previousHtmlOverflow =
         document.documentElement
             .style
             .overflow;
 
-    document.body.style.overflow =
-        'hidden';
+    previousBodyPosition =
+        document.body.style
+            .position;
+
+    previousBodyTop =
+        document.body.style
+            .top;
+
+    previousBodyWidth =
+        document.body.style
+            .width;
 
     document.documentElement
         .style
         .overflow =
         'hidden';
+
+    document.body.style.overflow =
+        'hidden';
+
+    document.body.style.position =
+        'fixed';
+
+    document.body.style.top =
+        `-${lockedScrollY}px`;
+
+    document.body.style.width =
+        '100%';
 }
 
 function unlockPageScroll() {
-    document.body.style.overflow =
-        previousBodyOverflow;
+    if (
+        !pageScrollIsLocked
+    ) {
+        return;
+    }
+
+    pageScrollIsLocked =
+        false;
 
     document.documentElement
         .style
         .overflow =
         previousHtmlOverflow;
+
+    document.body.style.overflow =
+        previousBodyOverflow;
+
+    document.body.style.position =
+        previousBodyPosition;
+
+    document.body.style.top =
+        previousBodyTop;
+
+    document.body.style.width =
+        previousBodyWidth;
+
+    window.scrollTo(
+        0,
+        lockedScrollY
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| Touch listener registration
+|--------------------------------------------------------------------------
+*/
+
+function bindTouchListeners() {
+    const element =
+        sheetElement.value;
+
+    if (
+        !element ||
+        boundTouchElement === element
+    ) {
+        return;
+    }
+
+    unbindTouchListeners();
+
+    boundTouchElement =
+        element;
+
+    element.addEventListener(
+        'touchstart',
+        handleTouchStart,
+        {
+            passive: false,
+            capture: true
+        }
+    );
+
+    element.addEventListener(
+        'touchmove',
+        handleTouchMove,
+        {
+            passive: false,
+            capture: true
+        }
+    );
+
+    element.addEventListener(
+        'touchend',
+        handleTouchEnd,
+        {
+            passive: false,
+            capture: true
+        }
+    );
+
+    element.addEventListener(
+        'touchcancel',
+        handleTouchCancel,
+        {
+            passive: false,
+            capture: true
+        }
+    );
+}
+
+function unbindTouchListeners() {
+    if (
+        !boundTouchElement
+    ) {
+        return;
+    }
+
+    boundTouchElement.removeEventListener(
+        'touchstart',
+        handleTouchStart,
+        true
+    );
+
+    boundTouchElement.removeEventListener(
+        'touchmove',
+        handleTouchMove,
+        true
+    );
+
+    boundTouchElement.removeEventListener(
+        'touchend',
+        handleTouchEnd,
+        true
+    );
+
+    boundTouchElement.removeEventListener(
+        'touchcancel',
+        handleTouchCancel,
+        true
+    );
+
+    boundTouchElement =
+        null;
 }
 
 /*
@@ -403,73 +565,84 @@ function unlockPageScroll() {
 */
 
 async function openSheet() {
+    console.log('BottomSheet openSheet', { rendered: rendered.value, mounted, modelValue: props.modelValue });
+
     clearMotionTimer();
 
-    if (!rendered.value) {
-        translateY.value =
-            window.innerHeight +
-            SHEET_SETTINGS.closedOffset;
+    isClosing.value =
+        false;
 
-        transitionEnabled.value =
-            false;
-
-        rendered.value =
-            true;
-
-        lockPageScroll();
-
-        await nextTick();
-
-        measureSheet();
-
-        translateY.value =
-            closedPosition();
-
-        await nextTick();
-
-        window.requestAnimationFrame(
-            () => {
-                window.requestAnimationFrame(
-                    () => {
-                        const duration =
-                            motionDuration(
-                                SHEET_SETTINGS.openDuration
-                            );
-
-                        currentDuration.value =
-                            duration;
-
-                        transitionEnabled.value =
-                            true;
-
-                        isAnimating.value =
-                            true;
-
-                        translateY.value =
-                            0;
-
-                        finishMotion(
-                            duration,
-                            () => {
-                                isAnimating.value =
-                                    false;
-
-                                transitionEnabled.value =
-                                    false;
-
-                                translateY.value =
-                                    0;
-                            }
-                        );
-                    }
-                );
-            }
-        );
+    if (
+        rendered.value
+    ) {
+        snapOpen();
 
         return;
     }
 
-    snapOpen();
+    rendered.value =
+        true;
+
+    transitionEnabled.value =
+        false;
+
+    isAnimating.value =
+        false;
+
+    translateY.value =
+        window.innerHeight +
+        SHEET_SETTINGS.closedOffset;
+
+    lockPageScroll();
+
+    await nextTick();
+
+    bindTouchListeners();
+    measureSheet();
+
+    translateY.value =
+        getClosedPosition();
+
+    await nextTick();
+
+    window.requestAnimationFrame(
+        () => {
+            window.requestAnimationFrame(
+                () => {
+                    const duration =
+                        getMotionDuration(
+                            SHEET_SETTINGS.openDuration
+                        );
+
+                    currentDuration.value =
+                        duration;
+
+                    transitionEnabled.value =
+                        true;
+
+                    isAnimating.value =
+                        true;
+
+                    translateY.value =
+                        0;
+
+                    finishMotion(
+                        duration,
+                        () => {
+                            isAnimating.value =
+                                false;
+
+                            transitionEnabled.value =
+                                false;
+
+                            translateY.value =
+                                0;
+                        }
+                    );
+                }
+            );
+        }
+    );
 }
 
 /*
@@ -488,13 +661,16 @@ function resetGestureState() {
     gestureStartedInContent.value =
         false;
 
+    gestureStartedOnHandle.value =
+        false;
+
     gestureVelocity.value =
         0;
 
     activeTouchIdentifier.value =
         null;
 
-    mousePointerId.value =
+    activePointerId.value =
         null;
 
     isDragging.value =
@@ -513,8 +689,12 @@ function finishClose(
     clearMotionTimer();
 
     resetGestureState();
+    unbindTouchListeners();
 
     isAnimating.value =
+        false;
+
+    isClosing.value =
         false;
 
     transitionEnabled.value =
@@ -523,20 +703,33 @@ function finishClose(
     rendered.value =
         false;
 
+    translateY.value =
+        0;
+
     unlockPageScroll();
 
-    if (!shouldEmit) {
+    if (
+        !shouldEmit
+    ) {
         return;
     }
 
-    emit(
-        'update:modelValue',
-        false
-    );
+    try {
+        emit(
+            'update:modelValue',
+            false
+        );
+    } catch {
+        // ignore
+    }
 
-    emit(
-        'close'
-    );
+    try {
+        emit(
+            'close'
+        );
+    } catch {
+        // ignore
+    }
 }
 
 function animateClose(
@@ -544,12 +737,7 @@ function animateClose(
 ) {
     if (
         !rendered.value ||
-        (
-            isAnimating.value &&
-            translateY.value >
-                sheetHeight.value *
-                    0.8
-        )
+        isClosing.value
     ) {
         return;
     }
@@ -558,7 +746,11 @@ function animateClose(
 
     measureSheet();
 
-    resetGestureState();
+    isClosing.value =
+        true;
+
+    isAnimating.value =
+        true;
 
     const currentPosition =
         Math.max(
@@ -566,16 +758,16 @@ function animateClose(
             0
         );
 
-    const remaining =
+    const remainingDistance =
         Math.max(
-            closedPosition() -
+            getClosedPosition() -
                 currentPosition,
             0
         );
 
-    const ratio =
+    const remainingRatio =
         Math.min(
-            remaining /
+            remainingDistance /
                 Math.max(
                     sheetHeight.value,
                     1
@@ -587,13 +779,15 @@ function animateClose(
         Math.max(
             160,
             SHEET_SETTINGS.closeDuration *
-                ratio
+                remainingRatio
         );
 
     const duration =
-        motionDuration(
+        getMotionDuration(
             calculatedDuration
         );
+
+    resetGestureState();
 
     currentDuration.value =
         duration;
@@ -601,11 +795,8 @@ function animateClose(
     transitionEnabled.value =
         true;
 
-    isAnimating.value =
-        true;
-
     translateY.value =
-        closedPosition();
+        getClosedPosition();
 
     finishMotion(
         duration,
@@ -618,9 +809,25 @@ function animateClose(
 }
 
 function requestClose() {
+    if (
+        !rendered.value
+    ) {
+        return;
+    }
+
     animateClose(
         true
     );
+}
+
+function forceOpen() {
+    if (
+        rendered.value
+    ) {
+        return;
+    }
+
+    openSheet();
 }
 
 /*
@@ -630,7 +837,16 @@ function requestClose() {
 */
 
 function snapOpen() {
+    if (
+        !rendered.value
+    ) {
+        return;
+    }
+
     clearMotionTimer();
+
+    isClosing.value =
+        false;
 
     const distance =
         Math.max(
@@ -638,7 +854,7 @@ function snapOpen() {
             0
         );
 
-    const ratio =
+    const distanceRatio =
         Math.min(
             distance /
                 Math.max(
@@ -650,15 +866,17 @@ function snapOpen() {
 
     const calculatedDuration =
         Math.max(
-            180,
+            170,
             SHEET_SETTINGS.snapDuration *
-                ratio
+                distanceRatio
         );
 
     const duration =
-        motionDuration(
+        getMotionDuration(
             calculatedDuration
         );
+
+    resetGestureState();
 
     currentDuration.value =
         duration;
@@ -668,8 +886,6 @@ function snapOpen() {
 
     isAnimating.value =
         true;
-
-    resetGestureState();
 
     translateY.value =
         0;
@@ -707,14 +923,45 @@ function handleBackdropClick() {
 
 /*
 |--------------------------------------------------------------------------
-| Drag helpers
+| Drag target helpers
 |--------------------------------------------------------------------------
 */
 
-function isMobileDragViewport() {
+function isDragViewportAllowed() {
     return (
         window.innerWidth <=
         SHEET_SETTINGS.dragMaximumViewportWidth
+    );
+}
+
+function targetIsDragHandle(
+    target
+) {
+    if (
+        !(target instanceof Element)
+    ) {
+        return false;
+    }
+
+    return Boolean(
+        target.closest(
+            '[data-sheet-drag-handle]'
+        )
+    );
+}
+
+function targetIsInsideSheet(
+    target
+) {
+    if (
+        !sheetElement.value ||
+        !(target instanceof Node)
+    ) {
+        return false;
+    }
+
+    return sheetElement.value.contains(
+        target
     );
 }
 
@@ -733,6 +980,8 @@ function shouldIgnoreDragTarget(
                 'input',
                 'textarea',
                 'select',
+                'button',
+                'a',
                 '[contenteditable="true"]',
                 '[data-sheet-no-drag]'
             ].join(', ')
@@ -740,22 +989,9 @@ function shouldIgnoreDragTarget(
     );
 }
 
-function targetIsInsideContent(
-    target
+function rubberBand(
+    distance
 ) {
-    if (
-        !contentElement.value ||
-        !(target instanceof Node)
-    ) {
-        return false;
-    }
-
-    return contentElement.value.contains(
-        target
-    );
-}
-
-function rubberBand(distance) {
     if (
         distance >=
         0
@@ -765,15 +1001,19 @@ function rubberBand(distance) {
 
     return -Math.min(
         SHEET_SETTINGS.upwardResistance,
-
         Math.sqrt(
             Math.abs(
                 distance
             )
-        ) *
-            2
+        ) * 2
     );
 }
+
+/*
+|--------------------------------------------------------------------------
+| Gesture logic
+|--------------------------------------------------------------------------
+*/
 
 function startGesture(
     clientY,
@@ -783,7 +1023,8 @@ function startGesture(
     if (
         !props.draggable ||
         isAnimating.value ||
-        !isMobileDragViewport() ||
+        isClosing.value ||
+        !isDragViewportAllowed() ||
         shouldIgnoreDragTarget(
             target
         )
@@ -791,7 +1032,26 @@ function startGesture(
         return false;
     }
 
+    const startedOnHandle =
+        targetIsDragHandle(
+            target
+        );
+
+    const startedInsideSheet =
+        targetIsInsideSheet(
+            target
+        );
+
+    if (
+        !startedOnHandle &&
+        !startedInsideSheet
+    ) {
+        return false;
+    }
+
     measureSheet();
+
+    clearMotionTimer();
 
     gestureSource.value =
         source;
@@ -799,8 +1059,12 @@ function startGesture(
     gestureActivated.value =
         false;
 
+    gestureStartedOnHandle.value =
+        startedOnHandle;
+
     gestureStartedInContent.value =
-        targetIsInsideContent(
+        startedInsideSheet &&
+        contentElement.value?.contains(
             target
         );
 
@@ -829,6 +1093,9 @@ function resetGestureBaseline(
     gestureStartY.value =
         clientY;
 
+    gestureDragAnchorY.value =
+        clientY;
+
     gesturePreviousY.value =
         clientY;
 
@@ -843,7 +1110,9 @@ function updateGesture(
     clientY,
     event
 ) {
-    if (!gestureSource.value) {
+    if (
+        !gestureSource.value
+    ) {
         return;
     }
 
@@ -865,43 +1134,19 @@ function updateGesture(
         movement /
         elapsed;
 
-    if (!gestureActivated.value) {
-        /*
-         * When the gesture starts inside the
-         * scrollable content, normal scrolling
-         * is preserved until the content reaches
-         * its upper edge.
-         */
-
-        if (
-            gestureStartedInContent.value &&
-            (
-                contentElement.value
-                    ?.scrollTop ??
-                0
-            ) >
-                0
-        ) {
-            resetGestureBaseline(
-                clientY,
-                now
-            );
-
-            return;
-        }
-
+    if (
+        !gestureActivated.value
+    ) {
         const initialDistance =
             clientY -
             gestureStartY.value;
 
         /*
          * Upward movement remains normal content
-         * scrolling and does not move the sheet.
+         * scrolling rather than dragging the sheet.
          */
-
         if (
-            initialDistance <=
-            0
+            initialDistance <= 0
         ) {
             resetGestureBaseline(
                 clientY,
@@ -910,6 +1155,13 @@ function updateGesture(
 
             return;
         }
+
+        /*
+         * Prevent the browser from taking ownership
+         * of a downward gesture while the content is
+         * already at its upper edge.
+         */
+        event.preventDefault();
 
         if (
             initialDistance <
@@ -924,8 +1176,6 @@ function updateGesture(
             return;
         }
 
-        clearMotionTimer();
-
         transitionEnabled.value =
             false;
 
@@ -935,27 +1185,17 @@ function updateGesture(
         isDragging.value =
             true;
 
-        /*
-         * Remove the activation threshold from
-         * the visible movement so the sheet does
-         * not suddenly jump.
-         */
-
         gestureDragAnchorY.value =
-            clientY -
-            (
-                initialDistance -
-                SHEET_SETTINGS.gestureActivationDistance
-            );
+            gestureStartY.value;
     }
 
     event.preventDefault();
 
     gestureVelocity.value =
         gestureVelocity.value *
-            0.7 +
+            0.62 +
         instantVelocity *
-            0.3;
+            0.38;
 
     gesturePreviousY.value =
         clientY;
@@ -974,11 +1214,15 @@ function updateGesture(
 }
 
 function finishGesture() {
-    if (!gestureSource.value) {
+    if (
+        !gestureSource.value
+    ) {
         return;
     }
 
-    if (!gestureActivated.value) {
+    if (
+        !gestureActivated.value
+    ) {
         resetGestureState();
 
         return;
@@ -1015,11 +1259,15 @@ function finishGesture() {
 }
 
 function cancelGesture() {
-    if (!gestureSource.value) {
+    if (
+        !gestureSource.value
+    ) {
         return;
     }
 
-    if (gestureActivated.value) {
+    if (
+        gestureActivated.value
+    ) {
         snapOpen();
 
         return;
@@ -1038,17 +1286,22 @@ function findTouch(
     touchList,
     identifier
 ) {
-    return Array.from(
-        touchList
-    ).find((touch) => {
-        return (
-            touch.identifier ===
-            identifier
-        );
-    }) ?? null;
+    return (
+        Array.from(
+            touchList
+        ).find((touch) => {
+            return (
+                touch.identifier ===
+                identifier
+            );
+        }) ??
+        null
+    );
 }
 
-function handleTouchStart(event) {
+function handleTouchStart(
+    event
+) {
     if (
         event.touches.length !==
         1
@@ -1066,7 +1319,9 @@ function handleTouchStart(event) {
             'touch'
         );
 
-    if (!started) {
+    if (
+        !started
+    ) {
         return;
     }
 
@@ -1074,7 +1329,9 @@ function handleTouchStart(event) {
         touch.identifier;
 }
 
-function handleTouchMove(event) {
+function handleTouchMove(
+    event
+) {
     if (
         gestureSource.value !==
             'touch' ||
@@ -1090,7 +1347,9 @@ function handleTouchMove(event) {
             activeTouchIdentifier.value
         );
 
-    if (!touch) {
+    if (
+        !touch
+    ) {
         return;
     }
 
@@ -1100,10 +1359,14 @@ function handleTouchMove(event) {
     );
 }
 
-function handleTouchEnd(event) {
+function handleTouchEnd(
+    event
+) {
     if (
         gestureSource.value !==
-            'touch'
+            'touch' ||
+        activeTouchIdentifier.value ===
+            null
     ) {
         return;
     }
@@ -1114,7 +1377,9 @@ function handleTouchEnd(event) {
             activeTouchIdentifier.value
         );
 
-    if (!endedTouch) {
+    if (
+        !endedTouch
+    ) {
         return;
     }
 
@@ -1124,7 +1389,7 @@ function handleTouchEnd(event) {
 function handleTouchCancel() {
     if (
         gestureSource.value !==
-            'touch'
+        'touch'
     ) {
         return;
     }
@@ -1138,7 +1403,9 @@ function handleTouchCancel() {
 |--------------------------------------------------------------------------
 */
 
-function handlePointerDown(event) {
+function handlePointerDown(
+    event
+) {
     if (
         event.pointerType !==
             'mouse' ||
@@ -1152,18 +1419,20 @@ function handlePointerDown(event) {
         startGesture(
             event.clientY,
             event.target,
-            'mouse'
+            'pointer'
         );
 
-    if (!started) {
+    if (
+        !started
+    ) {
         return;
     }
 
-    mousePointerId.value =
+    activePointerId.value =
         event.pointerId;
 
     try {
-        event.currentTarget
+        sheetElement.value
             ?.setPointerCapture(
                 event.pointerId
             );
@@ -1172,11 +1441,13 @@ function handlePointerDown(event) {
     }
 }
 
-function handlePointerMove(event) {
+function handlePointerMove(
+    event
+) {
     if (
         gestureSource.value !==
-            'mouse' ||
-        mousePointerId.value !==
+            'pointer' ||
+        activePointerId.value !==
             event.pointerId
     ) {
         return;
@@ -1192,7 +1463,7 @@ function releasePointerCapture(
     event
 ) {
     try {
-        event.currentTarget
+        sheetElement.value
             ?.releasePointerCapture(
                 event.pointerId
             );
@@ -1201,11 +1472,13 @@ function releasePointerCapture(
     }
 }
 
-function handlePointerUp(event) {
+function handlePointerUp(
+    event
+) {
     if (
         gestureSource.value !==
-            'mouse' ||
-        mousePointerId.value !==
+            'pointer' ||
+        activePointerId.value !==
             event.pointerId
     ) {
         return;
@@ -1218,10 +1491,12 @@ function handlePointerUp(event) {
     finishGesture();
 }
 
-function handlePointerCancel(event) {
+function handlePointerCancel(
+    event
+) {
     if (
         gestureSource.value !==
-            'mouse'
+        'pointer'
     ) {
         return;
     }
@@ -1235,11 +1510,13 @@ function handlePointerCancel(event) {
 
 /*
 |--------------------------------------------------------------------------
-| Keyboard
+| Keyboard and resize
 |--------------------------------------------------------------------------
 */
 
-function handleKeydown(event) {
+function handleKeydown(
+    event
+) {
     if (
         event.key !==
             'Escape' ||
@@ -1252,14 +1529,18 @@ function handleKeydown(event) {
     requestClose();
 }
 
-/*
-|--------------------------------------------------------------------------
-| Resize
-|--------------------------------------------------------------------------
-*/
-
 function handleResize() {
-    if (!rendered.value) {
+    if (
+        !rendered.value
+    ) {
+        return;
+    }
+
+    if (
+        isDragging.value
+    ) {
+        snapOpen();
+
         return;
     }
 
@@ -1277,34 +1558,40 @@ watch(
         props.modelValue,
 
     (isOpen) => {
-        if (isOpen) {
+        if (
+            !mounted
+        ) {
+            return;
+        }
+
+        if (
+            isOpen
+        ) {
             openSheet();
 
             return;
         }
 
-        if (rendered.value) {
+        if (
+            rendered.value
+        ) {
             animateClose(
                 false
             );
         }
-    },
-
-    {
-        immediate: true
     }
 );
 
 /*
 |--------------------------------------------------------------------------
-| Global listeners
+| Lifecycle
 |--------------------------------------------------------------------------
 */
 
-if (
-    typeof window !==
-    'undefined'
-) {
+onMounted(() => {
+    mounted =
+        true;
+
     reducedMotion.value =
         window.matchMedia(
             '(prefers-reduced-motion: reduce)'
@@ -1319,11 +1606,21 @@ if (
         'resize',
         handleResize
     );
-}
+
+    if (
+        props.modelValue
+    ) {
+        openSheet();
+    }
+});
 
 onBeforeUnmount(() => {
-    clearMotionTimer();
+    mounted =
+        false;
 
+    clearMotionTimer();
+    resetGestureState();
+    unbindTouchListeners();
     unlockPageScroll();
 
     window.removeEventListener(
@@ -1347,170 +1644,150 @@ onBeforeUnmount(() => {
                 fixed
                 inset-0
                 z-[999]
-                bg-green
+                bg-green/35
                 [will-change:opacity]
             "
-            :style="
-                backdropStyle
-            "
-            @click="
-                handleBackdropClick
-            "
+            :style="backdropStyle"
+            @click="handleBackdropClick"
         />
 
-        <!-- Bottom sheet -->
-        <section
-            v-if="rendered"
-            ref="sheetElement"
-            role="dialog"
-            aria-modal="true"
+    <section
+        v-if="rendered"
+        ref="sheetElement"
+        role="dialog"
+        aria-modal="true"
+        class="
+            fixed
+            inset-x-0
+            bottom-0
+            z-[1000]
+            flex
+            max-h-[92dvh]
+            w-full
+            flex-col
+            overflow-hidden
+            rounded-t-[2.5rem]
+            bg-baige
+            text-green
+            shadow-[var(--shadow-soft)]
+            [backface-visibility:hidden]
+            [will-change:transform]
+            [touch-action:none]
+        "
+        :class="{
+            'select-none':
+                isDragging
+        }"
+        :style="sheetStyle"
+        @click.stop
+        @pointerdown.capture="handlePointerDown"
+        @pointermove.capture="handlePointerMove"
+        @pointerup.capture="handlePointerUp"
+        @pointercancel.capture="handlePointerCancel"
+    >
+        <!--
+            Transparent drag area floating over
+            the beige bottom sheet.
+        -->
+        <div
+            v-if="draggable"
+            data-sheet-drag-handle
             class="
-                fixed
+                absolute
                 inset-x-0
-                bottom-0
-                z-[1000]
+                top-0
+                z-40
                 flex
-                max-h-[92dvh]
-                w-full
-                flex-col
-                overflow-hidden
-                rounded-t-[2.5rem]
-                bg-baige
-                text-green
-                shadow-[var(--shadow-soft)]
-                [backface-visibility:hidden]
-                [will-change:transform]
+                h-14
+                cursor-grab
+                touch-none
+                items-start
+                justify-center
+                bg-transparent
+                pt-4
 
-                md:rounded-t-[40px]
+                active:cursor-grabbing
+
+                xl:hidden
             "
-            :class="{
-                'select-none':
-                    isDragging
-            }"
-            :style="
-                sheetStyle
-            "
-            @click.stop
-            @touchstart="
-                handleTouchStart
-            "
-            @touchmove="
-                handleTouchMove
-            "
-            @touchend="
-                handleTouchEnd
-            "
-            @touchcancel="
-                handleTouchCancel
-            "
-            @pointerdown="
-                handlePointerDown
-            "
-            @pointermove="
-                handlePointerMove
-            "
-            @pointerup="
-                handlePointerUp
-            "
-            @pointercancel="
-                handlePointerCancel
-            "
+            aria-label="Potiahnutím nadol zatvoríte"
         >
-            <!--
-                Mobile handle.
-
-                It floats directly over the sheet.
-                There is no separate wrapper or
-                reserved background row.
-            -->
             <span
                 class="
                     pointer-events-none
-                    absolute
-                    left-1/2
-                    top-4
-                    z-30
                     block
                     h-1.5
                     w-12
-                    -translate-x-1/2
                     rounded-full
-                    bg-green
-                    transition-[transform,opacity]
-                    duration-200
-                    ease-out
+                    bg-green/70
+                    shadow-sm
                     [will-change:transform,opacity]
-
-                    lg:hidden
                 "
-                :style="
-                    handleStyle
+                :style="handleStyle"
+                aria-hidden="true"
+            />
+        </div>
+
+        <!-- Desktop close button -->
+        <button
+            v-if="showCloseButton"
+            type="button"
+            class="
+                absolute
+                right-4
+                top-4
+                z-50
+                flex
+                size-10
+                items-center
+                justify-center
+                rounded-full
+                bg-green
+                text-baige
+                shadow-sm
+                transition
+                duration-200
+
+                hover:scale-105
+
+                active:scale-90
+            "
+            aria-label="Zavrieť"
+            data-sheet-no-drag
+            @pointerdown.stop
+            @click.stop.prevent="requestClose"
+        >
+            <i
+                class="
+                    bi
+                    bi-x-lg
+                    text-sm
                 "
                 aria-hidden="true"
             />
+        </button>
 
-            <!-- Desktop close button -->
-            <button
-                type="button"
-                class="
-                    absolute
-                    right-6
-                    top-5
-                    z-30
-                    hidden
-                    size-10
-                    items-center
-                    justify-center
-                    rounded-full
-                    bg-green
-                    text-baige
-                    transition-all
-                    duration-200
+        <!-- Scrollable content -->
+        <div
+            ref="contentElement"
+            class="
+                min-h-0
+                flex-1
+                overflow-y-auto
+                overscroll-contain
+                px-5
+                pb-[calc(2rem+env(safe-area-inset-bottom))]
+                pt-12
 
-                    hover:bg-green/20
+                sm:px-8
+                sm:pt-14
 
-                    active:scale-90
-
-                    lg:flex
-                "
-                aria-label="Zavrieť"
-                data-sheet-no-drag
-                @pointerdown.stop
-                @click.stop="
-                    requestClose
-                "
-            >
-                <i
-                    class="
-                        bi
-                        bi-x-lg
-                        text-sm
-                    "
-                    aria-hidden="true"
-                />
-            </button>
-
-            <!-- Scrollable content -->
-            <div
-                ref="contentElement"
-                class="
-                    min-h-0
-                    flex-1
-                    overflow-y-auto
-                    overscroll-contain
-                    px-5
-                    pb-[calc(2rem+env(safe-area-inset-bottom))]
-                    pt-9
-
-                    sm:px-8
-                    sm:pt-10
-
-                    lg:px-12
-                    lg:pt-8
-                "
-            >
-                <slot />
-            </div>
-        </section>
+                xl:px-12
+                xl:pt-8
+            "
+        >
+            <slot />
+        </div>
+    </section>
     </Teleport>
 </template>

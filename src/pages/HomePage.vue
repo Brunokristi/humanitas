@@ -594,8 +594,19 @@ function employeePositions(
 }
 
 function openEmployee(employee) {
+    const resolvedEmployee =
+        employee ??
+        orderedEmployees.value?.[0] ??
+        null;
+
+    if (!resolvedEmployee) {
+        return;
+    }
+
+    console.log('openEmployee', resolvedEmployee?.firstName, resolvedEmployee?.lastName);
+
     selectedEmployee.value =
-        employee;
+        resolvedEmployee;
 
     employeeSheetOpen.value =
         true;

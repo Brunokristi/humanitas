@@ -1,5 +1,9 @@
 <script setup>
-import { computed } from 'vue';
+import {
+    computed,
+    ref,
+    watch
+} from 'vue';
 
 import BottomSheet from './BottomSheet.vue';
 
@@ -18,6 +22,8 @@ const props = defineProps({
 const emit = defineEmits([
     'update:modelValue'
 ]);
+
+const bottomSheetRef = ref(null);
 
 const isOpen = computed({
     get() {
@@ -125,6 +131,23 @@ const employeeBio = computed(() => {
     );
 });
 
+watch(
+    () => props.modelValue,
+    (isOpen) => {
+        console.log('EmployeeBottomSheet watch', isOpen, props.employee?.firstName, props.employee?.lastName);
+
+        if (!isOpen) {
+            return;
+        }
+
+        window.requestAnimationFrame(() => {
+            console.log('EmployeeBottomSheet forcing open', !!bottomSheetRef.value);
+            bottomSheetRef.value?.forceOpen?.();
+            bottomSheetRef.value?.openSheet?.();
+        });
+    }
+);
+
 function buildPublicAssetUrl(path) {
     if (!path) {
         return null;
@@ -152,6 +175,7 @@ function buildPublicAssetUrl(path) {
 
 <template>
     <BottomSheet
+        ref="bottomSheetRef"
         v-model="isOpen"
     >
         <div

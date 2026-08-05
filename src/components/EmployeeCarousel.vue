@@ -1076,6 +1076,34 @@ function selectCurrent() {
     );
 }
 
+function selectEmployee(index) {
+    console.log('EmployeeCarousel selectEmployee', index);
+
+    if (
+        index === undefined ||
+        index === null ||
+        index < 0 ||
+        index >= props.items.length
+    ) {
+        return;
+    }
+
+    currentIndex.value =
+        index;
+
+    const employee =
+        props.items[index];
+
+    if (!employee) {
+        return;
+    }
+
+    emit(
+        'select',
+        employee
+    );
+}
+
 watch(
     () =>
         props.items.length,
@@ -1229,11 +1257,14 @@ onBeforeUnmount(() => {
                             relative
                             aspect-[3/4.2]
                             w-full
+                            cursor-pointer
                             overflow-hidden
                             rounded-[2.1rem]
                             bg-baige
                             shadow-[var(--shadow-mid)]
                         "
+                        data-no-drag
+                        @click.stop="selectEmployee(index)"
                         :class="{
                             'scroll-motion':
                                 scrollMotion

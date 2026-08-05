@@ -790,7 +790,7 @@ onUnmounted(() => {
 ::view-transition-image-pair(humanitas-page-surface) {
     isolation: isolate;
     overflow: clip;
-    border-radius: inherit;
+    border-radius: 40px;
 }
 
 ::view-transition-old(humanitas-page-surface),
