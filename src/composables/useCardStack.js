@@ -9,7 +9,7 @@ import {
 
 import { useCardNavigation } from './useCardNavigation';
 
-const OVERVIEW_RADIUS = 32;
+const OVERVIEW_RADIUS = 40;
 const EXPANDED_RADIUS = 40;
 const OVERVIEW_SNAP_DURATION = 320;
 const OVERVIEW_SNAP_EASING =
@@ -18,20 +18,20 @@ const OVERVIEW_SNAP_EASING =
 const MOBILE_OVERVIEW_TRANSFORMS = [
     {
         x: 0,
-        y: 88,
+        y: 120,
         scale: 1,
         zIndex: 30
     },
     {
         x: 0,
-        y: 44,
-        scale: 0.972,
+        y: 60,
+        scale: 0.95,
         zIndex: 20
     },
     {
         x: 0,
         y: 0,
-        scale: 0.944,
+        scale: 0.90,
         zIndex: 10
     }
 ];

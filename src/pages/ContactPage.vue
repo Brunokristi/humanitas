@@ -4,7 +4,8 @@ import {
     onBeforeUnmount,
     onMounted,
     reactive,
-    ref
+    ref,
+    watch
 } from 'vue';
 
 import {
@@ -12,13 +13,9 @@ import {
 } from '../composables/useClinviaPublicSite';
 import { usePageSeo } from '../composables/usePageSeo';
 
-import {
-    useScrollMotion
-} from '../composables/useScrollMotion';
-
 import Button from '../components/Button.vue';
 
-defineProps({
+const props = defineProps({
     expanded: {
         type: Boolean,
         default: false
@@ -31,11 +28,6 @@ const {
     error,
     load
 } = useClinviaPublicSite();
-
-const {
-    motionRoot,
-    motionStyle
-} = useScrollMotion();
 
 usePageSeo({
     pageKey: 'contact',
@@ -433,40 +425,6 @@ function linkAttrs(url) {
         rel: 'noopener noreferrer'
     };
 }
-
-/*
- * Scroll motion
- */
-
-function contactCardBaseRotation(index) {
-    const rotations = [
-        -1.2,
-        0.9,
-        -0.6,
-        1.1,
-        -0.8
-    ];
-
-    return rotations[
-        index %
-        rotations.length
-    ];
-}
-
-function contactCardMotionStyle(index) {
-    return motionStyle(
-        contactCardBaseRotation(
-            index
-        )
-    );
-}
-
-function formCardMotionStyle() {
-    return motionStyle(
-        -0.1
-    );
-}
-
 
 /*
  * Animated message suggestion
@@ -1088,13 +1046,28 @@ async function submit() {
  * Lifecycle
  */
 
+watch(
+    () => props.expanded,
+    (isExpanded) => {
+        if (isExpanded) {
+            startMessageSuggestionAnimation();
+
+            return;
+        }
+
+        stopMessageSuggestionAnimation();
+    }
+);
+
 onMounted(() => {
     form.form_started_at =
         Math.floor(
             Date.now() / 1000
         );
 
-    startMessageSuggestionAnimation();
+    if (props.expanded) {
+        startMessageSuggestionAnimation();
+    }
 });
 
 onBeforeUnmount(() => {
@@ -1104,7 +1077,12 @@ onBeforeUnmount(() => {
 
 <template>
     <div
-        ref="motionRoot"
+        class="
+            relative
+            min-h-full
+            bg-green
+            text-baige
+        "
     >
         <main
             class="
@@ -1113,19 +1091,16 @@ onBeforeUnmount(() => {
                 px-5
                 pb-20
                 pt-5
-                
 
                 lg:px-15
                 lg:pb-28
                 lg:pt-12
-
             "
         >
             <!-- Two-column contact layout -->
             <section
                 class="
                     mx-auto
-                    mt-12
                     grid
                     w-full
                     max-w-6xl
@@ -1172,7 +1147,6 @@ onBeforeUnmount(() => {
 
                     <div
                         class="
-                            scroll-motion
                             min-w-0
                             overflow-hidden
                             rounded-[40px]
@@ -1180,22 +1154,13 @@ onBeforeUnmount(() => {
                             text-green
                             shadow-[var(--shadow-mid)]
 
-                            transition-[box-shadow]
+                            transition-[box-shadow,transform]
                             duration-300
                             ease-[cubic-bezier(0.22,1,0.36,1)]
 
+                            hover:-translate-y-[1px]
                             hover:shadow-[0_22px_48px_rgba(0,0,0,0.12)]
                         "
-                        :style="
-                            formCardMotionStyle()
-                        "
-                        data-scroll-motion
-                        data-motion-seed="0"
-                        data-base-rotation="-0.1"
-                        data-motion-strength="0.68"
-                        data-straighten-strength="0.8"
-                        data-max-y="9"
-                        data-max-scale="0.003"
                     >
                         <!-- Success -->
                         <div
@@ -1846,7 +1811,6 @@ onBeforeUnmount(() => {
                                     : {}
                             "
                             class="
-                                scroll-motion
                                 group
                                 relative
                                 flex
@@ -1871,24 +1835,6 @@ onBeforeUnmount(() => {
                                     ? 'flex-col items-stretch'
                                     : 'items-center'
                             "
-                            :style="
-                                contactCardMotionStyle(
-                                    index
-                                )
-                            "
-                            data-scroll-motion
-                            :data-motion-seed="
-                                index + 1
-                            "
-                            :data-base-rotation="
-                                contactCardBaseRotation(
-                                    index
-                                )
-                            "
-                            data-motion-strength="0.8"
-                            data-straighten-strength="0.94"
-                            data-max-y="10"
-                            data-max-scale="0.004"
                         >
                             <div
                                 class="

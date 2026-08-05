@@ -233,7 +233,20 @@ function pickCompanyIdentifier(company, fieldNames) {
         company?.company,
         company?.company_data,
         company?.companyData,
-        company?.metadata
+        company?.data,
+        company?.data?.company,
+        company?.data?.identification,
+        company?.data?.company_data,
+        company?.data?.companyData,
+        company?.metadata,
+        company?.company?.identification,
+        company?.company?.company,
+        company?.company?.company_data,
+        company?.company?.companyData,
+        company?.data?.company?.identification,
+        company?.data?.company?.company,
+        company?.data?.company?.company_data,
+        company?.data?.company?.companyData
     ]
 
     for (const nestedCandidate of nestedCandidates) {

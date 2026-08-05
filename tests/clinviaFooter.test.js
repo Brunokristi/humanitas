@@ -173,6 +173,33 @@ test('maps nested company identifier fields when ids are not top-level', () => {
     assert.equal(normalized.company.icDph, 'SK4455667788')
 })
 
+test('also reads identifiers from common nested company wrappers', () => {
+    const normalized = normalizeClinviaPublicFooterData({
+        data: {
+            legal_name: 'Wrapped IDs s.r.o.',
+            company: {
+                identification: {
+                    company_ico: '33334444',
+                    company_dic: '5566778899',
+                    company_vat_id: 'SK5566778899'
+                }
+            },
+            branches: [
+                {
+                    id: 2,
+                    name: 'Humanitas'
+                }
+            ]
+        }
+    }, {
+        branchIdentifier: '2'
+    })
+
+    assert.equal(normalized.company.ico, '33334444')
+    assert.equal(normalized.company.dic, '5566778899')
+    assert.equal(normalized.company.icDph, 'SK5566778899')
+})
+
 test('falls back to first branch when selected branch is missing', () => {
     const normalized = normalizeClinviaPublicFooterData(samplePayload, {
         branchIdentifier: '999'

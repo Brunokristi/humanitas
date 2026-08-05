@@ -17,12 +17,15 @@ import { usePageSeo } from '../composables/usePageSeo';
 import {
     useScrollMotion
 } from '../composables/useScrollMotion';
+import {
+    shouldReduceMotionForBrowser
+} from '../utils/browserCompatibility';
 
 import Button from '../components/Button.vue';
 import Card from '../components/Card.vue';
 import ServiceBottomSheet from '../components/ServiceBottomSheet.vue';
 
-defineProps({
+const props = defineProps({
     expanded: {
         type: Boolean,
         default: false
@@ -42,62 +45,40 @@ const {
     publicSiteStore
 );
 
-const scrollMotionEnabled =
+const browserAllowsScrollMotion =
     ref(true);
 
 if (
     typeof navigator !==
-    'undefined'
-) {
-    const userAgent =
-        navigator.userAgent;
-
-    const platform =
+    'undefined' &&
+    shouldReduceMotionForBrowser(
+        navigator.userAgent,
         navigator.platform ??
-        '';
-
-    const maxTouchPoints =
+            '',
         navigator.maxTouchPoints ??
-        0;
-
-    const isIosFamily =
-        /iP(hone|ad|od)/i.test(
-            userAgent
-        ) ||
-        (
-            platform ===
-                'MacIntel' &&
-            maxTouchPoints > 1
-        );
-
-    const isSafariEngine =
-        /Safari/i.test(
-            userAgent
-        ) &&
-        !/CriOS|FxiOS|EdgiOS|OPiOS|Chrome|Chromium/i.test(
-            userAgent
-        );
-
-    /*
-     * iOS Safari can visibly glitch while
-     * combining momentum horizontal scrolling
-     * with per-card transform updates.
-     */
-    if (
-        isIosFamily &&
-        isSafariEngine
-    ) {
-        scrollMotionEnabled.value =
-            false;
-    }
+            0
+    )
+) {
+    browserAllowsScrollMotion.value =
+        false;
 }
 
 /*
- * Horizontal card motion.
+ * Preview cards stay completely still.
  *
- * Each .services-track acts as its own
- * independent scroll source.
+ * The expanded page enables its horizontal
+ * scroll response only after it has mounted.
+ * This gives the View Transition two stable,
+ * matching snapshots instead of capturing
+ * service cards in different motion states.
  */
+const scrollMotionEnabled =
+    computed(() => {
+        return (
+            props.expanded &&
+            browserAllowsScrollMotion.value
+        );
+    });
 
 const {
     motionRoot
@@ -105,9 +86,7 @@ const {
     axis: 'x',
 
     selector:
-        scrollMotionEnabled.value
-            ? '[data-scroll-motion]'
-            : '[data-scroll-motion-disabled]',
+        '[data-scroll-motion]',
 
     sourceSelector:
         '[data-scroll-motion-source]',

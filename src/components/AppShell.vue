@@ -812,7 +812,7 @@ onUnmounted(() => {
 
 html[data-humanitas-transition='open']
 ::view-transition-group(humanitas-page-surface) {
-    animation-duration: 460ms;
+    animation-duration: 520ms;
     animation-timing-function:
         cubic-bezier(
             0.16,
@@ -824,7 +824,7 @@ html[data-humanitas-transition='open']
 
 html[data-humanitas-transition='close']
 ::view-transition-group(humanitas-page-surface) {
-    animation-duration: 420ms;
+    animation-duration: 480ms;
     animation-timing-function:
         cubic-bezier(
             0.22,
@@ -838,7 +838,7 @@ html[data-humanitas-transition='open']
 ::view-transition-old(humanitas-page-surface) {
     animation:
         humanitas-open-old
-        460ms
+        520ms
         linear
         both;
 }
@@ -847,7 +847,7 @@ html[data-humanitas-transition='open']
 ::view-transition-new(humanitas-page-surface) {
     animation:
         humanitas-open-new
-        460ms
+        520ms
         linear
         both;
 }
@@ -856,7 +856,7 @@ html[data-humanitas-transition='close']
 ::view-transition-old(humanitas-page-surface) {
     animation:
         humanitas-close-old
-        420ms
+        480ms
         linear
         both;
 }
@@ -865,7 +865,7 @@ html[data-humanitas-transition='close']
 ::view-transition-new(humanitas-page-surface) {
     animation:
         humanitas-close-new
-        420ms
+        480ms
         linear
         both;
 }
@@ -938,9 +938,87 @@ html[data-humanitas-transition='switch-backward']
         both;
 }
 
+/*
+ * Keep the source snapshot dominant while the
+ * card changes size. The destination layout is
+ * introduced only near the end, avoiding a long
+ * double exposure between two differently reflowed
+ * page layouts.
+ */
+
+
+/*
+ * Page-specific decorative animations must not
+ * advance between the old and new snapshots.
+ */
+html[data-humanitas-transition='open']
+.page-card *,
+html[data-humanitas-transition='close']
+.page-card * {
+    animation-play-state: paused !important;
+}
+
+html[data-humanitas-transition='open']
+::view-transition-old(humanitas-page-menu) {
+    animation:
+        humanitas-menu-old
+        520ms
+        linear
+        both;
+}
+
+html[data-humanitas-transition='open']
+::view-transition-new(humanitas-page-menu) {
+    animation:
+        humanitas-menu-new
+        520ms
+        linear
+        both;
+}
+
+html[data-humanitas-transition='close']
+::view-transition-old(humanitas-page-menu) {
+    animation:
+        humanitas-menu-old
+        480ms
+        linear
+        both;
+}
+
+html[data-humanitas-transition='close']
+::view-transition-new(humanitas-page-menu) {
+    animation:
+        humanitas-menu-new
+        480ms
+        linear
+        both;
+}
+
+@keyframes humanitas-menu-old {
+    0%,
+    68% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes humanitas-menu-new {
+    0%,
+    62% {
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 1;
+    }
+}
+
 @keyframes humanitas-open-old {
     0%,
-    52% {
+    70% {
         opacity: 1;
     }
 
@@ -951,11 +1029,10 @@ html[data-humanitas-transition='switch-backward']
 
 @keyframes humanitas-open-new {
     0%,
-    24% {
+    64% {
         opacity: 0;
     }
 
-    76%,
     100% {
         opacity: 1;
     }
@@ -963,7 +1040,7 @@ html[data-humanitas-transition='switch-backward']
 
 @keyframes humanitas-close-old {
     0%,
-    42% {
+    66% {
         opacity: 1;
     }
 
@@ -974,11 +1051,10 @@ html[data-humanitas-transition='switch-backward']
 
 @keyframes humanitas-close-new {
     0%,
-    18% {
+    60% {
         opacity: 0;
     }
 
-    70%,
     100% {
         opacity: 1;
     }

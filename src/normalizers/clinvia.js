@@ -389,6 +389,16 @@ function pickCompanyIdentifier(company, candidates) {
                 .filter(Boolean)
             : [];
 
+    const nestedCompanyCandidates = [
+        company?.company,
+        company?.data?.company,
+        company?.companyData,
+        company?.company_data,
+        company?.organization,
+        company?.organizationData,
+        company?.organization_data
+    ].filter(Boolean);
+
     const sources = [
         company,
         company?.identification,
@@ -398,6 +408,30 @@ function pickCompanyIdentifier(company, candidates) {
         company?.company?.identification,
         company?.company?.identifiers,
         company?.company?.ids,
+        company?.data,
+        company?.data?.identification,
+        company?.data?.identifiers,
+        company?.data?.ids,
+        company?.company_data,
+        company?.company_data?.identification,
+        company?.company_data?.identifiers,
+        company?.company_data?.ids,
+        ...nestedCompanyCandidates,
+        ...nestedCompanyCandidates
+            .map((nestedCompany) => {
+                return nestedCompany?.identification;
+            })
+            .filter(Boolean),
+        ...nestedCompanyCandidates
+            .map((nestedCompany) => {
+                return nestedCompany?.identifiers;
+            })
+            .filter(Boolean),
+        ...nestedCompanyCandidates
+            .map((nestedCompany) => {
+                return nestedCompany?.ids;
+            })
+            .filter(Boolean),
         ...branchCompanySources,
         ...branchCompanySources
             .map((nestedCompany) => {
