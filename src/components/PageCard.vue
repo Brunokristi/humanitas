@@ -31,6 +31,11 @@ const props = defineProps({
         default: false
     },
 
+    transitioning: {
+        type: Boolean,
+        default: false
+    },
+
     shared: {
         type: Boolean,
         default: false
@@ -410,6 +415,7 @@ function handleControlClick() {
                 <component
                     :is="card.component"
                     :expanded="isExpanded"
+                    :transitioning="transitioning"
                 />
             </div>
         </div>

@@ -52,8 +52,13 @@ html {
   scrollbar-gutter: stable;
 }
 
+html[data-humanitas-transition] {
+  overflow-anchor: none;
+}
+
 body {
   margin: 0;
+  overflow-x: clip;
   min-height: 100dvh;
   font-family: var(--font-body);
   font-weight: 400;
@@ -124,49 +129,8 @@ video {
       transparent 14px);
 }
 
-.page-card {
-  width: min(94vw, 860px);
-  height: auto;
-  min-height: min(74dvh, 760px);
-  backface-visibility: hidden;
-  transform: translateZ(0);
-}
 
-.page-card--overview {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-}
-
-.page-card--transition {
-  position: fixed;
-}
-
-.page-card--expanded,
-.page-card--switch-layer {
-  position: relative;
-  width: 100%;
-  min-height: calc(100dvh - var(--app-header-height, 0px));
-  height: auto;
-}
-
-.page-card--hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.page-preview-layer {
-  pointer-events: none;
-  user-select: none;
-}
-
-@media (max-width: 768px) {
-  .page-card {
-    width: min(95vw, 760px);
-    height: auto;
-    min-height: min(76dvh, 740px);
-  }
-}
+/* Page-card geometry is owned by PageCard.vue. */
 
 @media (prefers-reduced-motion: reduce) {
 

@@ -138,6 +138,10 @@ function setExpandedCardElement(
                     !stack.state
                         .interactionLocked
                 "
+                :transitioning="
+                    stack.state
+                        .interactionLocked
+                "
                 :shared="
                     stack.state
                         .sharedPageId ===
@@ -167,6 +171,10 @@ function setExpandedCardElement(
                 variant="expanded"
                 :interactive="
                     !stack.state
+                        .interactionLocked
+                "
+                :transitioning="
+                    stack.state
                         .interactionLocked
                 "
                 :shared="

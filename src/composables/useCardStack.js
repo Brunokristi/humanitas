@@ -12,7 +12,10 @@ import { useCardNavigation } from './useCardNavigation';
 const OVERVIEW_RADIUS = 40;
 const EXPANDED_RADIUS = 40;
 const OVERVIEW_SNAP_DURATION = 320;
+const SHELL_TRANSITION_DURATION = 520;
 const OVERVIEW_SNAP_EASING =
+    'cubic-bezier(0.22, 1, 0.36, 1)';
+const SHELL_TRANSITION_EASING =
     'cubic-bezier(0.22, 1, 0.36, 1)';
 
 const MOBILE_OVERVIEW_TRANSFORMS = [
@@ -158,9 +161,6 @@ function createCardStack({
 
     const pageScrollPositions =
         new Map();
-
-    let activeViewTransition =
-        null;
 
     let suppressRouteSync =
         false;
@@ -449,7 +449,8 @@ function createCardStack({
             interactive:
                 !state.interactionLocked,
             transitionMs:
-                overviewDragging.value ||
+                state.interactionLocked ||
+                    overviewDragging.value ||
                     reducedMotion.value
                     ? 0
                     : OVERVIEW_SNAP_DURATION,
@@ -535,49 +536,6 @@ function createCardStack({
         });
     }
 
-    function setTransitionType(type) {
-        state.transitionType =
-            type;
-
-        if (type) {
-            document.documentElement
-                .dataset
-                .humanitasTransition =
-                type;
-
-            return;
-        }
-
-        delete document
-            .documentElement
-            .dataset
-            .humanitasTransition;
-    }
-
-    function supportsViewTransitions() {
-        return (
-            typeof document
-                .startViewTransition ===
-            'function'
-        );
-    }
-
-    function stopActiveViewTransition() {
-        if (!activeViewTransition) {
-            return;
-        }
-
-        try {
-            activeViewTransition
-                .skipTransition?.();
-        } catch {
-            // The transition may already be complete.
-        }
-
-        activeViewTransition =
-            null;
-    }
-
     async function pushRoute(path) {
         if (
             !path ||
@@ -600,6 +558,216 @@ function createCardStack({
         }
     }
 
+    function waitForFrames(count = 1) {
+        return new Promise((resolve) => {
+            const next = () => {
+                if (count <= 0) {
+                    resolve();
+
+                    return;
+                }
+
+                count -= 1;
+                window.requestAnimationFrame(next);
+            };
+
+            next();
+        });
+    }
+
+    function hideElement(element) {
+        if (!element) {
+            return;
+        }
+
+        element.style.visibility =
+            'hidden';
+    }
+
+    function showElement(element) {
+        if (!element) {
+            return;
+        }
+
+        element.style.visibility =
+            '';
+    }
+
+    function createTransitionShell(
+        sourceElement,
+        {
+            rectOverride = null
+        } = {}
+    ) {
+        if (!sourceElement) {
+            return null;
+        }
+
+        const sourceRect =
+            rectOverride ??
+            normalizeRect(
+                sourceElement
+                    .getBoundingClientRect()
+            );
+
+        if (!sourceRect) {
+            return null;
+        }
+
+        const shell =
+            sourceElement.cloneNode(
+                true
+            );
+
+        shell.setAttribute(
+            'aria-hidden',
+            'true'
+        );
+
+        shell.style.position =
+            'fixed';
+        shell.style.top =
+            `${sourceRect.top}px`;
+        shell.style.left =
+            `${sourceRect.left}px`;
+        shell.style.width =
+            `${sourceRect.width}px`;
+        shell.style.height =
+            `${sourceRect.height}px`;
+        shell.style.minHeight =
+            `${sourceRect.height}px`;
+        shell.style.margin =
+            '0';
+        shell.style.zIndex =
+            '120';
+        shell.style.pointerEvents =
+            'none';
+        shell.style.overflow =
+            'hidden';
+        shell.style.contain =
+            'paint';
+        shell.style.transformOrigin =
+            'top left';
+
+        document.body.appendChild(
+            shell
+        );
+
+        return {
+            element: shell,
+            rect: sourceRect
+        };
+    }
+
+    function getExpandedAnimationRect(
+        expandedElement
+    ) {
+        const expandedRect =
+            normalizeRect(
+                expandedElement
+                    ?.getBoundingClientRect()
+            );
+
+        if (!expandedRect) {
+            return null;
+        }
+
+        const captureContentElement =
+            expandedElement.querySelector(
+                '.page-card__capture-content'
+            );
+
+        const contentHeight =
+            captureContentElement instanceof HTMLElement
+                ? captureContentElement.scrollHeight
+                : expandedElement.scrollHeight;
+
+        const targetHeight =
+            Math.max(
+                expandedRect.height,
+                Math.ceil(
+                    contentHeight ||
+                    expandedRect.height
+                )
+            );
+
+        return {
+            ...expandedRect,
+            height: targetHeight
+        };
+    }
+
+    async function animateTransitionShell(
+        shell,
+        {
+            previewRect,
+            expandedRect,
+            opening
+        }
+    ) {
+        if (
+            !shell ||
+            !previewRect ||
+            !expandedRect
+        ) {
+            return;
+        }
+
+        const translateX =
+            previewRect.left -
+            expandedRect.left;
+        const translateY =
+            previewRect.top -
+            expandedRect.top;
+        const scaleX =
+            previewRect.width /
+            expandedRect.width;
+        const scaleY =
+            previewRect.height /
+            expandedRect.height;
+        const radiusScale =
+            (scaleX + scaleY) /
+            2;
+
+        const fromKeyframe = {
+            transform: [
+                `translate3d(${translateX}px, ${translateY}px, 0)`,
+                `scale(${scaleX}, ${scaleY})`
+            ].join(' '),
+            borderRadius:
+                `${OVERVIEW_RADIUS / Math.max(radiusScale, 0.001)}px`
+        };
+
+        const toKeyframe = {
+            transform:
+                'translate3d(0, 0, 0) scale(1)',
+            borderRadius:
+                `${EXPANDED_RADIUS}px`
+        };
+
+        const animation =
+            shell.animate(
+                opening
+                    ? [
+                        fromKeyframe,
+                        toKeyframe
+                    ]
+                    : [
+                        toKeyframe,
+                        fromKeyframe
+                    ],
+                {
+                    duration:
+                        SHELL_TRANSITION_DURATION,
+                    easing:
+                        SHELL_TRANSITION_EASING,
+                    fill: 'both'
+                }
+            );
+
+        await animation.finished;
+    }
+
     function clearTransitionState() {
         state.interactionLocked =
             false;
@@ -610,13 +778,6 @@ function createCardStack({
         state.captureScrollY =
             0;
         state.captureRect =
-            null;
-
-        setTransitionType(
-            null
-        );
-
-        activeViewTransition =
             null;
     }
 
@@ -648,10 +809,23 @@ function createCardStack({
                 cardId
             );
 
+        const previewElement =
+            overviewCardElements.get(
+                cardId
+            );
+
+        const previewRect =
+            normalizeRect(
+                previewElement
+                    ?.getBoundingClientRect()
+            );
+
+        if (!previewElement || !previewRect) {
+            return;
+        }
+
         state.interactionLocked =
             true;
-        state.sharedPageId =
-            cardId;
         state.captureMode =
             'opening';
         state.captureScrollY =
@@ -659,66 +833,59 @@ function createCardStack({
         state.captureRect =
             getExpandedViewportRect();
 
-        setTransitionType(
-            'open'
-        );
+        state.mode =
+            'expanded';
+        state.activePageId =
+            cardId;
+        state.overviewPageId =
+            cardId;
 
-        const update = async () => {
-            state.mode =
-                'expanded';
-            state.activePageId =
-                cardId;
-            state.overviewPageId =
-                cardId;
+        window.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: 'auto'
+        });
 
-            window.scrollTo({
-                top: 0,
-                left: 0,
-                behavior: 'auto'
-            });
+        await nextTick();
 
-            if (updateRoute) {
-                await pushRoute(
-                    targetPath
-                );
-            }
+        const expandedElement =
+            expandedCardElement.value;
 
-            await nextTick();
-        };
-
-        if (
-            !animate ||
-            reducedMotion.value ||
-            !supportsViewTransitions()
-        ) {
-            await runImmediateUpdate(
-                update
+        let expandedRect =
+            getExpandedAnimationRect(
+                expandedElement
             );
 
+        if (!expandedElement || !expandedRect) {
             clearTransitionState();
 
             return;
         }
 
-        stopActiveViewTransition();
+        if (
+            state.captureRect &&
+            expandedRect.height >
+            state.captureRect.height
+        ) {
+            state.captureRect = {
+                ...state.captureRect,
+                height:
+                    expandedRect.height
+            };
 
-        const transition =
-            document.startViewTransition(
-                update
-            );
+            await nextTick();
 
-        activeViewTransition =
-            transition;
+            expandedRect =
+                getExpandedAnimationRect(
+                    expandedCardElement.value
+                ) ??
+                expandedRect;
+        }
 
-        try {
-            await transition.ready;
-
-            /*
-             * The browser has captured the fixed-height
-             * expanded card. The real DOM can now return
-             * to natural document height while the frozen
-             * transition pixels continue animating.
-             */
+        if (
+            !animate ||
+            reducedMotion.value
+        ) {
             state.captureMode =
                 null;
             state.captureRect =
@@ -726,12 +893,61 @@ function createCardStack({
 
             await nextTick();
 
-            await transition.finished;
-        } catch {
-            // A skipped transition still leaves the new state active.
-        } finally {
+            if (updateRoute) {
+                await pushRoute(
+                    targetPath
+                );
+            }
+
             clearTransitionState();
+
+            return;
         }
+
+        const shellRecord =
+            createTransitionShell(
+                expandedElement,
+                {
+                    rectOverride:
+                        expandedRect
+                }
+            );
+
+        hideElement(
+            expandedElement
+        );
+
+        try {
+            await waitForFrames(1);
+
+            await animateTransitionShell(
+                shellRecord?.element,
+                {
+                    previewRect,
+                    expandedRect,
+                    opening: true
+                }
+            );
+        } finally {
+            shellRecord?.element?.remove();
+            state.captureMode =
+                null;
+            state.captureRect =
+                null;
+
+            await nextTick();
+            showElement(
+                expandedCardElement.value
+            );
+        }
+
+        if (updateRoute) {
+            await pushRoute(
+                targetPath
+            );
+        }
+
+        clearTransitionState();
     }
 
     async function closeToOverview({
@@ -756,8 +972,6 @@ function createCardStack({
 
         state.interactionLocked =
             true;
-        state.sharedPageId =
-            cardId;
         state.captureMode =
             'closing';
         state.captureScrollY =
@@ -768,74 +982,163 @@ function createCardStack({
         state.overviewPageId =
             cardId;
 
-        setTransitionType(
-            'close'
-        );
-
-        /*
-         * Apply the fixed viewport capture before the old
-         * snapshot is taken. nextTick resolves before the
-         * browser paints another frame, so the user never
-         * sees the temporary capture layout directly.
-         */
         await nextTick();
 
-        const update = async () => {
-            state.mode =
-                'overview';
-            state.activePageId =
-                null;
-            state.captureMode =
-                null;
-            state.captureScrollY =
-                0;
-            state.captureRect =
-                null;
+        const expandedElement =
+            expandedCardElement.value;
 
-            window.scrollTo({
-                top: 0,
-                left: 0,
-                behavior: 'auto'
-            });
+        const expandedRect =
+            normalizeRect(
+                expandedElement
+                    ?.getBoundingClientRect()
+            );
 
+        if (!expandedElement || !expandedRect) {
+            clearTransitionState();
+
+            return;
+        }
+
+        hideElement(
+            expandedElement
+        );
+
+        state.mode =
+            'overview';
+        state.activePageId =
+            null;
+
+        window.scrollTo({
+            top: 0,
+            left: 0,
+            behavior: 'auto'
+        });
+
+        await nextTick();
+        await waitForFrames(2);
+
+        const previewElement =
+            overviewCardElements.get(
+                cardId
+            );
+
+        const previewRect =
+            normalizeRect(
+                previewElement
+                    ?.getBoundingClientRect()
+            );
+
+        if (!previewElement || !previewRect) {
             if (updateRoute) {
                 await pushRoute('/');
             }
-
-            await nextTick();
-        };
-
-        if (
-            !animate ||
-            reducedMotion.value ||
-            !supportsViewTransitions()
-        ) {
-            await runImmediateUpdate(
-                update
-            );
 
             clearTransitionState();
 
             return;
         }
 
-        stopActiveViewTransition();
+        if (
+            animate &&
+            !reducedMotion.value
+        ) {
+            const shellRecord =
+                createTransitionShell(
+                    previewElement
+                );
 
-        const transition =
-            document.startViewTransition(
-                update
+            hideElement(
+                previewElement
             );
 
-        activeViewTransition =
-            transition;
+            try {
+                const shellElement =
+                    shellRecord?.element;
 
-        try {
-            await transition.finished;
-        } catch {
-            // A skipped transition still leaves the overview active.
-        } finally {
-            clearTransitionState();
+                if (shellElement) {
+                    const translateX =
+                        previewRect.left -
+                        expandedRect.left;
+
+                    const translateY =
+                        previewRect.top -
+                        expandedRect.top;
+
+                    const scaleX =
+                        previewRect.width /
+                        expandedRect.width;
+                    const scaleY =
+                        previewRect.height /
+                        expandedRect.height;
+
+                    const inverseScaleX =
+                        1 /
+                        Math.max(
+                            scaleX,
+                            0.001
+                        );
+
+                    const inverseScaleY =
+                        1 /
+                        Math.max(
+                            scaleY,
+                            0.001
+                        );
+
+                    const inverseRadiusScale =
+                        (inverseScaleX + inverseScaleY) /
+                        2;
+
+                    shellElement.style.transform = [
+                        `translate3d(${-translateX}px, ${-translateY}px, 0)`,
+                        `scale(${inverseScaleX}, ${inverseScaleY})`
+                    ].join(' ');
+
+                    shellElement.style.borderRadius =
+                        `${EXPANDED_RADIUS / Math.max(inverseRadiusScale, 0.001)}px`;
+
+                    await waitForFrames(1);
+
+                    const animation =
+                        shellElement.animate(
+                            [
+                                {
+                                    transform: shellElement.style.transform,
+                                    borderRadius: shellElement.style.borderRadius
+                                },
+                                {
+                                    transform: 'translate3d(0, 0, 0) scale(1)',
+                                    borderRadius: `${OVERVIEW_RADIUS}px`
+                                }
+                            ],
+                            {
+                                duration:
+                                    SHELL_TRANSITION_DURATION,
+                                easing:
+                                    SHELL_TRANSITION_EASING,
+                                fill: 'both'
+                            }
+                        );
+
+                    await animation.finished;
+                }
+            } finally {
+                shellRecord?.element?.remove();
+                showElement(
+                    previewElement
+                );
+            }
         }
+
+        if (updateRoute) {
+            await pushRoute('/');
+        }
+
+        clearTransitionState();
+
+        previewElement.focus?.({
+            preventScroll: true
+        });
     }
 
     function getSwitchDirection(
@@ -884,82 +1187,36 @@ function createCardStack({
 
         state.interactionLocked =
             true;
-        state.transitionDirection =
-            getSwitchDirection(
-                currentCardId,
+
+        state.activePageId =
+            targetCardId;
+        state.overviewPageId =
+            targetCardId;
+
+        const targetScroll =
+            pageScrollPositions.get(
                 targetCardId
-            );
-        state.sharedPageId =
-            null;
+            ) ??
+            0;
 
-        setTransitionType(
-            state.transitionDirection >
-                0
-                ? 'switch-forward'
-                : 'switch-backward'
-        );
+        window.scrollTo({
+            top:
+                targetScroll,
+            left: 0,
+            behavior: 'auto'
+        });
 
-        const update = async () => {
-            state.activePageId =
-                targetCardId;
-            state.overviewPageId =
-                targetCardId;
+        await nextTick();
 
-            const targetScroll =
-                pageScrollPositions.get(
+        if (updateRoute) {
+            await pushRoute(
+                cardPath(
                     targetCardId
-                ) ??
-                0;
-
-            window.scrollTo({
-                top:
-                    targetScroll,
-                left: 0,
-                behavior: 'auto'
-            });
-
-            if (updateRoute) {
-                await pushRoute(
-                    cardPath(
-                        targetCardId
-                    )
-                );
-            }
-
-            await nextTick();
-        };
-
-        if (
-            !animate ||
-            reducedMotion.value ||
-            !supportsViewTransitions()
-        ) {
-            await runImmediateUpdate(
-                update
+                )
             );
-
-            clearTransitionState();
-
-            return;
         }
 
-        stopActiveViewTransition();
-
-        const transition =
-            document.startViewTransition(
-                update
-            );
-
-        activeViewTransition =
-            transition;
-
-        try {
-            await transition.finished;
-        } catch {
-            // A skipped transition still commits the target page.
-        } finally {
-            clearTransitionState();
-        }
+        clearTransitionState();
     }
 
     function navigateToPage(
@@ -1401,7 +1658,6 @@ function createCardStack({
 
     onBeforeUnmount(() => {
         stopRouteWatch();
-        stopActiveViewTransition();
 
         reducedMotionQuery
             .removeEventListener(
@@ -1412,10 +1668,6 @@ function createCardStack({
         window.removeEventListener(
             'resize',
             handleResize
-        );
-
-        setTransitionType(
-            null
         );
     });
 

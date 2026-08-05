@@ -19,6 +19,11 @@ const props = defineProps({
     expanded: {
         type: Boolean,
         default: false
+    },
+
+    transitioning: {
+        type: Boolean,
+        default: false
     }
 });
 
@@ -1047,15 +1052,19 @@ async function submit() {
  */
 
 watch(
-    () => props.expanded,
-    (isExpanded) => {
-        if (isExpanded) {
-            startMessageSuggestionAnimation();
-
-            return;
-        }
-
+    [
+        () => props.expanded,
+        () => props.transitioning
+    ],
+    () => {
         stopMessageSuggestionAnimation();
+
+        if (
+            props.expanded &&
+            !props.transitioning
+        ) {
+            startMessageSuggestionAnimation();
+        }
     }
 );
 
@@ -1065,7 +1074,10 @@ onMounted(() => {
             Date.now() / 1000
         );
 
-    if (props.expanded) {
+    if (
+        props.expanded &&
+        !props.transitioning
+    ) {
         startMessageSuggestionAnimation();
     }
 });
@@ -1101,6 +1113,7 @@ onBeforeUnmount(() => {
             <section
                 class="
                     mx-auto
+                    mt-12
                     grid
                     w-full
                     max-w-6xl
