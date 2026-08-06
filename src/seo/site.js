@@ -1,10 +1,14 @@
 export const SITE_NAME = 'Humanitas'
 
+export const SITE_ALTERNATE_NAME = 'Klinicka psychologia Humanitas'
+
 export const SITE_URL = 'https://klinickapsychologiars.sk'
 
 export const SITE_LOCALE = 'sk_SK'
 
 export const PRIMARY_OG_IMAGE_PATH = '/images/humanitas_logo_horizontal.png'
+
+export const STRUCTURED_DATA_LOGO_PATH = '/images/humanitas_logo.png'
 
 export const PUBLIC_ROUTES = Object.freeze({
     home: '/',

@@ -1,6 +1,7 @@
 <script setup>
 import {
     computed,
+    nextTick,
     onBeforeUnmount,
     onMounted,
     reactive,
@@ -12,6 +13,7 @@ import {
     useClinviaPublicSite
 } from '../composables/useClinviaPublicSite';
 import { usePageSeo } from '../composables/usePageSeo';
+
 import {
     useScrollMotion
 } from '../composables/useScrollMotion';
@@ -112,6 +114,29 @@ const submitError =
 
 const messageTextarea =
     ref(null);
+
+/*
+ * One persistent loader object.
+ *
+ * It remains mounted in the same fixed slot while its SVG
+ * state changes from loading to success.
+ */
+
+const statusLoaderObject =
+    ref(null);
+
+const showStatusPanel = computed(() => {
+    return (
+        isSubmitting.value ||
+        submittedSuccessfully.value
+    );
+});
+
+const statusLoaderState = computed(() => {
+    return submittedSuccessfully.value
+        ? 'success'
+        : 'loading';
+});
 
 /*
  * Phone formatting
@@ -228,6 +253,7 @@ const googleMapsEmbedUrl =
             '&z=17&output=embed'
         );
     });
+
 
 const shouldRenderInteractiveMap =
     computed(() => {
@@ -656,6 +682,64 @@ function sendAnotherMessage() {
 
     resetMessageSuggestionAnimation();
 }
+
+function setLoaderObjectState(
+    objectElement,
+    state
+) {
+    if (!objectElement) {
+        return;
+    }
+
+    const validStates = [
+        'loading',
+        'success',
+        'error'
+    ];
+
+    const nextState =
+        validStates.includes(state)
+            ? state
+            : 'loading';
+
+    try {
+        const svgRoot =
+            objectElement
+                .contentDocument
+                ?.documentElement;
+
+        if (!svgRoot) {
+            return;
+        }
+
+        svgRoot.dataset.state =
+            nextState;
+
+        svgRoot.dispatchEvent(
+            new CustomEvent(
+                'loader-state',
+                {
+                    detail:
+                        nextState
+                }
+            )
+        );
+    } catch {
+        // Ignore cross-document access errors.
+    }
+}
+
+function updateStatusLoaderState() {
+    setLoaderObjectState(
+        statusLoaderObject.value,
+        statusLoaderState.value
+    );
+}
+
+function handleStatusLoaderReady() {
+    updateStatusLoaderState();
+}
+
 
 function contactCardBaseRotation(index) {
     const rotations = [
@@ -1095,6 +1179,15 @@ async function submit() {
  */
 
 watch(
+    statusLoaderState,
+    async () => {
+        await nextTick();
+
+        updateStatusLoaderState();
+    }
+);
+
+watch(
     [
         () => props.expanded,
         () => props.transitioning
@@ -1146,22 +1239,26 @@ onBeforeUnmount(() => {
                 w-full
                 px-5
                 pb-20
+                pt-5
 
                 lg:px-15
                 lg:pb-28
+                lg:pt-12
             "
         >
             <!-- Two-column contact layout -->
             <section
                 class="
                     mx-auto
+                    mt-12
                     grid
                     w-full
-                    max-w-7xl
+                    max-w-6xl
                     grid-cols-1
                     items-start
                     space-y-32
                     
+                    lg:mt-16
                     lg:grid-cols-2
                     lg:gap-20
 
@@ -1245,580 +1342,617 @@ onBeforeUnmount(() => {
                     >
                         <div
                             class="
+                                relative
+                                min-h-[34rem]
                                 min-w-0
                                 overflow-hidden
                                 rounded-[40px]
                                 bg-baige
                                 text-green
                                 shadow-[var(--shadow-mid)]
-
+    
                                 transition-[box-shadow,transform]
                                 duration-300
                                 ease-[cubic-bezier(0.22,1,0.36,1)]
-
+    
                                 hover:-translate-y-[1px]
                                 hover:shadow-[0_22px_48px_rgba(0,0,0,0.12)]
                             "
                         >
-                        <!-- Success -->
-                        <div
-                            v-if="
-                                submittedSuccessfully
-                            "
-                            class="
-                                flex
-                                min-h-[34rem]
-                                flex-col
-                                items-center
-                                justify-center
-                                px-6
-                                py-12
-                                text-center
-                            "
-                        >
-                            <div
-                                class="
-                                    success-icon
-                                    flex
-                                    size-14
-                                    items-center
-                                    justify-center
-                                    rounded-full
-                                    bg-green
-                                    text-baige
-                                "
-                            >
-                                <i
+                                <form
                                     class="
-                                        bi
-                                        bi-check-lg
-                                        text-xl
+                                        relative
+                                        min-h-[34rem]
+    
+                                        transition-opacity
+                                        duration-300
+                                        ease-[cubic-bezier(0.22,1,0.36,1)]
                                     "
-                                    aria-hidden="true"
-                                />
-                            </div>
-
-                            <h2
-                                class="
-                                    mt-6
-                                    text-xl
-                                    font-bold
-                                    text-green
-                                "
-                            >
-                                Správa bola odoslaná
-                            </h2>
-
-                            <p
-                                class="
-                                    text-regular
-                                    mt-3
-                                    max-w-md
-                                    leading-[1.65]
-                                    text-green/60
-                                "
-                            >
-                                Ďakujeme za vašu správu.
-                                Ozveme sa vám čo najskôr.
-                            </p>
-
-                            <div
-                                class="
-                                    mt-7
-                                "
-                            >
-                                <Button
-                                    background-image=""
-                                    background-color="#335940"
-                                    text-color="#FBF9F3"
-                                    @click="
-                                        sendAnotherMessage
+                                    :class="
+                                        showStatusPanel
+                                            ? 'pointer-events-none opacity-0'
+                                            : 'opacity-100'
+                                    "
+                                    :aria-hidden="
+                                        showStatusPanel
+                                    "
+                                    :inert="
+                                        showStatusPanel
+                                            ? ''
+                                            : undefined
+                                    "
+                                    :aria-busy="
+                                        isSubmitting
+                                    "
+                                    @submit.prevent="
+                                        submit
                                     "
                                 >
-                                    Poslať ďalšiu správu
-                                </Button>
-                            </div>
-                        </div>
-
-                        <!-- Form -->
-                        <div
-                            v-else
-                        >
-                            <form
-                                class="
-                                    relative
-                                "
-                                :aria-busy="
-                                    isSubmitting
-                                "
-                                @submit.prevent="
-                                    submit
-                                "
-                            >
-                                <!-- Honeypot -->
-                                <div
-                                    class="
-                                        pointer-events-none
-                                        absolute
-                                        left-[-9999px]
-                                        top-[-9999px]
-                                        h-px
-                                        w-px
-                                        overflow-hidden
-                                        opacity-0
-                                    "
-                                    aria-hidden="true"
-                                >
-                                    <label
-                                        for="contact-website"
-                                    >
-                                        Webová stránka
-                                    </label>
-
-                                    <input
-                                        id="contact-website"
-                                        v-model="
-                                            form.website
-                                        "
-                                        type="text"
-                                        name="website"
-                                        tabindex="-1"
-                                        autocomplete="off"
-                                    >
-                                </div>
-
-                                <!-- Name -->
-                                <div
-                                    class="
-                                        flex
-                                        flex-col
-                                        px-6
-                                        pb-3
-                                        pt-5
-                                        gap-2
-                                    "
-                                >
-                                    <label
-                                        for="contact-name"
-                                        class="
-                                            text-regular
-                                            block
-                                            font-bold
-                                            tracking-[0.1em]
-                                        "
-                                    >
-                                        Meno
-                                    </label>
-
-                                    <input
-                                        id="contact-name"
-                                        v-model="
-                                            form.sender_name
-                                        "
-                                        type="text"
-                                        autocomplete="name"
-                                        placeholder="Vaše meno"
-                                        required
-                                        class="
-                                            text-regular
-                                            mt-1.5
-                                            w-full
-                                            border-0
-                                            bg-transparent
-                                            p-0
-                                            text-base
-                                            font-bold
-                                            text-green
-                                            outline-none
-                                            placeholder:font-normal
-                                            placeholder:text-green/30
-                                            focus:ring-0
-                                        "
-                                        :aria-invalid="
-                                            Boolean(
-                                                formErrors.sender_name
-                                            )
-                                        "
-                                    >
-
-                                    <p
-                                        v-if="
-                                            formErrors.sender_name
-                                        "
-                                        class="
-                                            text-regular
-                                            mt-2
-                                            text-sm
-                                            text-red-700
-                                        "
-                                    >
-                                        {{
-                                            formErrors.sender_name
-                                        }}
-                                    </p>
-                                </div>
-
-                                <!-- Email -->
-                                <div
-                                    class="
-                                        border-t
-                                        border-green/10
-                                        flex
-                                        flex-col
-                                        px-6
-                                        pb-3
-                                        pt-5
-                                        gap-2
-                                    "
-                                >
-                                    <label
-                                        for="contact-email"
-                                        class="
-                                            text-regular
-                                            block
-                                            font-bold
-                                            tracking-[0.1em]
-                                        "
-                                    >
-                                        E-mail
-                                    </label>
-
-                                    <input
-                                        id="contact-email"
-                                        v-model="
-                                            form.sender_email
-                                        "
-                                        type="email"
-                                        autocomplete="email"
-                                        placeholder="vas@email.sk"
-                                        required
-                                        class="
-                                            text-regular
-                                            mt-1.5
-                                            w-full
-                                            border-0
-                                            bg-transparent
-                                            p-0
-                                            text-base
-                                            font-bold
-                                            text-green
-                                            outline-none
-                                            placeholder:font-normal
-                                            placeholder:text-green/30
-                                            focus:ring-0
-                                        "
-                                        :aria-invalid="
-                                            Boolean(
-                                                formErrors.sender_email
-                                            )
-                                        "
-                                    >
-
-                                    <p
-                                        v-if="
-                                            formErrors.sender_email
-                                        "
-                                        class="
-                                            text-regular
-                                            mt-2
-                                            text-sm
-                                            text-red-700
-                                        "
-                                    >
-                                        {{
-                                            formErrors.sender_email
-                                        }}
-                                    </p>
-                                </div>
-
-                                <!-- Phone -->
-                                <div
-                                    class="
-                                        border-t
-                                        border-green/10
-                                        flex
-                                        flex-col
-                                        px-6
-                                        pb-3
-                                        pt-5
-                                        gap-2
-                                    "
-                                >
-                                    <label
-                                        for="contact-phone"
-                                        class="
-                                            text-regular
-                                            block
-                                            font-bold
-                                            tracking-[0.1em]
-                                        "
-                                    >
-                                        Telefón
-                                    </label>
-
-                                    <input
-                                        id="contact-phone"
-                                        :value="
-                                            form.sender_phone
-                                        "
-                                        type="tel"
-                                        inputmode="tel"
-                                        autocomplete="tel"
-                                        :placeholder="
-                                            PHONE_SETTINGS.example
-                                        "
-                                        maxlength="24"
-                                        required
-                                        class="
-                                            text-regular
-                                            mt-1.5
-                                            w-full
-                                            border-0
-                                            bg-transparent
-                                            p-0
-                                            text-base
-                                            font-bold
-                                            text-green
-                                            outline-none
-                                            placeholder:font-normal
-                                            placeholder:text-green/30
-                                            focus:ring-0
-                                        "
-                                        :aria-invalid="
-                                            Boolean(
-                                                formErrors.sender_phone
-                                            )
-                                        "
-                                        aria-describedby="
-                                            contact-phone-hint
-                                        "
-                                        @input="
-                                            handlePhoneInput
-                                        "
-                                        @blur="
-                                            handlePhoneBlur
-                                        "
-                                    >
-
-                                    <p
-                                        v-if="
-                                            formErrors.sender_phone
-                                        "
-                                        id="contact-phone-hint"
-                                        class="
-                                            text-regular
-                                            mt-2
-                                            text-sm
-                                            text-red-700
-                                        "
-                                    >
-                                        {{
-                                            formErrors.sender_phone
-                                        }}
-                                    </p>
-                                </div>
-
-                                <!-- Message -->
-                                <div
-                                    class="
-                                        border-t
-                                        border-green/10
-                                        flex
-                                        flex-col
-                                        px-6
-                                        pb-3
-                                        pt-5
-                                        gap-2
-                                    "
-                                >
-                                    <label
-                                        for="contact-message"
-                                        class="
-                                            text-regular
-                                            block
-                                            font-bold
-                                            tracking-[0.1em]
-                                        "
-                                    >
-                                        Správa
-                                    </label>
-
+                                    <!-- Honeypot -->
                                     <div
                                         class="
-                                            relative
-                                            mt-2
+                                            pointer-events-none
+                                            absolute
+                                            left-[-9999px]
+                                            top-[-9999px]
+                                            h-px
+                                            w-px
+                                            overflow-hidden
+                                            opacity-0
+                                        "
+                                        aria-hidden="true"
+                                    >
+                                        <label
+                                            for="contact-website"
+                                        >
+                                            Webová stránka
+                                        </label>
+    
+                                        <input
+                                            id="contact-website"
+                                            v-model="
+                                                form.website
+                                            "
+                                            type="text"
+                                            name="website"
+                                            tabindex="-1"
+                                            autocomplete="off"
+                                        >
+                                    </div>
+    
+                                    <!-- Name -->
+                                    <div
+                                        class="
+                                            flex
+                                            flex-col
+                                            px-6
+                                            pb-3
+                                            pt-5
+                                            gap-2
                                         "
                                     >
-                                        <div
-                                            v-if="
-                                                showMessageSuggestion
-                                            "
+                                        <label
+                                            for="contact-name"
                                             class="
-                                                pointer-events-none
-                                                absolute
-                                                inset-0
-                                                z-10
-                                                overflow-hidden
+                                                text-regular
+                                                block
+                                                font-bold
+                                                tracking-[0.1em]
                                             "
                                         >
-                                            <span
-                                                class="
-                                                    text-regular
-                                                    whitespace-pre-wrap
-                                                    text-base
-                                                    leading-[1.6]
-                                                    text-green/30
-                                                "
-                                            >
-                                                {{ messageSuggestionText
-                                                }}<span
-                                                    class="
-                                                        ml-[1px]
-                                                        inline-block
-                                                        h-[1.05em]
-                                                        w-px
-                                                        translate-y-[0.14em]
-                                                        animate-pulse
-                                                        bg-green/30
-                                                    "
-                                                />
-                                            </span>
-                                        </div>
-
-                                        <textarea
-                                            id="contact-message"
-                                            ref="messageTextarea"
-                                            v-model="form.body"
-                                            rows="1"
-                                            aria-label="Správa"
+                                            Meno
+                                        </label>
+    
+                                        <input
+                                            id="contact-name"
+                                            v-model="
+                                                form.sender_name
+                                            "
+                                            type="text"
+                                            autocomplete="name"
+                                            placeholder="Vaše meno"
                                             required
                                             class="
                                                 text-regular
-                                                relative
-                                                z-0
-                                                min-h-[7rem]
+                                                mt-1.5
                                                 w-full
-                                                resize-none
-                                                overflow-hidden
                                                 border-0
                                                 bg-transparent
                                                 p-0
                                                 text-base
-                                                leading-[1.6]
+                                                font-bold
                                                 text-green
                                                 outline-none
+                                                placeholder:font-normal
+                                                placeholder:text-green/30
                                                 focus:ring-0
                                             "
                                             :aria-invalid="
                                                 Boolean(
-                                                    formErrors.body
+                                                    formErrors.sender_name
                                                 )
                                             "
-                                            @input="
-                                                resizeMessageTextarea
+                                        >
+    
+                                        <p
+                                            v-if="
+                                                formErrors.sender_name
                                             "
-                                            @focus="
-                                                handleMessageFocus
+                                            class="
+                                                text-regular
+                                                mt-2
+                                                text-sm
+                                                text-red-700
+                                            "
+                                        >
+                                            {{
+                                                formErrors.sender_name
+                                            }}
+                                        </p>
+                                    </div>
+    
+                                    <!-- Email -->
+                                    <div
+                                        class="
+                                            border-t
+                                            border-green/10
+                                            flex
+                                            flex-col
+                                            px-6
+                                            pb-3
+                                            pt-5
+                                            gap-2
+                                        "
+                                    >
+                                        <label
+                                            for="contact-email"
+                                            class="
+                                                text-regular
+                                                block
+                                                font-bold
+                                                tracking-[0.1em]
+                                            "
+                                        >
+                                            E-mail
+                                        </label>
+    
+                                        <input
+                                            id="contact-email"
+                                            v-model="
+                                                form.sender_email
+                                            "
+                                            type="email"
+                                            autocomplete="email"
+                                            placeholder="vas@email.sk"
+                                            required
+                                            class="
+                                                text-regular
+                                                mt-1.5
+                                                w-full
+                                                border-0
+                                                bg-transparent
+                                                p-0
+                                                text-base
+                                                font-bold
+                                                text-green
+                                                outline-none
+                                                placeholder:font-normal
+                                                placeholder:text-green/30
+                                                focus:ring-0
+                                            "
+                                            :aria-invalid="
+                                                Boolean(
+                                                    formErrors.sender_email
+                                                )
+                                            "
+                                        >
+    
+                                        <p
+                                            v-if="
+                                                formErrors.sender_email
+                                            "
+                                            class="
+                                                text-regular
+                                                mt-2
+                                                text-sm
+                                                text-red-700
+                                            "
+                                        >
+                                            {{
+                                                formErrors.sender_email
+                                            }}
+                                        </p>
+                                    </div>
+    
+                                    <!-- Phone -->
+                                    <div
+                                        class="
+                                            border-t
+                                            border-green/10
+                                            flex
+                                            flex-col
+                                            px-6
+                                            pb-3
+                                            pt-5
+                                            gap-2
+                                        "
+                                    >
+                                        <label
+                                            for="contact-phone"
+                                            class="
+                                                text-regular
+                                                block
+                                                font-bold
+                                                tracking-[0.1em]
+                                            "
+                                        >
+                                            Telefón
+                                        </label>
+    
+                                        <input
+                                            id="contact-phone"
+                                            :value="
+                                                form.sender_phone
+                                            "
+                                            type="tel"
+                                            inputmode="tel"
+                                            autocomplete="tel"
+                                            :placeholder="
+                                                PHONE_SETTINGS.example
+                                            "
+                                            maxlength="24"
+                                            required
+                                            class="
+                                                text-regular
+                                                mt-1.5
+                                                w-full
+                                                border-0
+                                                bg-transparent
+                                                p-0
+                                                text-base
+                                                font-bold
+                                                text-green
+                                                outline-none
+                                                placeholder:font-normal
+                                                placeholder:text-green/30
+                                                focus:ring-0
+                                            "
+                                            :aria-invalid="
+                                                Boolean(
+                                                    formErrors.sender_phone
+                                                )
+                                            "
+                                            aria-describedby="
+                                                contact-phone-hint
+                                            "
+                                            @input="
+                                                handlePhoneInput
                                             "
                                             @blur="
-                                                handleMessageBlur
+                                                handlePhoneBlur
                                             "
-                                        />
+                                        >
+    
+                                        <p
+                                            v-if="
+                                                formErrors.sender_phone
+                                            "
+                                            id="contact-phone-hint"
+                                            class="
+                                                text-regular
+                                                mt-2
+                                                text-sm
+                                                text-red-700
+                                            "
+                                        >
+                                            {{
+                                                formErrors.sender_phone
+                                            }}
+                                        </p>
                                     </div>
-
-                                    <p
+    
+                                    <!-- Message -->
+                                    <div
+                                        class="
+                                            border-t
+                                            border-green/10
+                                            flex
+                                            flex-col
+                                            px-6
+                                            pb-3
+                                            pt-5
+                                            gap-2
+                                        "
+                                    >
+                                        <label
+                                            for="contact-message"
+                                            class="
+                                                text-regular
+                                                block
+                                                font-bold
+                                                tracking-[0.1em]
+                                            "
+                                        >
+                                            Správa
+                                        </label>
+    
+                                        <div
+                                            class="
+                                                relative
+                                                mt-2
+                                            "
+                                        >
+                                            <div
+                                                v-if="
+                                                    showMessageSuggestion
+                                                "
+                                                class="
+                                                    pointer-events-none
+                                                    absolute
+                                                    inset-0
+                                                    z-10
+                                                    overflow-hidden
+                                                "
+                                            >
+                                                <span
+                                                    class="
+                                                        text-regular
+                                                        whitespace-pre-wrap
+                                                        text-base
+                                                        leading-[1.6]
+                                                        text-green/30
+                                                    "
+                                                >
+                                                    {{ messageSuggestionText
+                                                    }}<span
+                                                        class="
+                                                            ml-[1px]
+                                                            inline-block
+                                                            h-[1.05em]
+                                                            w-px
+                                                            translate-y-[0.14em]
+                                                            animate-pulse
+                                                            bg-green/30
+                                                        "
+                                                    />
+                                                </span>
+                                            </div>
+    
+                                            <textarea
+                                                id="contact-message"
+                                                ref="messageTextarea"
+                                                v-model="form.body"
+                                                rows="1"
+                                                aria-label="Správa"
+                                                required
+                                                class="
+                                                    text-regular
+                                                    relative
+                                                    z-0
+                                                    min-h-[7rem]
+                                                    w-full
+                                                    resize-none
+                                                    overflow-hidden
+                                                    border-0
+                                                    bg-transparent
+                                                    p-0
+                                                    text-base
+                                                    leading-[1.6]
+                                                    text-green
+                                                    outline-none
+                                                    focus:ring-0
+                                                "
+                                                :aria-invalid="
+                                                    Boolean(
+                                                        formErrors.body
+                                                    )
+                                                "
+                                                @input="
+                                                    resizeMessageTextarea
+                                                "
+                                                @focus="
+                                                    handleMessageFocus
+                                                "
+                                                @blur="
+                                                    handleMessageBlur
+                                                "
+                                            />
+                                        </div>
+    
+                                        <p
+                                            v-if="
+                                                formErrors.body
+                                            "
+                                            class="
+                                                text-regular
+                                                mt-2
+                                                text-sm
+                                                text-red-700
+                                            "
+                                        >
+                                            {{
+                                                formErrors.body
+                                            }}
+                                        </p>
+                                    </div>
+    
+                                    <!-- Submit error -->
+                                    <div
                                         v-if="
-                                            formErrors.body
+                                            submitError
                                         "
                                         class="
-                                            text-regular
-                                            mt-2
-                                            text-sm
-                                            text-red-700
+                                            px-6
+                                            py-4
                                         "
                                     >
-                                        {{
-                                            formErrors.body
-                                        }}
-                                    </p>
-                                </div>
-
-                                <!-- Submit error -->
-                                <div
-                                    v-if="
-                                        submitError
-                                    "
-                                    class="
-                                        px-6
-                                        py-4
-                                    "
-                                >
-                                    <p
+                                        <p
+                                            class="
+                                                text-regular
+                                                text-sm
+                                                text-red-700
+                                            "
+                                        >
+                                            {{ submitError }}
+                                        </p>
+                                    </div>
+    
+                                    <!-- Submit -->
+                                    <div
                                         class="
-                                            text-regular
-                                            text-sm
-                                            text-red-700
+                                            flex
+                                            justify-center
+                                            px-6
+                                            py-6
                                         "
                                     >
-                                        {{ submitError }}
-                                    </p>
-                                </div>
-
-                                <!-- Submit -->
+                                        <Button
+                                            type="submit"
+                                            background-image=""
+                                            background-color="#335940"
+                                            text-color="#FBF9F3"
+                                            :disabled="
+                                                isSubmitting
+                                            "
+                                        >
+                                            {{
+                                                isSubmitting
+                                                    ? 'Odosielam…'
+                                                    : 'Odoslať správu'
+                                            }}
+                                        </Button>
+                                    </div>
+                                </form>
+    
+                                <!-- Persistent loading/success panel -->
                                 <div
-                                    class="
-                                        flex
-                                        justify-center
-                                        px-6
-                                        py-6
-                                    "
-                                >
-                                    <Button
-                                        type="submit"
-                                        background-image=""
-                                        background-color="#335940"
-                                        text-color="#FBF9F3"
-                                        :disabled="
-                                            isSubmitting
-                                        "
-                                    >
-                                        {{
-                                            isSubmitting
-                                                ? 'Odosielam…'
-                                                : 'Odoslať správu'
-                                        }}
-                                    </Button>
-                                </div>
-
-                                <div
-                                    v-if="
-                                        isSubmitting
-                                    "
                                     class="
                                         absolute
                                         inset-0
                                         z-30
                                         flex
+                                        min-h-[34rem]
+                                        flex-col
                                         items-center
-                                        justify-center
-                                        bg-baige/95
+                                        bg-baige
+                                        px-6
+                                        pt-10
+                                        text-center
+    
+                                        transition-opacity
+                                        duration-300
+                                        ease-[cubic-bezier(0.22,1,0.36,1)]
                                     "
-                                    aria-label="Odosielanie správy"
+                                    :class="
+                                        showStatusPanel
+                                            ? 'pointer-events-auto opacity-100'
+                                            : 'pointer-events-none opacity-0'
+                                    "
+                                    :aria-hidden="
+                                        !showStatusPanel
+                                    "
                                 >
-                                    <object
-                                        data="/images/logo_animated.svg"
-                                        type="image/svg+xml"
-                                        aria-label="Humanitas"
+                                    <!-- Fixed loader slot: it never moves -->
+                                    <div
                                         class="
-                                            h-auto
+                                            pointer-events-none
+                                            flex
+                                            h-[9rem]
                                             w-[clamp(8rem,18vw,12rem)]
+                                            shrink-0
+                                            items-center
+                                            justify-center
                                         "
                                     >
-                                        Humanitas
-                                    </object>
+                                        <object
+                                            ref="statusLoaderObject"
+                                            data="/humanitas_loader_states.svg"
+                                            type="image/svg+xml"
+                                            :aria-label="
+                                                submittedSuccessfully
+                                                    ? 'Správa odoslaná'
+                                                    : 'Odosielanie správy'
+                                            "
+                                            class="
+                                                h-auto
+                                                w-full
+                                            "
+                                            @load="
+                                                handleStatusLoaderReady
+                                            "
+                                        >
+                                            Humanitas
+                                        </object>
+                                    </div>
+    
+                                    <!-- Reserved text area below the fixed loader -->
+                                    <div
+                                        class="
+                                            flex
+                                            min-h-[15rem]
+                                            w-full
+                                            flex-col
+                                            items-center
+                                            pt-6
+                                        "
+                                    >
+                                        <Transition
+                                            name="success-content"
+                                        >
+                                            <div
+                                                v-if="
+                                                    submittedSuccessfully
+                                                "
+                                                class="
+                                                    flex
+                                                    w-full
+                                                    flex-col
+                                                    items-center
+                                                "
+                                            >
+                                                <h2
+                                                    class="
+                                                        text-xl
+                                                        font-bold
+                                                        text-green
+                                                    "
+                                                >
+                                                    Správa bola odoslaná
+                                                </h2>
+    
+                                                <p
+                                                    class="
+                                                        text-regular
+                                                        mt-3
+                                                        max-w-md
+                                                        leading-[1.65]
+                                                        text-green/60
+                                                    "
+                                                >
+                                                    Ďakujeme za vašu správu.
+                                                    Ozveme sa vám čo najskôr.
+                                                </p>
+    
+                                                <div
+                                                    class="
+                                                        mt-7
+                                                    "
+                                                >
+                                                    <Button
+                                                        background-image=""
+                                                        background-color="#335940"
+                                                        text-color="#FBF9F3"
+                                                        @click="
+                                                            sendAnotherMessage
+                                                        "
+                                                    >
+                                                        Poslať ďalšiu správu
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </Transition>
+                                    </div>
                                 </div>
-                            </form>
-                        </div>
                         </div>
                     </div>
                 </section>
@@ -1965,11 +2099,11 @@ onBeforeUnmount(() => {
                                     p-4
                                     text-green
                                     shadow-[var(--shadow-soft)]
-
+    
                                     transition-transform
                                     duration-300
                                     ease-[cubic-bezier(0.22,1,0.36,1)]
-
+    
                                     hover:z-20
                                     hover:-translate-y-[1px]
                                 "
@@ -2010,7 +2144,7 @@ onBeforeUnmount(() => {
                                             aria-hidden="true"
                                         />
                                     </div>
-
+    
                                     <p
                                         class="
                                             min-w-0
@@ -2031,7 +2165,7 @@ onBeforeUnmount(() => {
                                                 )
                                             }}
                                         </span>
-
+    
                                         <a
                                             v-if="
                                                 contact.type ===
@@ -2058,7 +2192,7 @@ onBeforeUnmount(() => {
                                                 contact.value
                                             }}
                                         </a>
-
+    
                                         <span
                                             v-else
                                             class="
@@ -2076,7 +2210,7 @@ onBeforeUnmount(() => {
                                         </span>
                                     </p>
                                 </div>
-
+    
                                 <div
                                     v-if="
                                         contact.type ===
@@ -2090,52 +2224,52 @@ onBeforeUnmount(() => {
                                         bg-green/10
                                     "
                                 >
-                                    <iframe
-                                        v-if="
-                                            shouldRenderInteractiveMap
-                                        "
-                                        :src="
-                                            googleMapsEmbedUrl
-                                        "
-                                        :title="
-                                            `Mapa adresy ${contact.value}`
-                                        "
-                                        class="
-                                            block
-                                            h-64
-                                            w-full
-                                            border-0
+                                                                    <iframe
+                                    v-if="
+                                        shouldRenderInteractiveMap
+                                    "
+                                    :src="
+                                        googleMapsEmbedUrl
+                                    "
+                                    :title="
+                                        `Mapa adresy ${contact.value}`
+                                    "
+                                    class="
+                                        block
+                                        h-64
+                                        w-full
+                                        border-0
 
-                                            lg:h-72
+                                        lg:h-72
+                                    "
+                                    loading="lazy"
+                                    allowfullscreen
+                                    referrerpolicy="no-referrer-when-downgrade"
+                                />
+
+                                <div
+                                    v-else
+                                    class="
+                                        flex
+                                        h-64
+                                        w-full
+                                        items-center
+                                        justify-center
+                                        bg-green/5
+                                        text-green/35
+
+                                        lg:h-72
+                                    "
+                                    aria-hidden="true"
+                                >
+                                    <i
+                                        class="
+                                            bi
+                                            bi-geo-alt
+                                            text-2xl
                                         "
-                                        loading="lazy"
-                                        allowfullscreen
-                                        referrerpolicy="no-referrer-when-downgrade"
                                     />
-
-                                    <div
-                                        v-else
-                                        class="
-                                            flex
-                                            h-64
-                                            w-full
-                                            items-center
-                                            justify-center
-                                            bg-green/5
-                                            text-green/35
-
-                                            lg:h-72
-                                        "
-                                        aria-hidden="true"
-                                    >
-                                        <i
-                                            class="
-                                                bi
-                                                bi-geo-alt
-                                                text-2xl
-                                            "
-                                        />
-                                    </div>
+                                </div>
                                 </div>
                             </component>
                         </div>
@@ -2160,44 +2294,45 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.success-icon {
-    animation:
-        success-pop
-        500ms
-        cubic-bezier(
-            0.34,
-            1.56,
-            0.64,
-            1
-        )
-        both;
+.success-content-enter-active {
+    transition:
+        opacity 500ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform 650ms cubic-bezier(0.16, 1, 0.3, 1),
+        filter 500ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-@keyframes success-pop {
-    from {
-        opacity: 0;
+.success-content-leave-active {
+    transition:
+        opacity 220ms ease,
+        transform 220ms ease,
+        filter 220ms ease;
+}
 
-        transform:
-            scale(0.55)
-            rotate(-12deg);
-    }
+.success-content-enter-from,
+.success-content-leave-to {
+    opacity: 0;
+    filter: blur(5px);
+    transform:
+        translateY(12px)
+        scale(0.98);
+}
 
-    to {
-        opacity: 1;
-
-        transform:
-            scale(1)
-            rotate(0);
-    }
+.success-content-enter-to,
+.success-content-leave-from {
+    opacity: 1;
+    filter: blur(0);
+    transform:
+        translateY(0)
+        scale(1);
 }
 
 @media (
     prefers-reduced-motion:
     reduce
 ) {
-    .success-icon {
-        animation:
-            none;
+    .success-content-enter-active,
+    .success-content-leave-active {
+        transition-duration: 1ms;
     }
 }
 </style>

@@ -565,6 +565,23 @@ watch(
     }
 );
 
+watch(
+    shouldShowLoaderScreen,
+    (isVisible, wasVisible) => {
+        if (!wasVisible || isVisible) {
+            return;
+        }
+
+        window.requestAnimationFrame(() => {
+            window.scrollTo({
+                top: 0,
+                left: 0,
+                behavior: 'auto'
+            });
+        });
+    }
+);
+
 onMounted(() => {
     initializeCookieConsent();
 
@@ -812,13 +829,8 @@ onUnmounted(() => {
                     key="loader-screen"
                     class="
                         app-shell-loader
-                        flex
-                        min-h-[100dvh]
-                        flex-col
-                        items-center
-                        justify-center
                         px-5
-                        py-16
+                        py-6
                     "
                     :aria-label="
                         shouldShowFatalLoadError
@@ -826,31 +838,29 @@ onUnmounted(() => {
                             : 'Načítavanie obsahu'
                     "
                 >
-                    <object
-                        ref="loaderObject"
-                        data="/humanitas_loader_states.svg"
-                        type="image/svg+xml"
-                        aria-label="Humanitas"
-                        class="
-                            h-auto
-                            w-[clamp(10rem,28vw,18rem)]
-                            shrink-0
-                        "
-                        @load="handleLoaderReady"
-                    >
-                        Humanitas
-                    </object>
+                    <div class="app-shell-loader__center">
+                        <object
+                            ref="loaderObject"
+                            data="/humanitas_loader_states.svg"
+                            type="image/svg+xml"
+                            aria-label="Humanitas"
+                            class="
+                                h-auto
+                                w-[clamp(10rem,28vw,18rem)]
+                                shrink-0
+                            "
+                            @load="handleLoaderReady"
+                        >
+                            Humanitas
+                        </object>
+                    </div>
 
                     <div
+                        v-if="shouldShowFatalLoadError"
                         class="
-                            flex
-                            h-48
+                            app-shell-loader__error-slot
                             w-full
                             max-w-xl
-                            shrink-0
-                            items-start
-                            justify-center
-                            pt-1
                         "
                     >
                         <div
@@ -954,10 +964,29 @@ onUnmounted(() => {
 }
 
 .app-shell-loader {
-    position: absolute;
-    inset: 0;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 100dvh;
     z-index: 60;
     background: var(--color-baige);
+}
+
+.app-shell-loader__center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.app-shell-loader__error-slot {
+    position: absolute;
+    left: 50%;
+    top: calc(50% + clamp(5.5rem, 16vw, 8.2rem));
+    transform: translateX(-50%);
 }
 
 .shell-fade-enter-active,

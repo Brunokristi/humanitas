@@ -31,7 +31,7 @@ const props = defineProps({
 
     showCloseButton: {
         type: Boolean,
-        default: false
+        default: true
     }
 });
 
@@ -1736,7 +1736,7 @@ onBeforeUnmount(() => {
                 right-4
                 top-4
                 z-50
-                flex
+                hidden
                 size-10
                 items-center
                 justify-center
@@ -1746,6 +1746,9 @@ onBeforeUnmount(() => {
                 shadow-sm
                 transition
                 duration-200
+                cursor-pointer
+
+                xl:flex
 
                 hover:scale-105
 

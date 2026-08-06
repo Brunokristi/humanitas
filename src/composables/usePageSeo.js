@@ -5,13 +5,15 @@ import { useRoute } from 'vue-router'
 import {
     PAGE_SEO,
     PRIMARY_OG_IMAGE_PATH,
+    SITE_ALTERNATE_NAME,
     SITE_LOCALE,
     SITE_NAME,
     SITE_URL,
     absoluteUrl,
     canonicalUrl,
     filterNullValues,
-    safeValue
+    safeValue,
+    STRUCTURED_DATA_LOGO_PATH
 } from '../seo/site'
 
 import { usePublicSiteStore } from '../stores/publicSite'
@@ -112,7 +114,8 @@ function buildClinicGraph({
     branch,
     contact,
     openingHours,
-    imageUrl
+    imageUrl,
+    logoUrl
 }) {
     const clinicName = safeValue(branch?.name ?? company?.legalName ?? company?.name ?? SITE_NAME)
     const clinicEmail = safeValue(contact?.email ?? contact?.value ?? company?.email ?? branch?.email)
@@ -143,6 +146,7 @@ function buildClinicGraph({
             '@id': `${SITE_URL}/#website`,
             url: SITE_URL,
             name: SITE_NAME,
+            alternateName: SITE_ALTERNATE_NAME,
             inLanguage: 'sk',
             publisher: {
                 '@id': `${SITE_URL}/#clinic`
@@ -153,7 +157,7 @@ function buildClinicGraph({
             '@id': `${SITE_URL}/#clinic`,
             name: clinicName,
             url: SITE_URL,
-            logo: imageUrl,
+            logo: logoUrl,
             image: imageUrl,
             email: clinicEmail || undefined,
             telephone: clinicPhone || undefined,
@@ -237,6 +241,7 @@ export function usePageSeo({
 
     const pageUrl = computed(() => canonicalUrl(page.path))
     const imageUrl = absoluteUrl(PRIMARY_OG_IMAGE_PATH)
+    const logoUrl = absoluteUrl(STRUCTURED_DATA_LOGO_PATH)
 
     const primaryContact = computed(() => {
         return (
@@ -258,7 +263,8 @@ export function usePageSeo({
         branch: currentBranch.value,
         contact: primaryContact.value,
         openingHours: openingHours.value,
-        imageUrl
+        imageUrl,
+        logoUrl
     }))
 
     const applySeo = () => {
@@ -313,6 +319,16 @@ export function usePageSeo({
 
         setManagedTag('meta', `${pageKey}:og:site_name`, {
             property: 'og:site_name',
+            content: SITE_NAME
+        })
+
+        setManagedTag('meta', `${pageKey}:application-name`, {
+            name: 'application-name',
+            content: SITE_NAME
+        })
+
+        setManagedTag('meta', `${pageKey}:apple-mobile-web-app-title`, {
+            name: 'apple-mobile-web-app-title',
             content: SITE_NAME
         })
 

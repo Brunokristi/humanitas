@@ -5,9 +5,11 @@ import { fileURLToPath } from 'node:url'
 import {
     PAGE_SEO,
     PRIMARY_OG_IMAGE_PATH,
+    SITE_ALTERNATE_NAME,
     SITE_NAME,
     SITE_URL,
-    absoluteUrl
+    absoluteUrl,
+    STRUCTURED_DATA_LOGO_PATH
 } from '../src/seo/site.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -93,6 +95,8 @@ function buildMetaTags({ title, description, canonical }) {
     return `
         <meta name="description" content="${escapeHtml(description)}">
         <meta name="robots" content="index,follow">
+        <meta name="application-name" content="${escapeHtml(SITE_NAME)}">
+        <meta name="apple-mobile-web-app-title" content="${escapeHtml(SITE_NAME)}">
         <link rel="canonical" href="${escapeHtml(canonical)}">
         <meta property="og:title" content="${escapeHtml(title)}">
         <meta property="og:description" content="${escapeHtml(description)}">
@@ -108,6 +112,9 @@ function buildMetaTags({ title, description, canonical }) {
 }
 
 function buildJsonLd(canonical, title, description) {
+    const imageUrl = absoluteUrl(PRIMARY_OG_IMAGE_PATH)
+    const logoUrl = absoluteUrl(STRUCTURED_DATA_LOGO_PATH)
+
     return JSON.stringify({
         '@context': 'https://schema.org',
         '@graph': [
@@ -115,14 +122,32 @@ function buildJsonLd(canonical, title, description) {
                 '@type': 'WebSite',
                 '@id': `${SITE_URL}/#website`,
                 url: SITE_URL,
-                name: SITE_NAME
+                name: SITE_NAME,
+                alternateName: SITE_ALTERNATE_NAME,
+                publisher: {
+                    '@id': `${SITE_URL}/#clinic`
+                }
+            },
+            {
+                '@type': 'MedicalClinic',
+                '@id': `${SITE_URL}/#clinic`,
+                name: SITE_NAME,
+                url: SITE_URL,
+                logo: logoUrl,
+                image: imageUrl
             },
             {
                 '@type': 'WebPage',
                 '@id': `${canonical}#webpage`,
                 url: canonical,
                 name: title,
-                description
+                description,
+                isPartOf: {
+                    '@id': `${SITE_URL}/#website`
+                },
+                about: {
+                    '@id': `${SITE_URL}/#clinic`
+                }
             }
         ]
     })
