@@ -296,10 +296,19 @@ function createCardStack({
         const stageRect =
             getStageRect();
 
+        const expandedRect =
+            getExpandedViewportRect();
+
         const isMobile =
             viewportWidth.value <
             768;
 
+        /*
+         * Keep the original card geometry. The visible page
+         * preview is rendered at the final expanded dimensions
+         * and uniformly scaled to cover this independent card
+         * rectangle. Any excess is clipped by the card shell.
+         */
         const cardWidth = isMobile
             ? clamp(
                 stageRect.width -
@@ -328,6 +337,34 @@ function createCardStack({
                 720
             );
 
+        const widthScale =
+            cardWidth /
+            Math.max(
+                expandedRect.width,
+                1
+            );
+
+        const heightScale =
+            cardHeight /
+            Math.max(
+                expandedRect.height,
+                1
+            );
+
+        const surfaceScale =
+            Math.max(
+                widthScale,
+                heightScale
+            );
+
+        const renderedSurfaceWidth =
+            expandedRect.width *
+            surfaceScale;
+
+        const renderedSurfaceHeight =
+            expandedRect.height *
+            surfaceScale;
+
         const transforms =
             getOverviewTransforms();
 
@@ -343,6 +380,23 @@ function createCardStack({
         return {
             cardWidth,
             cardHeight,
+            surfaceWidth:
+                expandedRect.width,
+            surfaceHeight:
+                expandedRect.height,
+            surfaceScale,
+            surfaceOffsetX:
+                (
+                    cardWidth -
+                    renderedSurfaceWidth
+                ) /
+                2,
+            surfaceOffsetY:
+                (
+                    cardHeight -
+                    renderedSurfaceHeight
+                ) /
+                2,
             baseLeft:
                 (
                     stageRect.width -
@@ -431,6 +485,16 @@ function createCardStack({
                 `${metrics.cardWidth}px`,
             height:
                 `${metrics.cardHeight}px`,
+            surfaceWidth:
+                metrics.surfaceWidth,
+            surfaceHeight:
+                metrics.surfaceHeight,
+            surfaceScale:
+                metrics.surfaceScale,
+            surfaceOffsetX:
+                metrics.surfaceOffsetX,
+            surfaceOffsetY:
+                metrics.surfaceOffsetY,
             baseLeft:
                 `${metrics.baseLeft}px`,
             x:
@@ -593,112 +657,335 @@ function createCardStack({
             '';
     }
 
-    function createTransitionShell(
-        sourceElement,
-        {
-            rectOverride = null
-        } = {}
+    function removeDuplicateIds(
+        element
     ) {
-        if (!sourceElement) {
-            return null;
-        }
+        element
+            .querySelectorAll?.(
+                '[id]'
+            )
+            .forEach((child) => {
+                child.removeAttribute(
+                    'id'
+                );
+            });
 
-        const sourceRect =
-            rectOverride ??
-            normalizeRect(
-                sourceElement
-                    .getBoundingClientRect()
-            );
+        element.removeAttribute?.(
+            'id'
+        );
+    }
 
-        if (!sourceRect) {
-            return null;
-        }
+    function stabilizeTransitionClone(
+        element
+    ) {
+        removeDuplicateIds(
+            element
+        );
 
-        const shell =
-            sourceElement.cloneNode(
-                true
-            );
+        element.classList.add(
+            'page-card--transition-clone'
+        );
 
-        shell.setAttribute(
+        element.setAttribute(
             'aria-hidden',
             'true'
         );
 
-        shell.style.position =
-            'fixed';
-        shell.style.top =
-            `${sourceRect.top}px`;
-        shell.style.left =
-            `${sourceRect.left}px`;
-        shell.style.width =
-            `${sourceRect.width}px`;
-        shell.style.height =
-            `${sourceRect.height}px`;
-        shell.style.minHeight =
-            `${sourceRect.height}px`;
-        shell.style.margin =
-            '0';
-        shell.style.zIndex =
-            '120';
-        shell.style.pointerEvents =
-            'none';
-        shell.style.overflow =
-            'hidden';
-        shell.style.contain =
-            'paint';
-        shell.style.transformOrigin =
-            'top left';
+        element.removeAttribute(
+            'tabindex'
+        );
+
+        element.removeAttribute(
+            'role'
+        );
+
+        /*
+         * Embedded documents cannot be cloned as stable
+         * compositor content. Hiding them prevents Safari
+         * from showing a white reload frame inside the card.
+         */
+        element
+            .querySelectorAll(
+                [
+                    'iframe',
+                    'object',
+                    'embed',
+                    'video',
+                    'canvas'
+                ].join(', ')
+            )
+            .forEach((media) => {
+                media.style.visibility =
+                    'hidden';
+                media.style.opacity =
+                    '0';
+            });
+    }
+
+    function createTransitionShell(
+        expandedElement,
+        expandedRect
+    ) {
+        if (
+            !expandedElement ||
+            !expandedRect
+        ) {
+            return null;
+        }
+
+        const shell =
+            expandedElement.cloneNode(
+                true
+            );
+
+        stabilizeTransitionClone(
+            shell
+        );
+
+        Object.assign(
+            shell.style,
+            {
+                position:
+                    'fixed',
+                top:
+                    `${expandedRect.top}px`,
+                left:
+                    `${expandedRect.left}px`,
+                width:
+                    `${expandedRect.width}px`,
+                height:
+                    `${expandedRect.height}px`,
+                minHeight:
+                    `${expandedRect.height}px`,
+                margin:
+                    '0',
+                zIndex:
+                    '2147483000',
+                pointerEvents:
+                    'none',
+                overflow:
+                    'hidden',
+                contain:
+                    'paint',
+                transformOrigin:
+                    'top left',
+                transform:
+                    'translate3d(0, 0, 0) scale(1, 1)',
+                transition:
+                    'none',
+                visibility:
+                    'visible',
+                opacity:
+                    '1',
+                backfaceVisibility:
+                    'hidden',
+                WebkitBackfaceVisibility:
+                    'hidden',
+                willChange:
+                    'transform, border-radius'
+            }
+        );
+
+        const contentElement =
+            shell.querySelector(
+                '.page-card__capture-content'
+            );
+
+        let counterElement =
+            null;
+
+        if (contentElement) {
+            /*
+             * The page may already contain its own transform,
+             * for example the closing scroll-position offset.
+             * Animate a new wrapper around it so that transform
+             * is preserved rather than overwritten.
+             */
+            counterElement =
+                document.createElement(
+                    'div'
+                );
+
+            counterElement.className =
+                'page-card__transition-counter';
+
+            Object.assign(
+                counterElement.style,
+                {
+                    position:
+                        'absolute',
+                    top:
+                        '0',
+                    left:
+                        '0',
+                    width:
+                        `${expandedRect.width}px`,
+                    height:
+                        `${expandedRect.height}px`,
+                    transformOrigin:
+                        'top left',
+                    willChange:
+                        'transform'
+                }
+            );
+
+            contentElement.parentNode
+                ?.insertBefore(
+                    counterElement,
+                    contentElement
+                );
+
+            counterElement.appendChild(
+                contentElement
+            );
+        }
 
         document.body.appendChild(
             shell
         );
 
         return {
-            element: shell,
-            rect: sourceRect
+            element:
+                shell,
+            contentElement:
+                counterElement
         };
     }
 
     function getExpandedAnimationRect(
         expandedElement
     ) {
-        const expandedRect =
-            normalizeRect(
-                expandedElement
-                    ?.getBoundingClientRect()
+        return normalizeRect(
+            expandedElement
+                ?.getBoundingClientRect()
+        );
+    }
+
+    function getCombinedTransitionGeometry({
+        previewRect,
+        expandedRect
+    }) {
+        const scaleX =
+            previewRect.width /
+            Math.max(
+                expandedRect.width,
+                1
             );
 
-        if (!expandedRect) {
-            return null;
-        }
-
-        const captureContentElement =
-            expandedElement.querySelector(
-                '.page-card__capture-content'
-            );
-
-        const contentHeight =
-            captureContentElement instanceof HTMLElement
-                ? captureContentElement.scrollHeight
-                : expandedElement.scrollHeight;
-
-        const targetHeight =
+        const scaleY =
+            previewRect.height /
             Math.max(
                 expandedRect.height,
-                Math.ceil(
-                    contentHeight ||
-                    expandedRect.height
-                )
+                1
             );
 
+        const uniformContentScale =
+            Math.max(
+                scaleX,
+                scaleY
+            );
+
+        const contentOffsetX =
+            (
+                previewRect.width -
+                expandedRect.width *
+                uniformContentScale
+            ) /
+            2;
+
+        const contentOffsetY =
+            (
+                previewRect.height -
+                expandedRect.height *
+                uniformContentScale
+            ) /
+            2;
+
         return {
-            ...expandedRect,
-            height: targetHeight
+            translateX:
+                previewRect.left -
+                expandedRect.left,
+            translateY:
+                previewRect.top -
+                expandedRect.top,
+            scaleX,
+            scaleY,
+            innerTranslateX:
+                contentOffsetX /
+                Math.max(
+                    scaleX,
+                    0.001
+                ),
+            innerTranslateY:
+                contentOffsetY /
+                Math.max(
+                    scaleY,
+                    0.001
+                ),
+            innerScaleX:
+                uniformContentScale /
+                Math.max(
+                    scaleX,
+                    0.001
+                ),
+            innerScaleY:
+                uniformContentScale /
+                Math.max(
+                    scaleY,
+                    0.001
+                )
         };
     }
 
+    function applyTransitionEndpoint(
+        shellRecord,
+        geometry,
+        endpoint
+    ) {
+        if (!shellRecord?.element) {
+            return;
+        }
+
+        if (endpoint === 'preview') {
+            shellRecord.element.style.transform = [
+                `translate3d(${geometry.translateX}px, ${geometry.translateY}px, 0)`,
+                `scale(${geometry.scaleX}, ${geometry.scaleY})`
+            ].join(' ');
+
+            /*
+             * Compensate each axis independently so the
+             * combined outer + inner transform is uniform.
+             * The card may change shape, but text and images
+             * never stretch.
+             */
+            if (shellRecord.contentElement) {
+                shellRecord.contentElement.style.transform = [
+                    `translate3d(${geometry.innerTranslateX}px, ${geometry.innerTranslateY}px, 0)`,
+                    `scale(${geometry.innerScaleX}, ${geometry.innerScaleY})`
+                ].join(' ');
+            }
+
+            shellRecord.element.style.borderRadius =
+                `${OVERVIEW_RADIUS / Math.max(geometry.scaleX, 0.001)}px / ` +
+                `${OVERVIEW_RADIUS / Math.max(geometry.scaleY, 0.001)}px`;
+
+            return;
+        }
+
+        shellRecord.element.style.transform =
+            'translate3d(0, 0, 0) scale(1, 1)';
+
+        shellRecord.element.style.borderRadius =
+            `${EXPANDED_RADIUS}px`;
+
+        if (shellRecord.contentElement) {
+            shellRecord.contentElement.style.transform =
+                'translate3d(0, 0, 0) scale(1, 1)';
+        }
+    }
+
     async function animateTransitionShell(
-        shell,
+        shellRecord,
         {
             previewRect,
             expandedRect,
@@ -706,66 +993,120 @@ function createCardStack({
         }
     ) {
         if (
-            !shell ||
+            !shellRecord?.element ||
             !previewRect ||
             !expandedRect
         ) {
             return;
         }
 
-        const translateX =
-            previewRect.left -
-            expandedRect.left;
-        const translateY =
-            previewRect.top -
-            expandedRect.top;
-        const scaleX =
-            previewRect.width /
-            expandedRect.width;
-        const scaleY =
-            previewRect.height /
-            expandedRect.height;
-        const radiusScale =
-            (scaleX + scaleY) /
-            2;
+        const geometry =
+            getCombinedTransitionGeometry({
+                previewRect,
+                expandedRect
+            });
 
-        const fromKeyframe = {
+        const previewShellKeyframe = {
             transform: [
-                `translate3d(${translateX}px, ${translateY}px, 0)`,
-                `scale(${scaleX}, ${scaleY})`
+                `translate3d(${geometry.translateX}px, ${geometry.translateY}px, 0)`,
+                `scale(${geometry.scaleX}, ${geometry.scaleY})`
             ].join(' '),
             borderRadius:
-                `${OVERVIEW_RADIUS / Math.max(radiusScale, 0.001)}px`
+                `${OVERVIEW_RADIUS / Math.max(geometry.scaleX, 0.001)}px / ` +
+                `${OVERVIEW_RADIUS / Math.max(geometry.scaleY, 0.001)}px`
         };
 
-        const toKeyframe = {
+        const expandedShellKeyframe = {
             transform:
-                'translate3d(0, 0, 0) scale(1)',
+                'translate3d(0, 0, 0) scale(1, 1)',
             borderRadius:
                 `${EXPANDED_RADIUS}px`
         };
 
-        const animation =
-            shell.animate(
+        const previewContentKeyframe = {
+            transform: [
+                `translate3d(${geometry.innerTranslateX}px, ${geometry.innerTranslateY}px, 0)`,
+                `scale(${geometry.innerScaleX}, ${geometry.innerScaleY})`
+            ].join(' ')
+        };
+
+        const expandedContentKeyframe = {
+            transform:
+                'translate3d(0, 0, 0) scale(1, 1)'
+        };
+
+        applyTransitionEndpoint(
+            shellRecord,
+            geometry,
+            opening
+                ? 'preview'
+                : 'expanded'
+        );
+
+        const shellAnimation =
+            shellRecord.element.animate(
                 opening
                     ? [
-                        fromKeyframe,
-                        toKeyframe
+                        previewShellKeyframe,
+                        expandedShellKeyframe
                     ]
                     : [
-                        toKeyframe,
-                        fromKeyframe
+                        expandedShellKeyframe,
+                        previewShellKeyframe
                     ],
                 {
                     duration:
                         SHELL_TRANSITION_DURATION,
                     easing:
                         SHELL_TRANSITION_EASING,
-                    fill: 'both'
+                    fill:
+                        'both'
                 }
             );
 
-        await animation.finished;
+        const animations = [
+            shellAnimation
+        ];
+
+        if (shellRecord.contentElement) {
+            animations.push(
+                shellRecord.contentElement.animate(
+                    opening
+                        ? [
+                            previewContentKeyframe,
+                            expandedContentKeyframe
+                        ]
+                        : [
+                            expandedContentKeyframe,
+                            previewContentKeyframe
+                        ],
+                    {
+                        duration:
+                            SHELL_TRANSITION_DURATION,
+                        easing:
+                            SHELL_TRANSITION_EASING,
+                        fill:
+                            'both'
+                    }
+                )
+            );
+        }
+
+        await Promise.allSettled(
+            animations.map(
+                (animation) => {
+                    return animation.finished;
+                }
+            )
+        );
+
+        applyTransitionEndpoint(
+            shellRecord,
+            geometry,
+            opening
+                ? 'expanded'
+                : 'preview'
+        );
     }
 
     function clearTransitionState() {
@@ -820,7 +1161,10 @@ function createCardStack({
                     ?.getBoundingClientRect()
             );
 
-        if (!previewElement || !previewRect) {
+        if (
+            !previewElement ||
+            !previewRect
+        ) {
             return;
         }
 
@@ -851,35 +1195,18 @@ function createCardStack({
         const expandedElement =
             expandedCardElement.value;
 
-        let expandedRect =
+        const expandedRect =
             getExpandedAnimationRect(
                 expandedElement
             );
 
-        if (!expandedElement || !expandedRect) {
+        if (
+            !expandedElement ||
+            !expandedRect
+        ) {
             clearTransitionState();
 
             return;
-        }
-
-        if (
-            state.captureRect &&
-            expandedRect.height >
-            state.captureRect.height
-        ) {
-            state.captureRect = {
-                ...state.captureRect,
-                height:
-                    expandedRect.height
-            };
-
-            await nextTick();
-
-            expandedRect =
-                getExpandedAnimationRect(
-                    expandedCardElement.value
-                ) ??
-                expandedRect;
         }
 
         if (
@@ -907,11 +1234,26 @@ function createCardStack({
         const shellRecord =
             createTransitionShell(
                 expandedElement,
-                {
-                    rectOverride:
-                        expandedRect
-                }
+                expandedRect
             );
+
+        if (!shellRecord) {
+            clearTransitionState();
+
+            return;
+        }
+
+        const geometry =
+            getCombinedTransitionGeometry({
+                previewRect,
+                expandedRect
+            });
+
+        applyTransitionEndpoint(
+            shellRecord,
+            geometry,
+            'preview'
+        );
 
         hideElement(
             expandedElement
@@ -921,21 +1263,34 @@ function createCardStack({
             await waitForFrames(1);
 
             await animateTransitionShell(
-                shellRecord?.element,
+                shellRecord,
                 {
                     previewRect,
                     expandedRect,
                     opening: true
                 }
             );
-        } finally {
-            shellRecord?.element?.remove();
+
+            /*
+             * Keep the frozen shell visible while the live
+             * page leaves its fixed capture rectangle. The
+             * clone and live page are now pixel-aligned.
+             */
             state.captureMode =
                 null;
             state.captureRect =
                 null;
 
             await nextTick();
+            await waitForFrames(2);
+
+            showElement(
+                expandedCardElement.value
+            );
+
+            await waitForFrames(1);
+        } finally {
+            shellRecord.element.remove();
             showElement(
                 expandedCardElement.value
             );
@@ -983,25 +1338,39 @@ function createCardStack({
             cardId;
 
         await nextTick();
+        await waitForFrames(2);
 
         const expandedElement =
             expandedCardElement.value;
 
         const expandedRect =
-            normalizeRect(
+            getExpandedAnimationRect(
                 expandedElement
-                    ?.getBoundingClientRect()
             );
 
-        if (!expandedElement || !expandedRect) {
+        if (
+            !expandedElement ||
+            !expandedRect
+        ) {
             clearTransitionState();
 
             return;
         }
 
-        hideElement(
-            expandedElement
-        );
+        const shellRecord =
+            animate &&
+                !reducedMotion.value
+                ? createTransitionShell(
+                    expandedElement,
+                    expandedRect
+                )
+                : null;
+
+        if (shellRecord) {
+            hideElement(
+                expandedElement
+            );
+        }
 
         state.mode =
             'overview';
@@ -1028,7 +1397,12 @@ function createCardStack({
                     ?.getBoundingClientRect()
             );
 
-        if (!previewElement || !previewRect) {
+        if (
+            !previewElement ||
+            !previewRect
+        ) {
+            shellRecord?.element?.remove();
+
             if (updateRoute) {
                 await pushRoute('/');
             }
@@ -1038,92 +1412,28 @@ function createCardStack({
             return;
         }
 
-        if (
-            animate &&
-            !reducedMotion.value
-        ) {
-            const shellRecord =
-                createTransitionShell(
-                    previewElement
-                );
-
+        if (shellRecord) {
             hideElement(
                 previewElement
             );
 
             try {
-                const shellElement =
-                    shellRecord?.element;
+                await animateTransitionShell(
+                    shellRecord,
+                    {
+                        previewRect,
+                        expandedRect,
+                        opening: false
+                    }
+                );
 
-                if (shellElement) {
-                    const translateX =
-                        previewRect.left -
-                        expandedRect.left;
+                showElement(
+                    previewElement
+                );
 
-                    const translateY =
-                        previewRect.top -
-                        expandedRect.top;
-
-                    const scaleX =
-                        previewRect.width /
-                        expandedRect.width;
-                    const scaleY =
-                        previewRect.height /
-                        expandedRect.height;
-
-                    const inverseScaleX =
-                        1 /
-                        Math.max(
-                            scaleX,
-                            0.001
-                        );
-
-                    const inverseScaleY =
-                        1 /
-                        Math.max(
-                            scaleY,
-                            0.001
-                        );
-
-                    const inverseRadiusScale =
-                        (inverseScaleX + inverseScaleY) /
-                        2;
-
-                    shellElement.style.transform = [
-                        `translate3d(${-translateX}px, ${-translateY}px, 0)`,
-                        `scale(${inverseScaleX}, ${inverseScaleY})`
-                    ].join(' ');
-
-                    shellElement.style.borderRadius =
-                        `${EXPANDED_RADIUS / Math.max(inverseRadiusScale, 0.001)}px`;
-
-                    await waitForFrames(1);
-
-                    const animation =
-                        shellElement.animate(
-                            [
-                                {
-                                    transform: shellElement.style.transform,
-                                    borderRadius: shellElement.style.borderRadius
-                                },
-                                {
-                                    transform: 'translate3d(0, 0, 0) scale(1)',
-                                    borderRadius: `${OVERVIEW_RADIUS}px`
-                                }
-                            ],
-                            {
-                                duration:
-                                    SHELL_TRANSITION_DURATION,
-                                easing:
-                                    SHELL_TRANSITION_EASING,
-                                fill: 'both'
-                            }
-                        );
-
-                    await animation.finished;
-                }
+                await waitForFrames(1);
             } finally {
-                shellRecord?.element?.remove();
+                shellRecord.element.remove();
                 showElement(
                     previewElement
                 );

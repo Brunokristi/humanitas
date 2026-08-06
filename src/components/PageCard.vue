@@ -87,6 +87,16 @@ const menuLabel = computed(() => {
 });
 
 const displayedControlLabel = computed(() => {
+    /*
+     * Keep the same label on both sides of the frozen
+     * transition. It changes to “Hlavné menu” only after
+     * the movement has finished, avoiding a text swap
+     * inside the animated surface.
+     */
+    if (props.transitioning) {
+        return menuLabel.value;
+    }
+
     return isPreview.value
         ? menuLabel.value
         : 'Hlavné menu';
@@ -202,19 +212,94 @@ const rootStyle = computed(() => {
 });
 
 const contentStyle = computed(() => {
+    if (isPreview.value) {
+        const surfaceWidth =
+            Number(
+                props.visual?.surfaceWidth
+            ) ||
+            1;
+
+        const surfaceHeight =
+            Number(
+                props.visual?.surfaceHeight
+            ) ||
+            1;
+
+        const surfaceScale =
+            Number(
+                props.visual?.surfaceScale
+            ) ||
+            1;
+
+        const surfaceOffsetX =
+            Number(
+                props.visual?.surfaceOffsetX
+            ) ||
+            0;
+
+        const surfaceOffsetY =
+            Number(
+                props.visual?.surfaceOffsetY
+            ) ||
+            0;
+
+        return {
+            position:
+                'absolute',
+            top:
+                `${surfaceOffsetY}px`,
+            left:
+                `${surfaceOffsetX}px`,
+            width:
+                `${surfaceWidth}px`,
+            height:
+                `${surfaceHeight}px`,
+            minHeight:
+                `${surfaceHeight}px`,
+            transform:
+                `translate3d(0, 0, 0) scale(${surfaceScale})`,
+            transformOrigin:
+                'top left'
+        };
+    }
+
     if (
         props.captureMode ===
         'closing'
     ) {
         return {
+            position:
+                'relative',
+            top:
+                '0',
+            left:
+                '0',
+            width:
+                '100%',
+            minHeight:
+                'inherit',
             transform:
-                `translate3d(0, -${Math.max(0, props.captureScrollY)}px, 0)`
+                `translate3d(0, -${Math.max(0, props.captureScrollY)}px, 0)`,
+            transformOrigin:
+                'top left'
         };
     }
 
     return {
+        position:
+            'relative',
+        top:
+            '0',
+        left:
+            '0',
+        width:
+            '100%',
+        minHeight:
+            'inherit',
         transform:
-            'translate3d(0, 0, 0)'
+            'translate3d(0, 0, 0)',
+        transformOrigin:
+            'top left'
     };
 });
 
@@ -433,9 +518,11 @@ function handleControlClick() {
 
 .page-card__capture-content {
     position: relative;
-    width: 100%;
     min-height: inherit;
     transition: none;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    will-change: transform;
 }
 
 .page-card__top-bar {
@@ -512,5 +599,24 @@ function handleControlClick() {
     .page-card-menu {
         transition: none !important;
     }
+}
+</style>
+
+
+<style>
+.page-card--transition-clone,
+.page-card--transition-clone * {
+    animation-play-state: paused !important;
+    transition: none !important;
+    caret-color: transparent !important;
+}
+
+.page-card--transition-clone iframe,
+.page-card--transition-clone object,
+.page-card--transition-clone embed,
+.page-card--transition-clone video,
+.page-card--transition-clone canvas {
+    visibility: hidden !important;
+    opacity: 0 !important;
 }
 </style>
