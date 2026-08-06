@@ -60,8 +60,7 @@ const renderHeavyContent = computed(() => {
 const decorativeMotionEnabled = computed(() => {
     return (
         props.expanded &&
-        !props.transitioning &&
-        !isMobilePerformanceMode.value
+        !props.transitioning
     );
 });
 
@@ -732,8 +731,7 @@ function startHeroPhraseAnimation() {
         heroPhraseTimer !==
             null ||
         !props.expanded ||
-        props.transitioning ||
-        isMobilePerformanceMode.value
+        props.transitioning
     ) {
         return;
     }
@@ -1164,6 +1162,9 @@ onBeforeUnmount(() => {
                             homepageServices
                         "
                         aria-label="Ponúkané služby"
+                        :scroll-motion="
+                            decorativeMotionEnabled
+                        "
                         :auto-play="
                             decorativeMotionEnabled
                         "
@@ -1559,7 +1560,8 @@ onBeforeUnmount(() => {
                             left-1/2
                             top-1/2
                             h-auto
-                            max-w-none
+                            w-[min(100vw,10rem)]
+                            max-w-[34rem]
                             shrink-0
                             -translate-x-1/2
                             -translate-y-1/2

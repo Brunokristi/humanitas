@@ -129,9 +129,6 @@ video {
       transparent 14px);
 }
 
-
-/* Page-card geometry is owned by PageCard.vue. */
-
 @media (prefers-reduced-motion: reduce) {
 
   *,

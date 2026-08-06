@@ -97,8 +97,6 @@ export function useScrollMotion(
     /*
      * Allows the root element itself
      * to participate.
-     *
-     * This is useful for PageCard.vue.
      */
     const includeRoot =
         options.includeRoot ??
@@ -1161,7 +1159,7 @@ export function useScrollMotion(
     function start() {
         if (
             typeof window ===
-                'undefined' ||
+            'undefined' ||
             started ||
             !shouldRun()
         ) {

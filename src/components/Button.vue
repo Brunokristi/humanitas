@@ -1,8 +1,11 @@
 <script setup>
 import {
-    computed,
-    inject
+    computed
 } from 'vue';
+
+import {
+    useRouter
+} from 'vue-router';
 
 const props = defineProps({
     backgroundImage: {
@@ -65,10 +68,8 @@ const emit = defineEmits([
     'click',
 ]);
 
-const navigateToPath = inject(
-    'humanitasNavigateToPath',
-    null
-);
+const router =
+    useRouter();
 
 const isInternalLink = computed(() => {
     if (
@@ -94,15 +95,12 @@ function shouldInterceptInternalClick(event) {
         return false;
     }
 
-    if (typeof navigateToPath !== 'function') {
-        return false;
-    }
-
     if (
         event.metaKey ||
         event.ctrlKey ||
         event.shiftKey ||
-        event.altKey
+        event.altKey ||
+        event.button === 1
     ) {
         return false;
     }
@@ -118,7 +116,10 @@ const handleClick = (event) => {
 
     if (shouldInterceptInternalClick(event)) {
         event.preventDefault();
-        navigateToPath(props.href);
+
+        router.push(
+            props.href
+        );
     }
 
     emit('click', event);

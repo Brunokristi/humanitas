@@ -1,28 +1,29 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { h } from 'vue'
-import { pages } from '../data/pages'
 import { PUBLIC_ROUTES } from '../seo/site'
-
-const EmptyRouteView = {
-    name: 'EmptyRouteView',
-    render() {
-        return h('div', { style: 'display:none;' })
-    }
-}
+import HomePage from '../pages/HomePage.vue'
+import ServicesPage from '../pages/ServicesPage.vue'
+import ContactPage from '../pages/ContactPage.vue'
 
 const routes = [
     {
         path: '/domov',
         redirect: PUBLIC_ROUTES.home
     },
-    ...pages.map((page) => ({
-        path: page.route,
-        name: page.id,
-        component: EmptyRouteView,
-        meta: {
-            cardId: page.id
-        }
-    }))
+    {
+        path: '/',
+        name: 'home',
+        component: HomePage
+    },
+    {
+        path: '/sluzby',
+        name: 'services',
+        component: ServicesPage
+    },
+    {
+        path: '/kontakt',
+        name: 'contact',
+        component: ContactPage
+    }
 ]
 
 export const router = createRouter({

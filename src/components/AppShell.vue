@@ -4,7 +4,6 @@ import {
     nextTick,
     onMounted,
     onUnmounted,
-    provide,
     ref,
     watch
 } from 'vue';
@@ -16,15 +15,12 @@ import {
     useRouter
 } from 'vue-router';
 
-import { pages } from '../data/pages';
 import { useCookieConsent } from '../composables/useCookieConsent';
-import { useCardStack } from '../composables/useCardStack';
 import { usePublicSiteStore } from '../stores/publicSite';
 
 import AppHeader from './AppHeader.vue';
 import AppFooter from './AppFooter.vue';
 import Button from './Button.vue';
-import CardStage from './CardStage.vue';
 import CookieConsentSheet from './CookieConsentSheet.vue';
 
 const route =
@@ -32,6 +28,24 @@ const route =
 
 const router =
     useRouter();
+
+const navigationElement =
+    ref(null);
+
+const navigationButtonElements =
+    ref([]);
+
+const navigationIndicatorStyle =
+    ref({
+        width: '0px',
+        height: '0px',
+        transform:
+            'translate3d(0, 0, 0)',
+        opacity: '0'
+    });
+
+let navigationResizeObserver =
+    null;
 
 const publicSiteStore =
     usePublicSiteStore();
@@ -44,21 +58,20 @@ const {
     publicSiteStore
 );
 
-const stack =
-    useCardStack({
-        pages,
-        router,
-        route
-    });
-
-provide(
-    'humanitasNavigateToPath',
-    (path) => {
-        stack.navigateToPath(
-            path
-        );
+const navigationItems = [
+    {
+        label: 'Domov',
+        path: '/'
+    },
+    {
+        label: 'Služby',
+        path: '/sluzby'
+    },
+    {
+        label: 'Kontakt',
+        path: '/kontakt'
     }
-);
+];
 
 const {
     initializeCookieConsent
@@ -175,15 +188,113 @@ const shouldShowLoaderScreen = computed(() => {
     );
 });
 
-function handleGlobalKeydown(event) {
-    if (
-        event.key ===
-            'Escape' &&
-        stack.mode.value ===
-            'expanded'
-    ) {
-        stack.minimizeCard();
+function isActiveRoute(path) {
+    if (path === '/') {
+        return route.path === '/';
     }
+
+    return (
+        route.path === path ||
+        route.path.startsWith(
+            `${path}/`
+        )
+    );
+}
+
+function navigate(path) {
+    if (route.path === path) {
+        return;
+    }
+
+    router.push(path);
+}
+
+function setNavigationButtonElement(
+    element,
+    index
+) {
+    if (!element) {
+        navigationButtonElements.value[
+            index
+        ] = null;
+
+        return;
+    }
+
+    const root =
+        element.$el ??
+        element;
+
+    navigationButtonElements.value[
+        index
+    ] = root;
+}
+
+function getActiveNavigationIndex() {
+    return navigationItems.findIndex(
+        (item) => {
+            return isActiveRoute(
+                item.path
+            );
+        }
+    );
+}
+
+function updateNavigationIndicator() {
+    const navigation =
+        navigationElement.value;
+
+    const activeIndex =
+        getActiveNavigationIndex();
+
+    const activeButton =
+        navigationButtonElements.value[
+            activeIndex
+        ];
+
+    if (
+        !navigation ||
+        !activeButton
+    ) {
+        navigationIndicatorStyle.value = {
+            ...navigationIndicatorStyle.value,
+            opacity: '0'
+        };
+
+        return;
+    }
+
+    const navigationRect =
+        navigation.getBoundingClientRect();
+
+    const buttonRect =
+        activeButton.getBoundingClientRect();
+
+    navigationIndicatorStyle.value = {
+        width:
+            `${buttonRect.width}px`,
+
+        height:
+            `${buttonRect.height}px`,
+
+        transform: [
+            'translate3d(',
+            `${buttonRect.left - navigationRect.left}px, `,
+            `${buttonRect.top - navigationRect.top}px, `,
+            '0)'
+        ].join(''),
+
+        opacity:
+            '1'
+    };
+}
+
+async function refreshNavigationIndicator() {
+    await nextTick();
+
+    window.requestAnimationFrame(() => {
+        updateNavigationIndicator();
+    });
 }
 
 function getLoaderSvgRoot() {
@@ -444,6 +555,16 @@ watch(
     }
 );
 
+watch(
+    () => route.path,
+    () => {
+        refreshNavigationIndicator();
+    },
+    {
+        immediate: true
+    }
+);
+
 onMounted(() => {
     initializeCookieConsent();
 
@@ -457,9 +578,35 @@ onMounted(() => {
         .scrollbarGutter =
         'stable';
 
+    refreshNavigationIndicator();
+
+    navigationResizeObserver =
+        new ResizeObserver(() => {
+            updateNavigationIndicator();
+        });
+
+    if (
+        navigationElement.value
+    ) {
+        navigationResizeObserver.observe(
+            navigationElement.value
+        );
+    }
+
+    navigationButtonElements.value
+        .filter(Boolean)
+        .forEach((element) => {
+            navigationResizeObserver.observe(
+                element
+            );
+        });
+
     window.addEventListener(
-        'keydown',
-        handleGlobalKeydown
+        'resize',
+        updateNavigationIndicator,
+        {
+            passive: true
+        }
     );
 });
 
@@ -479,9 +626,15 @@ onUnmounted(() => {
     clearLoaderErrorTransitionTimer();
     clearErrorRevealTimer();
 
+    navigationResizeObserver
+        ?.disconnect();
+
+    navigationResizeObserver =
+        null;
+
     window.removeEventListener(
-        'keydown',
-        handleGlobalKeydown
+        'resize',
+        updateNavigationIndicator
     );
 
     document.documentElement
@@ -643,23 +796,119 @@ onUnmounted(() => {
 
                     <main
                         class="
-                            relative
-                            z-20
-                            flex
+                            mx-auto
                             w-full
-                            flex-1
-                            items-start
-                            justify-center
-                            overflow-visible
+                            max-w-[1600px]
                             px-2
+                            pb-2
 
-                            sm:px-6
+                            sm:px-3
+                            sm:pb-3
+
+                            lg:px-4
+                            lg:pb-4
                         "
                     >
-                        <CardStage
-                            :pages="pages"
-                            :stack="stack"
-                        />
+                        <section
+                            class="
+                                page-surface
+                                overflow-hidden
+                                rounded-[40px]
+                                bg-green
+                                text-baige
+                                shadow-[var(--shadow-strong)]
+                            "
+                        >
+                            <nav
+                                ref="navigationElement"
+                                aria-label="Hlavná navigácia"
+                                class="
+                                    page-navigation
+                                    relative
+                                    flex
+                                    w-full
+                                    items-center
+                                    justify-center
+                                    gap-2
+                                    overflow-x-auto
+                                    px-4
+                                    pt-4
+                                    pb-15
+
+                                    sm:gap-3
+                                    sm:px-6
+                                    sm:pt-5
+
+                                    lg:px-8
+                                "
+                            >
+                                <span
+                                    aria-hidden="true"
+                                    class="
+                                        page-navigation__indicator
+                                        pointer-events-none
+                                        absolute
+                                        left-0
+                                        top-0
+                                        rounded-full
+                                        bg-baige
+                                    "
+                                    :style="
+                                        navigationIndicatorStyle
+                                    "
+                                />
+
+                                <Button
+                                    v-for="
+                                        (
+                                            item,
+                                            index
+                                        ) in
+                                        navigationItems
+                                    "
+                                    :key="item.path"
+                                    :ref="
+                                        (element) => {
+                                            setNavigationButtonElement(
+                                                element,
+                                                index
+                                            );
+                                        }
+                                    "
+                                    type="button"
+                                    background-image=""
+                                    background-color="transparent"
+                                    :text-color="
+                                        isActiveRoute(item.path)
+                                            ? 'var(--color-green)'
+                                            : 'color-mix(in srgb, var(--color-baige) 70%, transparent)'
+                                    "
+                                    class="
+                                        page-navigation__button
+                                        relative
+                                        z-10
+                                    "
+                                    :aria-current="
+                                        isActiveRoute(item.path)
+                                            ? 'page'
+                                            : undefined
+                                    "
+                                    @click="
+                                        navigate(item.path)
+                                    "
+                                >
+                                    {{ item.label }}
+                                </Button>
+                            </nav>
+
+                            <RouterView v-slot="{ Component }">
+                                <component
+                                    :is="Component"
+                                    :expanded="true"
+                                    :transitioning="false"
+                                />
+                            </RouterView>
+                        </section>
                     </main>
 
                     <AppFooter />
@@ -681,10 +930,33 @@ onUnmounted(() => {
     background: transparent;
 }
 
+.page-navigation {
+    scrollbar-width: none;
+}
+
+.page-navigation::-webkit-scrollbar {
+    display: none;
+}
+
+.page-navigation__indicator {
+    transition:
+        transform 520ms cubic-bezier(0.22, 1, 0.36, 1),
+        width 520ms cubic-bezier(0.22, 1, 0.36, 1),
+        height 520ms cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 160ms ease;
+    will-change:
+        transform,
+        width,
+        height;
+}
+
+.page-navigation__button {
+    flex-shrink: 0;
+}
+
 .shell-fade-enter-active,
 .shell-fade-leave-active {
-    transition:
-        opacity 0.24s ease;
+    transition: opacity 0.24s ease;
 }
 
 .shell-fade-enter-from,
@@ -697,33 +969,11 @@ onUnmounted(() => {
     visibility: hidden;
     opacity: 0;
     filter: blur(5px);
-
-    transform:
-        translateY(14px)
-        scale(0.98);
-
+    transform: translateY(14px) scale(0.98);
     transition:
-        opacity 520ms
-            cubic-bezier(
-                0.22,
-                1,
-                0.36,
-                1
-            ),
-        transform 700ms
-            cubic-bezier(
-                0.16,
-                1,
-                0.3,
-                1
-            ),
-        filter 600ms
-            cubic-bezier(
-                0.22,
-                1,
-                0.36,
-                1
-            ),
+        opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform 700ms cubic-bezier(0.16, 1, 0.3, 1),
+        filter 600ms cubic-bezier(0.22, 1, 0.36, 1),
         visibility 0s linear 700ms;
 }
 
@@ -732,438 +982,22 @@ onUnmounted(() => {
     visibility: visible;
     opacity: 1;
     filter: blur(0);
-
-    transform:
-        translateY(0)
-        scale(1);
-
+    transform: translateY(0) scale(1);
     transition:
-        opacity 520ms
-            cubic-bezier(
-                0.22,
-                1,
-                0.36,
-                1
-            ),
-        transform 700ms
-            cubic-bezier(
-                0.16,
-                1,
-                0.3,
-                1
-            ),
-        filter 600ms
-            cubic-bezier(
-                0.22,
-                1,
-                0.36,
-                1
-            ),
-        visibility 0s linear 0s;
+        opacity 520ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform 700ms cubic-bezier(0.16, 1, 0.3, 1),
+        filter 600ms cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0s;
 }
 
 @media (
-    prefers-reduced-motion:
-    reduce
+    prefers-reduced-motion: reduce
 ) {
     .shell-fade-enter-active,
     .shell-fade-leave-active,
-    .error-content {
+    .error-content,
+    .page-navigation__indicator {
         transition-duration: 1ms;
-    }
-}
-</style>
-
-<style>
-/*
- * The browser creates frozen compositor snapshots for these
- * transitions. No live page layout is scaled frame by frame.
- */
-
-::view-transition-group(humanitas-page-surface) {
-    overflow: clip;
-    border-radius: 40px;
-    box-shadow: var(--shadow-strong);
-    z-index: 9000;
-}
-
-::view-transition-image-pair(humanitas-page-surface) {
-    isolation: isolate;
-    overflow: clip;
-    border-radius: 40px;
-}
-
-::view-transition-old(humanitas-page-surface),
-::view-transition-new(humanitas-page-surface) {
-    height: 100%;
-    mix-blend-mode: normal;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-}
-
-::view-transition-group(humanitas-page-menu) {
-    z-index: 9100;
-}
-
-::view-transition-old(humanitas-page-menu),
-::view-transition-new(humanitas-page-menu) {
-    mix-blend-mode: normal;
-}
-
-html[data-humanitas-transition='open']
-::view-transition-group(humanitas-page-surface) {
-    animation-duration: 520ms;
-    animation-timing-function:
-        cubic-bezier(
-            0.16,
-            1,
-            0.3,
-            1
-        );
-}
-
-html[data-humanitas-transition='close']
-::view-transition-group(humanitas-page-surface) {
-    animation-duration: 480ms;
-    animation-timing-function:
-        cubic-bezier(
-            0.22,
-            1,
-            0.36,
-            1
-        );
-}
-
-html[data-humanitas-transition='open']
-::view-transition-old(humanitas-page-surface) {
-    animation:
-        humanitas-open-old
-        520ms
-        linear
-        both;
-}
-
-html[data-humanitas-transition='open']
-::view-transition-new(humanitas-page-surface) {
-    animation:
-        humanitas-open-new
-        520ms
-        linear
-        both;
-}
-
-html[data-humanitas-transition='close']
-::view-transition-old(humanitas-page-surface) {
-    animation:
-        humanitas-close-old
-        480ms
-        linear
-        both;
-}
-
-html[data-humanitas-transition='close']
-::view-transition-new(humanitas-page-surface) {
-    animation:
-        humanitas-close-new
-        480ms
-        linear
-        both;
-}
-
-html[data-humanitas-transition='open']
-::view-transition-old(root),
-html[data-humanitas-transition='open']
-::view-transition-new(root),
-html[data-humanitas-transition='close']
-::view-transition-old(root),
-html[data-humanitas-transition='close']
-::view-transition-new(root) {
-    animation: none;
-    mix-blend-mode: normal;
-}
-
-html[data-humanitas-transition='switch-forward']
-::view-transition-old(root) {
-    animation:
-        humanitas-switch-forward-old
-        310ms
-        cubic-bezier(
-            0.32,
-            0.72,
-            0,
-            1
-        )
-        both;
-}
-
-html[data-humanitas-transition='switch-forward']
-::view-transition-new(root) {
-    animation:
-        humanitas-switch-forward-new
-        310ms
-        cubic-bezier(
-            0.32,
-            0.72,
-            0,
-            1
-        )
-        both;
-}
-
-html[data-humanitas-transition='switch-backward']
-::view-transition-old(root) {
-    animation:
-        humanitas-switch-backward-old
-        310ms
-        cubic-bezier(
-            0.32,
-            0.72,
-            0,
-            1
-        )
-        both;
-}
-
-html[data-humanitas-transition='switch-backward']
-::view-transition-new(root) {
-    animation:
-        humanitas-switch-backward-new
-        310ms
-        cubic-bezier(
-            0.32,
-            0.72,
-            0,
-            1
-        )
-        both;
-}
-
-/*
- * Keep the source snapshot dominant while the
- * card changes size. The destination layout is
- * introduced only near the end, avoiding a long
- * double exposure between two differently reflowed
- * page layouts.
- */
-
-
-/*
- * Page-specific decorative animations must not
- * advance between the old and new snapshots.
- */
-html[data-humanitas-transition='open']
-.page-card *,
-html[data-humanitas-transition='close']
-.page-card * {
-    animation-play-state: paused !important;
-}
-
-html[data-humanitas-transition='open']
-::view-transition-old(humanitas-page-menu) {
-    animation:
-        humanitas-menu-old
-        520ms
-        linear
-        both;
-}
-
-html[data-humanitas-transition='open']
-::view-transition-new(humanitas-page-menu) {
-    animation:
-        humanitas-menu-new
-        520ms
-        linear
-        both;
-}
-
-html[data-humanitas-transition='close']
-::view-transition-old(humanitas-page-menu) {
-    animation:
-        humanitas-menu-old
-        480ms
-        linear
-        both;
-}
-
-html[data-humanitas-transition='close']
-::view-transition-new(humanitas-page-menu) {
-    animation:
-        humanitas-menu-new
-        480ms
-        linear
-        both;
-}
-
-@keyframes humanitas-menu-old {
-    0%,
-    68% {
-        opacity: 1;
-    }
-
-    100% {
-        opacity: 0;
-    }
-}
-
-@keyframes humanitas-menu-new {
-    0%,
-    62% {
-        opacity: 0;
-    }
-
-    100% {
-        opacity: 1;
-    }
-}
-
-@keyframes humanitas-open-old {
-    0%,
-    70% {
-        opacity: 1;
-    }
-
-    100% {
-        opacity: 0;
-    }
-}
-
-@keyframes humanitas-open-new {
-    0%,
-    64% {
-        opacity: 0;
-    }
-
-    100% {
-        opacity: 1;
-    }
-}
-
-@keyframes humanitas-close-old {
-    0%,
-    66% {
-        opacity: 1;
-    }
-
-    100% {
-        opacity: 0;
-    }
-}
-
-@keyframes humanitas-close-new {
-    0%,
-    60% {
-        opacity: 0;
-    }
-
-    100% {
-        opacity: 1;
-    }
-}
-
-@keyframes humanitas-switch-forward-old {
-    from {
-        transform:
-            translate3d(
-                0,
-                0,
-                0
-            )
-            scale(1);
-        opacity: 1;
-    }
-
-    to {
-        transform:
-            translate3d(
-                -24%,
-                0,
-                0
-            )
-            scale(0.965);
-        opacity: 0.72;
-    }
-}
-
-@keyframes humanitas-switch-forward-new {
-    from {
-        transform:
-            translate3d(
-                100%,
-                0,
-                0
-            )
-            scale(0.99);
-        opacity: 1;
-    }
-
-    to {
-        transform:
-            translate3d(
-                0,
-                0,
-                0
-            )
-            scale(1);
-        opacity: 1;
-    }
-}
-
-@keyframes humanitas-switch-backward-old {
-    from {
-        transform:
-            translate3d(
-                0,
-                0,
-                0
-            )
-            scale(1);
-        opacity: 1;
-    }
-
-    to {
-        transform:
-            translate3d(
-                24%,
-                0,
-                0
-            )
-            scale(0.965);
-        opacity: 0.72;
-    }
-}
-
-@keyframes humanitas-switch-backward-new {
-    from {
-        transform:
-            translate3d(
-                -100%,
-                0,
-                0
-            )
-            scale(0.99);
-        opacity: 1;
-    }
-
-    to {
-        transform:
-            translate3d(
-                0,
-                0,
-                0
-            )
-            scale(1);
-        opacity: 1;
-    }
-}
-
-@media (
-    prefers-reduced-motion:
-    reduce
-) {
-    ::view-transition-group(*),
-    ::view-transition-old(*),
-    ::view-transition-new(*) {
-        animation-duration: 1ms !important;
     }
 }
 </style>

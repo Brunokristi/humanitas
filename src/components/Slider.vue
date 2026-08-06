@@ -8,6 +8,10 @@ import {
     watch
 } from 'vue';
 
+import {
+    useScrollMotion
+} from '../composables/useScrollMotion';
+
 import Button from './Button.vue';
 import Card from './Card.vue';
 
@@ -60,12 +64,31 @@ const props = defineProps({
     autoPlayDelay: {
         type: Number,
         default: 3000
+    },
+
+    scrollMotion: {
+        type: Boolean,
+        default: false
     }
 });
 
 const emit = defineEmits([
     'select'
 ]);
+
+const scrollMotionEnabled = computed(() => {
+    return props.scrollMotion;
+});
+
+const {
+    motionRoot
+} = useScrollMotion({
+    enabled:
+        scrollMotionEnabled,
+
+    disableOnCoarsePointer:
+        false
+});
 
 /*
  * =========================================================
@@ -1573,6 +1596,7 @@ onBeforeUnmount(() => {
 
 <template>
     <section
+        ref="motionRoot"
         class="
             relative
             w-full
@@ -1724,6 +1748,40 @@ onBeforeUnmount(() => {
                             :active="
                                 renderedItem.originalIndex ===
                                 currentIndex
+                            "
+                            :class="{
+                                'scroll-motion':
+                                    scrollMotion
+                            }"
+                            :data-scroll-motion="
+                                scrollMotion
+                                    ? ''
+                                    : undefined
+                            "
+                            :data-motion-seed="
+                                scrollMotion
+                                    ? renderedItem.originalIndex + 1
+                                    : undefined
+                            "
+                            :data-motion-strength="
+                                scrollMotion
+                                    ? 1
+                                    : undefined
+                            "
+                            :data-straighten-strength="
+                                scrollMotion
+                                    ? 0.96
+                                    : undefined
+                            "
+                            :data-max-y="
+                                scrollMotion
+                                    ? 10
+                                    : undefined
+                            "
+                            :data-max-scale="
+                                scrollMotion
+                                    ? 0.004
+                                    : undefined
                             "
                             :equal-height="
                                 equalHeight
