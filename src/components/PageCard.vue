@@ -54,6 +54,11 @@ const props = defineProps({
     captureScrollY: {
         type: Number,
         default: 0
+    },
+
+    backgroundHidden: {
+        type: Boolean,
+        default: false
     }
 });
 
@@ -134,10 +139,14 @@ const rootStyle = computed(() => {
             zIndex:
                 props.visual?.zIndex ??
                 1,
-            opacity: 1,
+            opacity:
+                props.backgroundHidden
+                    ? 0
+                    : 1,
             visibility: 'visible',
             pointerEvents:
-                props.interactive
+                props.interactive &&
+                !props.backgroundHidden
                     ? 'auto'
                     : 'none',
             borderRadius:
@@ -154,11 +163,22 @@ const rootStyle = computed(() => {
                     0
                 ) > 0
                     ? [
-                        'transform',
-                        `${props.visual.transitionMs}ms`,
-                        props.visual.transitionEasing
+                        [
+                            'transform',
+                            `${props.visual.transitionMs}ms`,
+                            props.visual.transitionEasing
+                        ].join(' '),
+                        [
+                            'opacity',
+                            '120ms',
+                            'cubic-bezier(0.22, 1, 0.36, 1)'
+                        ].join(' ')
+                    ].join(', ')
+                    : [
+                        'opacity',
+                        '120ms',
+                        'cubic-bezier(0.22, 1, 0.36, 1)'
                     ].join(' ')
-                    : 'none'
         };
     }
 
@@ -525,6 +545,8 @@ function handleControlClick() {
 .page-card {
     box-sizing: border-box;
     overflow: hidden;
+    isolation: isolate;
+    background: #335940;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
     transform-origin: top left;

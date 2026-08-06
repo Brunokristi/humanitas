@@ -14,9 +14,12 @@ const EXPANDED_RADIUS = 40;
 const OPENING_BOTTOM_RADIUS = 0;
 const OVERVIEW_SNAP_DURATION = 320;
 const SHELL_TRANSITION_DURATION = 520;
+const HANDOFF_TRANSITION_DURATION = 110;
 const OVERVIEW_SNAP_EASING =
     'cubic-bezier(0.22, 1, 0.36, 1)';
 const SHELL_TRANSITION_EASING =
+    'cubic-bezier(0.22, 1, 0.36, 1)';
+const HANDOFF_TRANSITION_EASING =
     'cubic-bezier(0.22, 1, 0.36, 1)';
 
 const MOBILE_OVERVIEW_TRANSFORMS = [
@@ -658,6 +661,133 @@ function createCardStack({
             '';
     }
 
+    function prepareElementForHandoff(
+        element
+    ) {
+        if (!element) {
+            return;
+        }
+
+        /*
+         * The real destination must already be fully opaque
+         * underneath the frozen transition shell.
+         *
+         * Never fade both surfaces at the same time. Two
+         * half-transparent layers do not equal one opaque
+         * layer; the background stack becomes visible through
+         * them, especially in Safari.
+         */
+        element.style.visibility =
+            'visible';
+        element.style.opacity =
+            '1';
+        element.style.backgroundColor =
+            '#335940';
+        element.style.backfaceVisibility =
+            'hidden';
+        element.style.webkitBackfaceVisibility =
+            'hidden';
+    }
+
+    function finishElementHandoff(
+        element
+    ) {
+        if (!element) {
+            return;
+        }
+
+        element.style.visibility =
+            'visible';
+        element.style.opacity =
+            '1';
+        element.style.removeProperty(
+            'will-change'
+        );
+    }
+
+    async function crossfadeTransitionHandoff({
+        fromElement,
+        toElement,
+        roundOpeningBottom = false
+    }) {
+        if (
+            !fromElement ||
+            !toElement
+        ) {
+            finishElementHandoff(
+                toElement
+            );
+
+            return;
+        }
+
+        prepareElementForHandoff(
+            toElement
+        );
+
+        /*
+         * Paint the fully opaque destination below the shell
+         * before the shell starts disappearing. Because the
+         * destination never changes opacity, there is always
+         * one completely opaque green page surface covering
+         * the background cards.
+         */
+        toElement.getBoundingClientRect();
+        window.getComputedStyle(
+            toElement
+        ).opacity;
+
+        await waitForFrames(2);
+
+        const fromStart = {
+            opacity: 1
+        };
+
+        const fromEnd = {
+            opacity: 0
+        };
+
+        if (roundOpeningBottom) {
+            fromStart.borderBottomLeftRadius =
+                `${OPENING_BOTTOM_RADIUS}px`;
+            fromStart.borderBottomRightRadius =
+                `${OPENING_BOTTOM_RADIUS}px`;
+            fromEnd.borderBottomLeftRadius =
+                `${EXPANDED_RADIUS}px`;
+            fromEnd.borderBottomRightRadius =
+                `${EXPANDED_RADIUS}px`;
+        }
+
+        const fromAnimation =
+            fromElement.animate(
+                [
+                    fromStart,
+                    fromEnd
+                ],
+                {
+                    duration:
+                        HANDOFF_TRANSITION_DURATION,
+                    easing:
+                        HANDOFF_TRANSITION_EASING,
+                    fill:
+                        'both'
+                }
+            );
+
+        /*
+         * Fade only the temporary shell. The destination below
+         * remains at opacity 1 for the entire handoff, so the
+         * card underneath can never show through.
+         */
+        await Promise.allSettled([
+            fromAnimation.finished
+        ]);
+
+        finishElementHandoff(
+            toElement
+        );
+    }
+
     function createOpeningPreparationCover(
         previewElement,
         previewRect
@@ -731,6 +861,8 @@ function createCardStack({
                     'visible',
                 opacity:
                     '1',
+                backgroundColor:
+                    '#335940',
                 backfaceVisibility:
                     'hidden',
                 WebkitBackfaceVisibility:
@@ -1041,12 +1173,14 @@ function createCardStack({
                     'visible',
                 opacity:
                     '1',
+                backgroundColor:
+                    '#335940',
                 backfaceVisibility:
                     'hidden',
                 WebkitBackfaceVisibility:
                     'hidden',
                 willChange:
-                    'transform, border-radius'
+                    'transform, border-radius, opacity'
             }
         );
 
@@ -1086,6 +1220,8 @@ function createCardStack({
                         `${expandedRect.width}px`,
                     height:
                         `${expandedRect.height}px`,
+                    backgroundColor:
+                        '#335940',
                     transformOrigin:
                         'top left',
                     willChange:
@@ -1296,7 +1432,7 @@ function createCardStack({
 
         const expandedBottomRadiusValue =
             endpoint ===
-            'opening-expanded'
+                'opening-expanded'
                 ? OPENING_BOTTOM_RADIUS
                 : EXPANDED_RADIUS;
 
@@ -1733,25 +1869,34 @@ function createCardStack({
              * page leaves its fixed capture rectangle. The
              * clone and live page are now pixel-aligned.
              */
+            const liveExpandedElement =
+                expandedCardElement.value;
+
+            prepareElementForHandoff(
+                liveExpandedElement
+            );
+
             state.captureMode =
                 null;
             state.captureRect =
                 null;
 
             await nextTick();
-            await waitForFrames(2);
 
-            showElement(
-                expandedCardElement.value
-            );
-
-            await waitForFrames(1);
+            await crossfadeTransitionHandoff({
+                fromElement:
+                    shellRecord.element,
+                toElement:
+                    expandedCardElement.value,
+                roundOpeningBottom:
+                    true
+            });
         } finally {
             preparationCover
                 ?.remove();
 
             shellRecord.element.remove();
-            showElement(
+            finishElementHandoff(
                 expandedCardElement.value
             );
         }
@@ -1873,7 +2018,7 @@ function createCardStack({
         }
 
         if (shellRecord) {
-            hideElement(
+            prepareElementForHandoff(
                 previewElement
             );
 
@@ -1887,14 +2032,15 @@ function createCardStack({
                     }
                 );
 
-                showElement(
-                    previewElement
-                );
-
-                await waitForFrames(1);
+                await crossfadeTransitionHandoff({
+                    fromElement:
+                        shellRecord.element,
+                    toElement:
+                        previewElement
+                });
             } finally {
                 shellRecord.element.remove();
-                showElement(
+                finishElementHandoff(
                     previewElement
                 );
             }

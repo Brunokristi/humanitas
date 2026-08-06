@@ -121,8 +121,17 @@ function setExpandedCardElement(
         "
     >
         <div
-            v-if="isOverview"
             class="card-stage__overview"
+            :class="{
+                'card-stage__overview--background':
+                    !isOverview
+            }"
+            :aria-hidden="
+                !isOverview
+                    ? 'true'
+                    : undefined
+            "
+            :inert="!isOverview"
         >
             <PageCard
                 v-for="card in renderedCards"
@@ -135,8 +144,17 @@ function setExpandedCardElement(
                     )
                 "
                 :interactive="
+                    isOverview &&
                     !stack.state
                         .interactionLocked
+                "
+                :background-hidden="
+                    !isOverview &&
+                    !stack.state
+                        .interactionLocked &&
+                    card.id ===
+                        stack.state
+                            .activePageId
                 "
                 :transitioning="
                     stack.state
@@ -162,7 +180,7 @@ function setExpandedCardElement(
         </div>
 
         <div
-            v-else-if="activeCard"
+            v-if="activeCard"
             class="card-stage__expanded"
         >
             <PageCard
@@ -211,8 +229,16 @@ function setExpandedCardElement(
 
 .card-stage__overview {
     position: relative;
+    z-index: 1;
     width: 100%;
     height: 100%;
+}
+
+.card-stage__overview--background {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    user-select: none;
 }
 
 .card-stage--overview {
@@ -227,6 +253,7 @@ function setExpandedCardElement(
 
 .card-stage__expanded {
     position: relative;
+    z-index: 40;
     width: 100%;
     min-height:
         calc(
@@ -236,6 +263,7 @@ function setExpandedCardElement(
 }
 
 .card-stage--expanded {
+    isolation: isolate;
     overflow: visible;
     touch-action: auto;
 }
