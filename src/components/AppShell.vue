@@ -665,14 +665,153 @@ onUnmounted(() => {
                 flex-col
             "
         >
+            <div
+                class="
+                    flex
+                    min-h-[100dvh]
+                    flex-col
+                "
+            >
+                <div
+                    class="app-shell-header"
+                >
+                    <AppHeader
+                        :show-menu="false"
+                        :is-fixed="false"
+                    />
+                </div>
+
+                <main
+                    class="
+                        mx-auto
+                        w-full
+                        max-w-[1600px]
+                        px-2
+                        pb-2
+
+                        sm:px-3
+                        sm:pb-3
+
+                        lg:px-4
+                        lg:pb-4
+                    "
+                >
+                    <section
+                        class="
+                            w-full
+                            page-surface
+                            overflow-hidden
+                            rounded-[40px]
+                            bg-green
+                            text-baige
+                            shadow-[var(--shadow-strong)]
+                        "
+                    >
+                        <nav
+                            ref="navigationElement"
+                            aria-label="Hlavná navigácia"
+                            class="
+                                page-navigation
+                                relative
+                                flex
+                                w-full
+                                items-center
+                                justify-center
+                                gap-2
+                                overflow-x-auto
+                                px-4
+                                pt-4
+                                pb-15
+
+                                sm:gap-3
+                                sm:px-6
+                                sm:pt-5
+
+                                lg:px-8
+                            "
+                        >
+                            <span
+                                aria-hidden="true"
+                                class="
+                                    page-navigation__indicator
+                                    pointer-events-none
+                                    absolute
+                                    left-0
+                                    top-0
+                                    rounded-full
+                                    bg-baige
+                                "
+                                :style="
+                                    navigationIndicatorStyle
+                                "
+                            />
+
+                            <Button
+                                v-for="
+                                    (
+                                        item,
+                                        index
+                                    ) in
+                                    navigationItems
+                                "
+                                :key="item.path"
+                                :ref="
+                                    (element) => {
+                                        setNavigationButtonElement(
+                                            element,
+                                            index
+                                        );
+                                    }
+                                "
+                                type="button"
+                                background-image=""
+                                background-color="transparent"
+                                :text-color="
+                                    isActiveRoute(item.path)
+                                        ? 'var(--color-green)'
+                                        : 'color-mix(in srgb, var(--color-baige) 70%, transparent)'
+                                "
+                                class="
+                                    page-navigation__button
+                                    relative
+                                    z-10
+                                "
+                                :aria-current="
+                                    isActiveRoute(item.path)
+                                        ? 'page'
+                                        : undefined
+                                "
+                                @click="
+                                    navigate(item.path)
+                                "
+                            >
+                                {{ item.label }}
+                            </Button>
+                        </nav>
+
+                        <RouterView v-slot="{ Component }">
+                            <component
+                                :is="Component"
+                                :expanded="true"
+                                :transitioning="false"
+                            />
+                        </RouterView>
+                    </section>
+                </main>
+
+                <AppFooter />
+
+                <CookieConsentSheet />
+            </div>
+
             <Transition
                 name="shell-fade"
-                mode="out-in"
             >
                 <div
                     v-if="shouldShowLoaderScreen"
                     key="loader-screen"
                     class="
+                        app-shell-loader
                         flex
                         min-h-[100dvh]
                         flex-col
@@ -775,146 +914,6 @@ onUnmounted(() => {
                         </div>
                     </div>
                 </div>
-
-                <div
-                    v-else
-                    key="content"
-                    class="
-                        flex
-                        min-h-[100dvh]
-                        flex-col
-                    "
-                >
-                    <div
-                        class="app-shell-header"
-                    >
-                        <AppHeader
-                            :show-menu="false"
-                            :is-fixed="false"
-                        />
-                    </div>
-
-                    <main
-                        class="
-                            mx-auto
-                            w-full
-                            max-w-[1600px]
-                            px-2
-                            pb-2
-
-                            sm:px-3
-                            sm:pb-3
-
-                            lg:px-4
-                            lg:pb-4
-                        "
-                    >
-                        <section
-                            class="
-                                page-surface
-                                overflow-hidden
-                                rounded-[40px]
-                                bg-green
-                                text-baige
-                                shadow-[var(--shadow-strong)]
-                            "
-                        >
-                            <nav
-                                ref="navigationElement"
-                                aria-label="Hlavná navigácia"
-                                class="
-                                    page-navigation
-                                    relative
-                                    flex
-                                    w-full
-                                    items-center
-                                    justify-center
-                                    gap-2
-                                    overflow-x-auto
-                                    px-4
-                                    pt-4
-                                    pb-15
-
-                                    sm:gap-3
-                                    sm:px-6
-                                    sm:pt-5
-
-                                    lg:px-8
-                                "
-                            >
-                                <span
-                                    aria-hidden="true"
-                                    class="
-                                        page-navigation__indicator
-                                        pointer-events-none
-                                        absolute
-                                        left-0
-                                        top-0
-                                        rounded-full
-                                        bg-baige
-                                    "
-                                    :style="
-                                        navigationIndicatorStyle
-                                    "
-                                />
-
-                                <Button
-                                    v-for="
-                                        (
-                                            item,
-                                            index
-                                        ) in
-                                        navigationItems
-                                    "
-                                    :key="item.path"
-                                    :ref="
-                                        (element) => {
-                                            setNavigationButtonElement(
-                                                element,
-                                                index
-                                            );
-                                        }
-                                    "
-                                    type="button"
-                                    background-image=""
-                                    background-color="transparent"
-                                    :text-color="
-                                        isActiveRoute(item.path)
-                                            ? 'var(--color-green)'
-                                            : 'color-mix(in srgb, var(--color-baige) 70%, transparent)'
-                                    "
-                                    class="
-                                        page-navigation__button
-                                        relative
-                                        z-10
-                                    "
-                                    :aria-current="
-                                        isActiveRoute(item.path)
-                                            ? 'page'
-                                            : undefined
-                                    "
-                                    @click="
-                                        navigate(item.path)
-                                    "
-                                >
-                                    {{ item.label }}
-                                </Button>
-                            </nav>
-
-                            <RouterView v-slot="{ Component }">
-                                <component
-                                    :is="Component"
-                                    :expanded="true"
-                                    :transitioning="false"
-                                />
-                            </RouterView>
-                        </section>
-                    </main>
-
-                    <AppFooter />
-
-                    <CookieConsentSheet />
-                </div>
             </Transition>
         </div>
     </div>
@@ -952,6 +951,13 @@ onUnmounted(() => {
 
 .page-navigation__button {
     flex-shrink: 0;
+}
+
+.app-shell-loader {
+    position: absolute;
+    inset: 0;
+    z-index: 60;
+    background: var(--color-baige);
 }
 
 .shell-fade-enter-active,

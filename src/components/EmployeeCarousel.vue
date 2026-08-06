@@ -1274,7 +1274,6 @@ onBeforeUnmount(() => {
                             bg-baige
                             shadow-[var(--shadow-mid)]
                         "
-                        data-no-drag
                         @click.stop="selectEmployee(index)"
                         :class="{
                             'scroll-motion':

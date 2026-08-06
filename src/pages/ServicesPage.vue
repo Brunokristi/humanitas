@@ -2214,6 +2214,7 @@ onBeforeUnmount(() => {
                                 pb-14
                                 pt-5
 
+                                md:px-10
 
                                 lg:gap-8
                                 lg:pb-16
