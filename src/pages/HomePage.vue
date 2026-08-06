@@ -1329,7 +1329,6 @@ onBeforeUnmount(() => {
                                     "
                                 >
                                     <Button
-                                        data-no-drag
                                         background-image=""
                                         background-color="#335940"
                                         text-color="#FBF9F3"

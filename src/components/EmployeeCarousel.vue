@@ -59,7 +59,7 @@ const {
         scrollMotionEnabled,
 
     disableOnCoarsePointer:
-        true
+        false
 });
 
 const currentIndex = ref(

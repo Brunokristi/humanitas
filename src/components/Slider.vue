@@ -169,6 +169,12 @@ const previousPointerTime = ref(0);
 const pointerVelocity = ref(0);
 
 /*
+ * A button or link may be the element where the drag starts.
+ * Suppress only the click generated after a real drag.
+ */
+let suppressClickUntil = 0;
+
+/*
  * Autoplay
  */
 
@@ -1146,15 +1152,19 @@ function handleCardClick(
         return;
     }
 
+    /*
+     * Buttons and links are allowed to start a drag.
+     * A tap still activates them. A horizontal drag
+     * suppresses the click generated on release.
+     */
     if (
         event.target.closest(
             [
-                'a',
-                'button',
                 'input',
                 'textarea',
                 'select',
-                '[data-no-drag]'
+                '[contenteditable="true"]',
+                '[data-slider-no-drag]'
             ].join(', ')
         )
     ) {
@@ -1170,6 +1180,26 @@ function handleCardClick(
 /*
  * Drag
  */
+
+function suppressClickAfterDrag() {
+    suppressClickUntil =
+        performance.now() +
+        450;
+}
+
+function handleSliderClickCapture(
+    event
+) {
+    if (
+        performance.now() >
+        suppressClickUntil
+    ) {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+}
 
 function handlePointerDown(event) {
     if (event.button !== 0) {
@@ -1268,7 +1298,15 @@ function handlePointerMove(event) {
         ) >
         CLICK_DRAG_THRESHOLD
     ) {
+        if (
+            !hasDragged.value
+        ) {
+            suppressClickAfterDrag();
+        }
+
         hasDragged.value = true;
+
+        event.preventDefault();
     }
 
     const maximumDrag =
@@ -1659,6 +1697,9 @@ onBeforeUnmount(() => {
             "
             @pointercancel="
                 handlePointerCancel
+            "
+            @click.capture="
+                handleSliderClickCapture
             "
         >
             <template

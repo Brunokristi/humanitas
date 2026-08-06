@@ -12,6 +12,9 @@ import {
     useClinviaPublicSite
 } from '../composables/useClinviaPublicSite';
 import { usePageSeo } from '../composables/usePageSeo';
+import {
+    useScrollMotion
+} from '../composables/useScrollMotion';
 
 import Button from '../components/Button.vue';
 
@@ -33,6 +36,23 @@ const {
     error,
     load
 } = useClinviaPublicSite();
+
+const scrollMotionEnabled = computed(() => {
+    return (
+        props.expanded &&
+        !props.transitioning
+    );
+});
+
+const {
+    motionRoot
+} = useScrollMotion({
+    enabled:
+        scrollMotionEnabled,
+
+    disableOnCoarsePointer:
+        false
+});
 
 usePageSeo({
     pageKey: 'contact',
@@ -637,6 +657,21 @@ function sendAnotherMessage() {
     resetMessageSuggestionAnimation();
 }
 
+function contactCardBaseRotation(index) {
+    const rotations = [
+        -1.4,
+        1.15,
+        -0.9,
+        1.35,
+        -1.1,
+        0.85
+    ];
+
+    return rotations[
+        index % rotations.length
+    ];
+}
+
 function resizeMessageTextarea() {
     const textarea =
         messageTextarea.value;
@@ -1097,6 +1132,7 @@ onBeforeUnmount(() => {
 
 <template>
     <div
+        ref="motionRoot"
         class="
             relative
             min-h-full
@@ -1110,26 +1146,22 @@ onBeforeUnmount(() => {
                 w-full
                 px-5
                 pb-20
-                pt-5
 
                 lg:px-15
                 lg:pb-28
-                lg:pt-12
             "
         >
             <!-- Two-column contact layout -->
             <section
                 class="
                     mx-auto
-                    mt-12
                     grid
                     w-full
-                    max-w-6xl
+                    max-w-7xl
                     grid-cols-1
                     items-start
                     space-y-32
                     
-                    lg:mt-16
                     lg:grid-cols-2
                     lg:gap-20
 
@@ -1168,21 +1200,66 @@ onBeforeUnmount(() => {
 
                     <div
                         class="
-                            min-w-0
-                            overflow-hidden
-                            rounded-[40px]
-                            bg-baige
-                            text-green
-                            shadow-[var(--shadow-mid)]
-
-                            transition-[box-shadow,transform]
-                            duration-300
-                            ease-[cubic-bezier(0.22,1,0.36,1)]
-
-                            hover:-translate-y-[1px]
-                            hover:shadow-[0_22px_48px_rgba(0,0,0,0.12)]
+                            scroll-motion
+                        "
+                        :data-scroll-motion="
+                            scrollMotionEnabled
+                                ? ''
+                                : undefined
+                        "
+                        :data-motion-seed="
+                            scrollMotionEnabled
+                                ? 1
+                                : undefined
+                        "
+                        :data-base-rotation="
+                            scrollMotionEnabled
+                                ? -1.25
+                                : undefined
+                        "
+                        :data-rotation-mode="
+                            scrollMotionEnabled
+                                ? 'offset'
+                                : undefined
+                        "
+                        :data-motion-strength="
+                            scrollMotionEnabled
+                                ? 1
+                                : undefined
+                        "
+                        :data-straighten-strength="
+                            scrollMotionEnabled
+                                ? 0.97
+                                : undefined
+                        "
+                        :data-max-y="
+                            scrollMotionEnabled
+                                ? 12
+                                : undefined
+                        "
+                        :data-max-scale="
+                            scrollMotionEnabled
+                                ? 0.004
+                                : undefined
                         "
                     >
+                        <div
+                            class="
+                                min-w-0
+                                overflow-hidden
+                                rounded-[40px]
+                                bg-baige
+                                text-green
+                                shadow-[var(--shadow-mid)]
+
+                                transition-[box-shadow,transform]
+                                duration-300
+                                ease-[cubic-bezier(0.22,1,0.36,1)]
+
+                                hover:-translate-y-[1px]
+                                hover:shadow-[0_22px_48px_rgba(0,0,0,0.12)]
+                            "
+                        >
                         <!-- Success -->
                         <div
                             v-if="
@@ -1742,6 +1819,7 @@ onBeforeUnmount(() => {
                                 </div>
                             </form>
                         </div>
+                        </div>
                     </div>
                 </section>
 
@@ -1789,7 +1867,7 @@ onBeforeUnmount(() => {
                             gap-4
                         "
                     >
-                        <component
+                        <div
                             v-for="
                                 (
                                     contact,
@@ -1800,221 +1878,267 @@ onBeforeUnmount(() => {
                             :key="
                                 `${contact.type}-${contact.value}-${index}`
                             "
-                            :is="
-                                contact.type ===
-                                'address'
-                                    ? 'div'
-                                    : contactHref(
-                                        contact
-                                    )
-                                        ? 'a'
-                                        : 'div'
+                            class="
+                                scroll-motion
                             "
-                            :href="
-                                contact.type !==
-                                    'address'
-                                    ? (
-                                        contactHref(
-                                            contact
-                                        ) ||
-                                        undefined
-                                    )
+                            :data-scroll-motion="
+                                scrollMotionEnabled
+                                    ? ''
                                     : undefined
                             "
-                            v-bind="
-                                contact.type !==
-                                    'address'
-                                    ? linkAttrs(
-                                        contactHref(
-                                            contact
-                                        )
-                                    )
-                                    : {}
+                            :data-motion-seed="
+                                scrollMotionEnabled
+                                    ? index + 2
+                                    : undefined
                             "
-                            class="
-                                group
-                                relative
-                                flex
-                                min-w-0
-                                gap-4
-                                rounded-[40px]
-                                bg-baige
-                                p-4
-                                text-green
-                                shadow-[var(--shadow-soft)]
-
-                                transition-transform
-                                duration-300
-                                ease-[cubic-bezier(0.22,1,0.36,1)]
-
-                                hover:z-20
-                                hover:-translate-y-[1px]
+                            :data-base-rotation="
+                                scrollMotionEnabled
+                                    ? contactCardBaseRotation(index)
+                                    : undefined
                             "
-                            :class="
-                                contact.type ===
-                                'address'
-                                    ? 'flex-col items-stretch'
-                                    : 'items-center'
+                            :data-rotation-mode="
+                                scrollMotionEnabled
+                                    ? 'offset'
+                                    : undefined
+                            "
+                            :data-motion-strength="
+                                scrollMotionEnabled
+                                    ? 1
+                                    : undefined
+                            "
+                            :data-straighten-strength="
+                                scrollMotionEnabled
+                                    ? 0.97
+                                    : undefined
+                            "
+                            :data-max-y="
+                                scrollMotionEnabled
+                                    ? 10
+                                    : undefined
+                            "
+                            :data-max-scale="
+                                scrollMotionEnabled
+                                    ? 0.0035
+                                    : undefined
                             "
                         >
-                            <div
+                            <component
+                                :is="
+                                    contact.type ===
+                                    'address'
+                                        ? 'div'
+                                        : contactHref(
+                                            contact
+                                        )
+                                            ? 'a'
+                                            : 'div'
+                                "
+                                :href="
+                                    contact.type !==
+                                        'address'
+                                        ? (
+                                            contactHref(
+                                                contact
+                                            ) ||
+                                            undefined
+                                        )
+                                        : undefined
+                                "
+                                v-bind="
+                                    contact.type !==
+                                        'address'
+                                        ? linkAttrs(
+                                            contactHref(
+                                                contact
+                                            )
+                                        )
+                                        : {}
+                                "
                                 class="
+                                    group
+                                    relative
                                     flex
                                     min-w-0
-                                    items-center
                                     gap-4
+                                    rounded-[40px]
+                                    bg-baige
+                                    p-4
+                                    text-green
+                                    shadow-[var(--shadow-soft)]
+
+                                    transition-transform
+                                    duration-300
+                                    ease-[cubic-bezier(0.22,1,0.36,1)]
+
+                                    hover:z-20
+                                    hover:-translate-y-[1px]
+                                "
+                                :class="
+                                    contact.type ===
+                                    'address'
+                                        ? 'flex-col items-stretch'
+                                        : 'items-center'
                                 "
                             >
                                 <div
                                     class="
                                         flex
-                                        size-10
-                                        shrink-0
+                                        min-w-0
                                         items-center
-                                        justify-center
-                                        rounded-full
-                                        bg-green
-                                        text-baige
+                                        gap-4
                                     "
                                 >
-                                    <i
-                                        class="bi"
-                                        :class="
-                                            contactIcon(
-                                                contact
-                                            )
+                                    <div
+                                        class="
+                                            flex
+                                            size-10
+                                            shrink-0
+                                            items-center
+                                            justify-center
+                                            rounded-full
+                                            bg-green
+                                            text-baige
                                         "
-                                        aria-hidden="true"
-                                    />
+                                    >
+                                        <i
+                                            class="bi"
+                                            :class="
+                                                contactIcon(
+                                                    contact
+                                                )
+                                            "
+                                            aria-hidden="true"
+                                        />
+                                    </div>
+
+                                    <p
+                                        class="
+                                            min-w-0
+                                            flex-1
+                                        "
+                                    >
+                                        <span
+                                            class="
+                                                text-regular
+                                                block
+                                                text-sm
+                                                text-green/50
+                                            "
+                                        >
+                                            {{
+                                                contactLabel(
+                                                    contact
+                                                )
+                                            }}
+                                        </span>
+
+                                        <a
+                                            v-if="
+                                                contact.type ===
+                                                    'address' &&
+                                                googleMapsUrl
+                                            "
+                                            :href="
+                                                googleMapsUrl
+                                            "
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            class="
+                                                text-regular
+                                                mt-0.5
+                                                block
+                                                break-words
+                                                font-bold
+                                                text-green
+                                                transition-opacity
+                                                hover:opacity-60
+                                            "
+                                        >
+                                            {{
+                                                contact.value
+                                            }}
+                                        </a>
+
+                                        <span
+                                            v-else
+                                            class="
+                                                text-regular
+                                                mt-0.5
+                                                block
+                                                break-words
+                                                font-bold
+                                                text-green
+                                            "
+                                        >
+                                            {{
+                                                contact.value
+                                            }}
+                                        </span>
+                                    </p>
                                 </div>
 
-                                <p
-                                    class="
-                                        min-w-0
-                                        flex-1
-                                    "
-                                >
-                                    <span
-                                        class="
-                                            text-regular
-                                            block
-                                            text-sm
-                                            text-green/50
-                                        "
-                                    >
-                                        {{
-                                            contactLabel(
-                                                contact
-                                            )
-                                        }}
-                                    </span>
-
-                                    <a
-                                        v-if="
-                                            contact.type ===
-                                                'address' &&
-                                            googleMapsUrl
-                                        "
-                                        :href="
-                                            googleMapsUrl
-                                        "
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="
-                                            text-regular
-                                            mt-0.5
-                                            block
-                                            break-words
-                                            font-bold
-                                            text-green
-                                            transition-opacity
-                                            hover:opacity-60
-                                        "
-                                    >
-                                        {{
-                                            contact.value
-                                        }}
-                                    </a>
-
-                                    <span
-                                        v-else
-                                        class="
-                                            text-regular
-                                            mt-0.5
-                                            block
-                                            break-words
-                                            font-bold
-                                            text-green
-                                        "
-                                    >
-                                        {{
-                                            contact.value
-                                        }}
-                                    </span>
-                                </p>
-                            </div>
-
-                            <div
-                                v-if="
-                                    contact.type ===
-                                        'address' &&
-                                    googleMapsEmbedUrl
-                                "
-                                class="
-                                    mt-1
-                                    overflow-hidden
-                                    rounded-[28px]
-                                    bg-green/10
-                                "
-                            >
-                                <iframe
+                                <div
                                     v-if="
-                                        shouldRenderInteractiveMap
-                                    "
-                                    :src="
+                                        contact.type ===
+                                            'address' &&
                                         googleMapsEmbedUrl
                                     "
-                                    :title="
-                                        `Mapa adresy ${contact.value}`
-                                    "
                                     class="
-                                        block
-                                        h-64
-                                        w-full
-                                        border-0
-
-                                        lg:h-72
+                                        mt-1
+                                        overflow-hidden
+                                        rounded-[28px]
+                                        bg-green/10
                                     "
-                                    loading="lazy"
-                                    allowfullscreen
-                                    referrerpolicy="no-referrer-when-downgrade"
-                                />
-
-                                <div
-                                    v-else
-                                    class="
-                                        flex
-                                        h-64
-                                        w-full
-                                        items-center
-                                        justify-center
-                                        bg-green/5
-                                        text-green/35
-
-                                        lg:h-72
-                                    "
-                                    aria-hidden="true"
                                 >
-                                    <i
-                                        class="
-                                            bi
-                                            bi-geo-alt
-                                            text-2xl
+                                    <iframe
+                                        v-if="
+                                            shouldRenderInteractiveMap
                                         "
+                                        :src="
+                                            googleMapsEmbedUrl
+                                        "
+                                        :title="
+                                            `Mapa adresy ${contact.value}`
+                                        "
+                                        class="
+                                            block
+                                            h-64
+                                            w-full
+                                            border-0
+
+                                            lg:h-72
+                                        "
+                                        loading="lazy"
+                                        allowfullscreen
+                                        referrerpolicy="no-referrer-when-downgrade"
                                     />
+
+                                    <div
+                                        v-else
+                                        class="
+                                            flex
+                                            h-64
+                                            w-full
+                                            items-center
+                                            justify-center
+                                            bg-green/5
+                                            text-green/35
+
+                                            lg:h-72
+                                        "
+                                        aria-hidden="true"
+                                    >
+                                        <i
+                                            class="
+                                                bi
+                                                bi-geo-alt
+                                                text-2xl
+                                            "
+                                        />
+                                    </div>
                                 </div>
-                            </div>
-                        </component>
+                            </component>
+                        </div>
                     </div>
 
                     <p
