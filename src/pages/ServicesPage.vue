@@ -17,9 +17,6 @@ import { usePageSeo } from '../composables/usePageSeo';
 import {
     useScrollMotion
 } from '../composables/useScrollMotion';
-import {
-    shouldReduceMotionForBrowser
-} from '../utils/browserCompatibility';
 
 import Button from '../components/Button.vue';
 import Card from '../components/Card.vue';
@@ -50,9 +47,6 @@ const {
     publicSiteStore
 );
 
-const browserAllowsScrollMotion =
-    ref(true);
-
 const isMobilePerformanceMode =
     ref(
         typeof window !==
@@ -65,21 +59,6 @@ const isMobilePerformanceMode =
 
 let performanceMediaQuery =
     null;
-
-if (
-    typeof navigator !==
-    'undefined' &&
-    shouldReduceMotionForBrowser(
-        navigator.userAgent,
-        navigator.platform ??
-            '',
-        navigator.maxTouchPoints ??
-            0
-    )
-) {
-    browserAllowsScrollMotion.value =
-        false;
-}
 
 /*
  * Preview cards stay completely still.
@@ -94,9 +73,7 @@ const scrollMotionEnabled =
     computed(() => {
         return (
             props.expanded &&
-            !props.transitioning &&
-            browserAllowsScrollMotion.value &&
-            !isMobilePerformanceMode.value
+            !props.transitioning
         );
     });
 
@@ -107,7 +84,7 @@ const {
         scrollMotionEnabled,
 
     disableOnCoarsePointer:
-        true,
+        false,
 
     axis: 'x',
 
@@ -545,10 +522,6 @@ const showAnimatedSearchPlaceholder =
     });
 
 const displayedSearchPlaceholder = computed(() => {
-    if (isMobilePerformanceMode.value) {
-        return searchPlaceholders[0];
-    }
-
     return searchPlaceholderText.value;
 });
 
@@ -665,8 +638,7 @@ function startSearchPlaceholderAnimation() {
     if (
         searchFocused.value ||
         searchTerm.value ||
-        searchPlaceholderTimer ||
-        isMobilePerformanceMode.value
+        searchPlaceholderTimer
     ) {
         return;
     }
