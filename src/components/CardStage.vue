@@ -91,6 +91,44 @@ function setExpandedCardElement(
             element
         );
 }
+
+function shouldRenderPreviewContent(
+    cardId
+) {
+    const interactionLocked =
+        props.stack.state
+            .interactionLocked;
+
+    /*
+     * Normal overview: render all previews.
+     *
+     * During a transition, render only the page that is
+     * actually moving. The other visible background cards
+     * remain as lightweight green shells with their labels.
+     *
+     * Expanded and settled: no background page component is
+     * kept alive behind the active page.
+     */
+    if (
+        isOverview.value &&
+        !interactionLocked
+    ) {
+        return true;
+    }
+
+    if (!interactionLocked) {
+        return false;
+    }
+
+    const movingCardId =
+        props.stack.state
+            .activePageId ??
+        props.stack.state
+            .overviewPageId;
+
+    return cardId ===
+        movingCardId;
+}
 </script>
 
 <template>
@@ -126,11 +164,6 @@ function setExpandedCardElement(
                 'card-stage__overview--background':
                     !isOverview
             }"
-            :aria-hidden="
-                !isOverview
-                    ? 'true'
-                    : undefined
-            "
             :inert="!isOverview"
         >
             <PageCard
@@ -147,6 +180,11 @@ function setExpandedCardElement(
                     isOverview &&
                     !stack.state
                         .interactionLocked
+                "
+                :render-content="
+                    shouldRenderPreviewContent(
+                        card.id
+                    )
                 "
                 :background-hidden="
                     !isOverview &&

@@ -490,7 +490,7 @@ function bindTouchListeners() {
         'touchstart',
         handleTouchStart,
         {
-            passive: false,
+            passive: true,
             capture: true
         }
     );
@@ -508,7 +508,7 @@ function bindTouchListeners() {
         'touchend',
         handleTouchEnd,
         {
-            passive: false,
+            passive: true,
             capture: true
         }
     );
@@ -517,7 +517,7 @@ function bindTouchListeners() {
         'touchcancel',
         handleTouchCancel,
         {
-            passive: false,
+            passive: true,
             capture: true
         }
     );
@@ -565,7 +565,6 @@ function unbindTouchListeners() {
 */
 
 async function openSheet() {
-    console.log('BottomSheet openSheet', { rendered: rendered.value, mounted, modelValue: props.modelValue });
 
     clearMotionTimer();
 

@@ -661,6 +661,31 @@ function createCardStack({
             '';
     }
 
+    function releaseFocusWithin(
+        element
+    ) {
+        if (
+            !element ||
+            typeof document ===
+            'undefined'
+        ) {
+            return;
+        }
+
+        const activeElement =
+            document.activeElement;
+
+        if (
+            activeElement instanceof
+            HTMLElement &&
+            element.contains(
+                activeElement
+            )
+        ) {
+            activeElement.blur();
+        }
+    }
+
     function prepareElementForHandoff(
         element
     ) {
@@ -1107,10 +1132,43 @@ function createCardStack({
                     'object',
                     'embed',
                     'video',
+                    'audio',
                     'canvas'
                 ].join(', ')
             )
             .forEach((media) => {
+                /*
+                 * A cloned iframe may begin loading as soon as
+                 * the clone is inserted. Remove external sources
+                 * before insertion while preserving the element's
+                 * CSS dimensions.
+                 */
+                media.removeAttribute(
+                    'src'
+                );
+                media.removeAttribute(
+                    'srcdoc'
+                );
+                media.removeAttribute(
+                    'data'
+                );
+                media.removeAttribute(
+                    'poster'
+                );
+
+                media
+                    .querySelectorAll?.(
+                        'source'
+                    )
+                    .forEach((source) => {
+                        source.removeAttribute(
+                            'src'
+                        );
+                        source.removeAttribute(
+                            'srcset'
+                        );
+                    });
+
                 media.style.visibility =
                     'hidden';
                 media.style.opacity =
@@ -1710,13 +1768,10 @@ function createCardStack({
                 )
             );
 
-        const preparationCover =
-            needsContentStabilization
-                ? createOpeningPreparationCover(
-                    previewElement,
-                    previewRect
-                )
-                : null;
+
+        releaseFocusWithin(
+            previewElement
+        );
 
         state.interactionLocked =
             true;
@@ -1767,8 +1822,6 @@ function createCardStack({
             !expandedElement ||
             !expandedRect
         ) {
-            preparationCover
-                ?.remove();
 
             clearTransitionState();
 
@@ -1779,8 +1832,6 @@ function createCardStack({
             !animate ||
             reducedMotion.value
         ) {
-            preparationCover
-                ?.remove();
 
             showElement(
                 expandedElement
@@ -1811,8 +1862,6 @@ function createCardStack({
             );
 
         if (!shellRecord) {
-            preparationCover
-                ?.remove();
 
             showElement(
                 expandedElement
@@ -1848,9 +1897,6 @@ function createCardStack({
         await waitForFrames(
             1
         );
-
-        preparationCover
-            ?.remove();
 
         try {
             await waitForFrames(1);
@@ -1892,8 +1938,6 @@ function createCardStack({
                     true
             });
         } finally {
-            preparationCover
-                ?.remove();
 
             shellRecord.element.remove();
             finishElementHandoff(

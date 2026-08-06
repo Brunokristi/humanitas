@@ -2669,6 +2669,10 @@ onBeforeUnmount(() => {
         </main>
 
         <ServiceBottomSheet
+            v-if="
+                props.expanded &&
+                !props.transitioning
+            "
             v-model="
                 serviceDetailsOpen
             "

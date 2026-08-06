@@ -1661,6 +1661,10 @@ onBeforeUnmount(() => {
 
         <!-- Service detail -->
         <ServiceBottomSheet
+            v-if="
+                props.expanded &&
+                !props.transitioning
+            "
             v-model="
                 serviceDetailsOpen
             "
@@ -1671,6 +1675,10 @@ onBeforeUnmount(() => {
 
         <!-- Employee detail -->
         <EmployeeBottomSheet
+            v-if="
+                props.expanded &&
+                !props.transitioning
+            "
             v-model="
                 employeeSheetOpen
             "

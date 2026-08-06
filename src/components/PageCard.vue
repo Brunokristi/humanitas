@@ -59,6 +59,11 @@ const props = defineProps({
     backgroundHidden: {
         type: Boolean,
         default: false
+    },
+
+    renderContent: {
+        type: Boolean,
+        default: true
     }
 });
 
@@ -532,9 +537,16 @@ function handleControlClick() {
                 }"
             >
                 <component
+                    v-if="props.renderContent"
                     :is="card.component"
                     :expanded="isExpanded"
                     :transitioning="transitioning"
+                />
+
+                <div
+                    v-else
+                    class="page-card__background-placeholder"
+                    aria-hidden="true"
                 />
             </div>
         </div>
@@ -608,6 +620,12 @@ function handleControlClick() {
     height: auto;
     overflow: visible;
     touch-action: pan-y;
+}
+
+.page-card__background-placeholder {
+    width: 100%;
+    min-height: inherit;
+    background: #335940;
 }
 
 .page-card--preview {

@@ -209,6 +209,14 @@ const googleMapsEmbedUrl =
         );
     });
 
+const shouldRenderInteractiveMap =
+    computed(() => {
+        return (
+            props.expanded &&
+            !props.transitioning
+        );
+    });
+
 /*
  * Contacts
  */
@@ -1960,6 +1968,9 @@ onBeforeUnmount(() => {
                                 "
                             >
                                 <iframe
+                                    v-if="
+                                        shouldRenderInteractiveMap
+                                    "
                                     :src="
                                         googleMapsEmbedUrl
                                     "
@@ -1978,6 +1989,30 @@ onBeforeUnmount(() => {
                                     allowfullscreen
                                     referrerpolicy="no-referrer-when-downgrade"
                                 />
+
+                                <div
+                                    v-else
+                                    class="
+                                        flex
+                                        h-64
+                                        w-full
+                                        items-center
+                                        justify-center
+                                        bg-green/5
+                                        text-green/35
+
+                                        lg:h-72
+                                    "
+                                    aria-hidden="true"
+                                >
+                                    <i
+                                        class="
+                                            bi
+                                            bi-geo-alt
+                                            text-2xl
+                                        "
+                                    />
+                                </div>
                             </div>
                         </component>
                     </div>
