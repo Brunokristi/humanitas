@@ -1303,6 +1303,17 @@ onBeforeUnmount(() => {
 <template>
     <div
         ref="motionRoot"
+        data-transition-needs-settle
+        class="
+            page-paint-surface
+            relative
+            min-h-full
+            min-w-0
+            w-full
+            overflow-x-clip
+            bg-green
+            text-baige
+        "
     >
         <!-- Loading -->
         <div
@@ -1516,13 +1527,16 @@ onBeforeUnmount(() => {
                 "
             >
                 <form
+                    data-transition-stable
                     class="
                         mx-auto
                         flex
+                        min-w-0
                         w-full
                         max-w-5xl
                         flex-col
                         gap-2
+                        overflow-hidden
                         rounded-[2rem]
                         bg-baige
                         p-2
@@ -1636,6 +1650,8 @@ onBeforeUnmount(() => {
                             relative
                             min-w-0
                             flex-1
+
+                            md:ml-3
                         "
                     >
                         <i
@@ -1724,8 +1740,6 @@ onBeforeUnmount(() => {
 
                                 focus:border-green/25
                                 focus:ring-0
-
-                                md:ml-3
                             "
                             @focus="
                                 handleSearchFocus
@@ -1781,6 +1795,8 @@ onBeforeUnmount(() => {
                         class="
                             flex
                             h-12
+                            w-full
+                            max-w-full
                             shrink-0
                             items-center
                             justify-center
@@ -2057,6 +2073,7 @@ onBeforeUnmount(() => {
                                 }
                             "
                             data-scroll-motion-source
+                            data-transition-stable
                             class="
                                 services-track
                                 flex

@@ -166,6 +166,12 @@ const rootStyle = computed(() => {
         props.captureMode &&
         props.captureRect
     ) {
+        const bottomRadius =
+            props.captureMode ===
+            'opening'
+                ? 0
+                : 40;
+
         return {
             ...sharedStyles,
             position: 'fixed',
@@ -183,7 +189,12 @@ const rootStyle = computed(() => {
             zIndex: 100,
             opacity: 1,
             pointerEvents: 'none',
-            borderRadius: '40px',
+            borderTopLeftRadius: '40px',
+            borderTopRightRadius: '40px',
+            borderBottomLeftRadius:
+                `${bottomRadius}px`,
+            borderBottomRightRadius:
+                `${bottomRadius}px`,
             transform:
                 'translate3d(0, 0, 0)',
             transition: 'none'
@@ -204,7 +215,10 @@ const rootStyle = computed(() => {
             props.interactive
                 ? 'auto'
                 : 'none',
-        borderRadius: '40px',
+        borderTopLeftRadius: '40px',
+        borderTopRightRadius: '40px',
+        borderBottomLeftRadius: '40px',
+        borderBottomRightRadius: '40px',
         transform:
             'translate3d(0, 0, 0)',
         transition: 'none'
@@ -519,6 +533,7 @@ function handleControlClick() {
 .page-card__capture-content {
     position: relative;
     min-height: inherit;
+    background-color: #335940;
     transition: none;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
@@ -555,6 +570,7 @@ function handleControlClick() {
     box-sizing: border-box;
     width: 100%;
     min-height: inherit;
+    background-color: #335940;
     padding-top: 4.5rem;
 }
 
@@ -604,6 +620,18 @@ function handleControlClick() {
 
 
 <style>
+.page-card--transition-clone {
+    background-color: #335940 !important;
+    color: #fbf9f3 !important;
+}
+
+.page-card--transition-clone .page-card__capture-content,
+.page-card--transition-clone .page-card__transition-counter,
+.page-card--transition-clone .page-card__page-content,
+.page-card--transition-clone .page-paint-surface {
+    background-color: #335940 !important;
+}
+
 .page-card--transition-clone,
 .page-card--transition-clone * {
     animation-play-state: paused !important;

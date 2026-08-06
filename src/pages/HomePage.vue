@@ -120,17 +120,20 @@ const activeServices = computed(() => {
 });
 
 const homepageServices = computed(() => {
-    const eligibleServices =
-        activeServices.value.filter(
+    /*
+     * Preview and expanded cards are separate Vue instances.
+     * A random shuffle produced a different slider order in
+     * each instance, which looked like a Safari layout glitch
+     * during the transition handoff. Keep the order stable.
+     */
+    return activeServices.value
+        .filter(
             hasServiceDescription
+        )
+        .slice(
+            0,
+            6
         );
-
-    return shuffleItems(
-        eligibleServices
-    ).slice(
-        0,
-        6
-    );
 });
 
 const remainingServicesCount =
@@ -419,38 +422,6 @@ function buildPublicAssetUrl(
     return `${apiBaseUrl}${normalizedPath}`;
 }
 
-function shuffleItems(items) {
-    const shuffled = [
-        ...items
-    ];
-
-    for (
-        let index =
-            shuffled.length - 1;
-        index > 0;
-        index--
-    ) {
-        const randomIndex =
-            Math.floor(
-                Math.random() *
-                    (
-                        index +
-                        1
-                    )
-            );
-
-        [
-            shuffled[index],
-            shuffled[randomIndex]
-        ] = [
-            shuffled[randomIndex],
-            shuffled[index]
-        ];
-    }
-
-    return shuffled;
-}
-
 /*
  * Service card helpers
  */
@@ -681,7 +652,19 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div>
+    <div
+        data-transition-needs-settle
+        class="
+            page-paint-surface
+            relative
+            min-h-full
+            min-w-0
+            w-full
+            overflow-x-clip
+            bg-green
+            text-baige
+        "
+    >
         <!-- Loading -->
         <div
             v-if="
@@ -915,13 +898,15 @@ onBeforeUnmount(() => {
 
                 <!-- Hero illustration -->
                 <div
+                    data-transition-stable
                     class="
                         relative
                         flex
+                        min-h-[20rem]
+                        w-full
                         items-center
                         justify-center
                         overflow-x-clip
-                        w-full
 
                         md:min-h-[34rem]
                         md:overflow-visible
@@ -1008,6 +993,7 @@ onBeforeUnmount(() => {
 
                 <!-- Service slider -->
                 <div
+                    data-transition-stable
                     class="
                         min-w-0
                         overflow-visible
@@ -1021,6 +1007,10 @@ onBeforeUnmount(() => {
                             homepageServices
                         "
                         aria-label="Ponúkané služby"
+                        :auto-play="
+                            props.expanded &&
+                            !props.transitioning
+                        "
                         @select="
                             openServiceDetails
                         "

@@ -11,6 +11,7 @@ import { useCardNavigation } from './useCardNavigation';
 
 const OVERVIEW_RADIUS = 40;
 const EXPANDED_RADIUS = 40;
+const OPENING_BOTTOM_RADIUS = 0;
 const OVERVIEW_SNAP_DURATION = 320;
 const SHELL_TRANSITION_DURATION = 520;
 const OVERVIEW_SNAP_EASING =
@@ -657,6 +658,269 @@ function createCardStack({
             '';
     }
 
+    function createOpeningPreparationCover(
+        previewElement,
+        previewRect
+    ) {
+        if (
+            !previewElement ||
+            !previewRect
+        ) {
+            return null;
+        }
+
+        const cover =
+            previewElement.cloneNode(
+                true
+            );
+
+        stabilizeTransitionClone(
+            cover
+        );
+
+        const layoutWidth =
+            Math.max(
+                previewElement.offsetWidth,
+                1
+            );
+
+        const layoutHeight =
+            Math.max(
+                previewElement.offsetHeight,
+                1
+            );
+
+        const scaleX =
+            previewRect.width /
+            layoutWidth;
+
+        const scaleY =
+            previewRect.height /
+            layoutHeight;
+
+        Object.assign(
+            cover.style,
+            {
+                position:
+                    'fixed',
+                top:
+                    `${previewRect.top}px`,
+                left:
+                    `${previewRect.left}px`,
+                width:
+                    `${layoutWidth}px`,
+                height:
+                    `${layoutHeight}px`,
+                minHeight:
+                    `${layoutHeight}px`,
+                margin:
+                    '0',
+                zIndex:
+                    '2147483001',
+                pointerEvents:
+                    'none',
+                overflow:
+                    'hidden',
+                transformOrigin:
+                    'top left',
+                transform:
+                    `translate3d(0, 0, 0) scale(${scaleX}, ${scaleY})`,
+                transition:
+                    'none',
+                visibility:
+                    'visible',
+                opacity:
+                    '1',
+                backfaceVisibility:
+                    'hidden',
+                WebkitBackfaceVisibility:
+                    'hidden',
+                contain:
+                    'layout paint style'
+            }
+        );
+
+        document.body.appendChild(
+            cover
+        );
+
+        cover.getBoundingClientRect();
+
+        return cover;
+    }
+
+    function waitWithTimeout(
+        promise,
+        timeout = 180
+    ) {
+        return Promise.race([
+            Promise.resolve(
+                promise
+            ).catch(
+                () => undefined
+            ),
+
+            new Promise((resolve) => {
+                window.setTimeout(
+                    resolve,
+                    timeout
+                );
+            })
+        ]);
+    }
+
+    async function decodeTransitionImages(
+        rootElement
+    ) {
+        if (!rootElement) {
+            return;
+        }
+
+        const images = [
+            ...rootElement.querySelectorAll(
+                'img'
+            )
+        ];
+
+        await Promise.allSettled(
+            images.map((image) => {
+                if (
+                    image.complete &&
+                    image.naturalWidth > 0
+                ) {
+                    return Promise.resolve();
+                }
+
+                if (
+                    typeof image.decode ===
+                    'function'
+                ) {
+                    return waitWithTimeout(
+                        image.decode(),
+                        220
+                    );
+                }
+
+                return waitWithTimeout(
+                    new Promise((resolve) => {
+                        image.addEventListener(
+                            'load',
+                            resolve,
+                            {
+                                once: true
+                            }
+                        );
+
+                        image.addEventListener(
+                            'error',
+                            resolve,
+                            {
+                                once: true
+                            }
+                        );
+                    }),
+                    220
+                );
+            })
+        );
+    }
+
+    function transitionLayoutSignature(
+        rootElement
+    ) {
+        const elements = [
+            rootElement,
+            ...rootElement.querySelectorAll(
+                '[data-transition-stable]'
+            )
+        ];
+
+        return elements
+            .map((element) => {
+                const rect =
+                    element.getBoundingClientRect();
+
+                return [
+                    rect.left,
+                    rect.top,
+                    rect.width,
+                    rect.height,
+                    element.scrollWidth,
+                    element.scrollHeight
+                ]
+                    .map((value) => {
+                        return Math.round(
+                            value *
+                            10
+                        ) /
+                            10;
+                    })
+                    .join(':');
+            })
+            .join('|');
+    }
+
+    async function waitForTransitionContentStable(
+        rootElement
+    ) {
+        if (!rootElement) {
+            return;
+        }
+
+        if (document.fonts?.ready) {
+            await waitWithTimeout(
+                document.fonts.ready,
+                180
+            );
+        }
+
+        await decodeTransitionImages(
+            rootElement
+        );
+
+        let previousSignature =
+            null;
+
+        let stableFrameCount =
+            0;
+
+        for (
+            let frame = 0;
+            frame < 8;
+            frame += 1
+        ) {
+            await waitForFrames(
+                1
+            );
+
+            const signature =
+                transitionLayoutSignature(
+                    rootElement
+                );
+
+            if (
+                signature ===
+                previousSignature
+            ) {
+                stableFrameCount +=
+                    1;
+            } else {
+                stableFrameCount =
+                    0;
+            }
+
+            if (
+                stableFrameCount >=
+                2
+            ) {
+                return;
+            }
+
+            previousSignature =
+                signature;
+        }
+    }
+
     function removeDuplicateIds(
         element
     ) {
@@ -844,6 +1108,14 @@ function createCardStack({
             shell
         );
 
+        /*
+         * Force WebKit to allocate and paint the shell and
+         * counter-transform layer before animation starts.
+         */
+        shell.getBoundingClientRect();
+        counterElement
+            ?.getBoundingClientRect();
+
         return {
             element:
                 shell,
@@ -937,6 +1209,28 @@ function createCardStack({
         };
     }
 
+    function formatCornerRadius(
+        horizontalRadius,
+        verticalRadius
+    ) {
+        /*
+         * Individual corner-radius longhands use two
+         * whitespace-separated values:
+         *
+         *     border-bottom-left-radius: 40px 28px;
+         *
+         * The slash syntax belongs only to the
+         * `border-radius` shorthand. WebKit may reject or
+         * discretely apply a slash value on a longhand,
+         * which caused the bottom corners to snap at the
+         * end of the minimizing animation.
+         */
+        return [
+            `${horizontalRadius}px`,
+            `${verticalRadius}px`
+        ].join(' ');
+    }
+
     function applyTransitionEndpoint(
         shellRecord,
         geometry,
@@ -965,9 +1259,28 @@ function createCardStack({
                 ].join(' ');
             }
 
-            shellRecord.element.style.borderRadius =
-                `${OVERVIEW_RADIUS / Math.max(geometry.scaleX, 0.001)}px / ` +
-                `${OVERVIEW_RADIUS / Math.max(geometry.scaleY, 0.001)}px`;
+            const previewCornerRadius =
+                formatCornerRadius(
+                    OVERVIEW_RADIUS /
+                    Math.max(
+                        geometry.scaleX,
+                        0.001
+                    ),
+                    OVERVIEW_RADIUS /
+                    Math.max(
+                        geometry.scaleY,
+                        0.001
+                    )
+                );
+
+            shellRecord.element.style.borderTopLeftRadius =
+                previewCornerRadius;
+            shellRecord.element.style.borderTopRightRadius =
+                previewCornerRadius;
+            shellRecord.element.style.borderBottomLeftRadius =
+                previewCornerRadius;
+            shellRecord.element.style.borderBottomRightRadius =
+                previewCornerRadius;
 
             return;
         }
@@ -975,8 +1288,32 @@ function createCardStack({
         shellRecord.element.style.transform =
             'translate3d(0, 0, 0) scale(1, 1)';
 
-        shellRecord.element.style.borderRadius =
-            `${EXPANDED_RADIUS}px`;
+        const expandedTopRadius =
+            formatCornerRadius(
+                EXPANDED_RADIUS,
+                EXPANDED_RADIUS
+            );
+
+        const expandedBottomRadiusValue =
+            endpoint ===
+            'opening-expanded'
+                ? OPENING_BOTTOM_RADIUS
+                : EXPANDED_RADIUS;
+
+        const expandedBottomRadius =
+            formatCornerRadius(
+                expandedBottomRadiusValue,
+                expandedBottomRadiusValue
+            );
+
+        shellRecord.element.style.borderTopLeftRadius =
+            expandedTopRadius;
+        shellRecord.element.style.borderTopRightRadius =
+            expandedTopRadius;
+        shellRecord.element.style.borderBottomLeftRadius =
+            expandedBottomRadius;
+        shellRecord.element.style.borderBottomRightRadius =
+            expandedBottomRadius;
 
         if (shellRecord.contentElement) {
             shellRecord.contentElement.style.transform =
@@ -1006,21 +1343,69 @@ function createCardStack({
                 expandedRect
             });
 
+        const previewRadiusX =
+            OVERVIEW_RADIUS /
+            Math.max(
+                geometry.scaleX,
+                0.001
+            );
+
+        const previewRadiusY =
+            OVERVIEW_RADIUS /
+            Math.max(
+                geometry.scaleY,
+                0.001
+            );
+
+        const previewCornerRadius =
+            formatCornerRadius(
+                previewRadiusX,
+                previewRadiusY
+            );
+
+        const expandedTopRadius =
+            formatCornerRadius(
+                EXPANDED_RADIUS,
+                EXPANDED_RADIUS
+            );
+
+        const expandedBottomRadiusValue =
+            opening
+                ? OPENING_BOTTOM_RADIUS
+                : EXPANDED_RADIUS;
+
+        const expandedBottomRadius =
+            formatCornerRadius(
+                expandedBottomRadiusValue,
+                expandedBottomRadiusValue
+            );
+
         const previewShellKeyframe = {
             transform: [
                 `translate3d(${geometry.translateX}px, ${geometry.translateY}px, 0)`,
                 `scale(${geometry.scaleX}, ${geometry.scaleY})`
             ].join(' '),
-            borderRadius:
-                `${OVERVIEW_RADIUS / Math.max(geometry.scaleX, 0.001)}px / ` +
-                `${OVERVIEW_RADIUS / Math.max(geometry.scaleY, 0.001)}px`
+            borderTopLeftRadius:
+                previewCornerRadius,
+            borderTopRightRadius:
+                previewCornerRadius,
+            borderBottomLeftRadius:
+                previewCornerRadius,
+            borderBottomRightRadius:
+                previewCornerRadius
         };
 
         const expandedShellKeyframe = {
             transform:
                 'translate3d(0, 0, 0) scale(1, 1)',
-            borderRadius:
-                `${EXPANDED_RADIUS}px`
+            borderTopLeftRadius:
+                expandedTopRadius,
+            borderTopRightRadius:
+                expandedTopRadius,
+            borderBottomLeftRadius:
+                expandedBottomRadius,
+            borderBottomRightRadius:
+                expandedBottomRadius
         };
 
         const previewContentKeyframe = {
@@ -1040,9 +1425,23 @@ function createCardStack({
             geometry,
             opening
                 ? 'preview'
-                : 'expanded'
+                : 'settled-expanded'
         );
 
+        /*
+         * Use one animation for the complete shell geometry.
+         *
+         * Previously, minimizing used a second animation for
+         * the bottom corners. Safari could apply that second
+         * longhand animation discretely, so the radius stayed
+         * at 0 until the card had nearly reached its endpoint.
+         *
+         * Opening temporarily reaches square bottom corners.
+         * The settled live page is rounded again after the
+         * shell handoff. Closing therefore begins with all
+         * four corners rounded and keeps them rounded while
+         * returning to the overview card.
+         */
         const shellAnimation =
             shellRecord.element.animate(
                 opening
@@ -1104,7 +1503,7 @@ function createCardStack({
             shellRecord,
             geometry,
             opening
-                ? 'expanded'
+                ? 'opening-expanded'
                 : 'preview'
         );
     }
@@ -1168,6 +1567,21 @@ function createCardStack({
             return;
         }
 
+        const needsContentStabilization =
+            Boolean(
+                previewElement.querySelector(
+                    '[data-transition-needs-settle]'
+                )
+            );
+
+        const preparationCover =
+            needsContentStabilization
+                ? createOpeningPreparationCover(
+                    previewElement,
+                    previewRect
+                )
+                : null;
+
         state.interactionLocked =
             true;
         state.captureMode =
@@ -1195,6 +1609,19 @@ function createCardStack({
         const expandedElement =
             expandedCardElement.value;
 
+        if (
+            needsContentStabilization &&
+            expandedElement
+        ) {
+            hideElement(
+                expandedElement
+            );
+
+            await waitForTransitionContentStable(
+                expandedElement
+            );
+        }
+
         const expandedRect =
             getExpandedAnimationRect(
                 expandedElement
@@ -1204,6 +1631,9 @@ function createCardStack({
             !expandedElement ||
             !expandedRect
         ) {
+            preparationCover
+                ?.remove();
+
             clearTransitionState();
 
             return;
@@ -1213,6 +1643,13 @@ function createCardStack({
             !animate ||
             reducedMotion.value
         ) {
+            preparationCover
+                ?.remove();
+
+            showElement(
+                expandedElement
+            );
+
             state.captureMode =
                 null;
             state.captureRect =
@@ -1238,6 +1675,13 @@ function createCardStack({
             );
 
         if (!shellRecord) {
+            preparationCover
+                ?.remove();
+
+            showElement(
+                expandedElement
+            );
+
             clearTransitionState();
 
             return;
@@ -1258,6 +1702,19 @@ function createCardStack({
         hideElement(
             expandedElement
         );
+
+        /*
+         * The preparation cover keeps the exact preview
+         * visible while Home/Services finish child layout.
+         * Remove it only after the animated shell is already
+         * painted at the identical preview endpoint.
+         */
+        await waitForFrames(
+            1
+        );
+
+        preparationCover
+            ?.remove();
 
         try {
             await waitForFrames(1);
@@ -1290,6 +1747,9 @@ function createCardStack({
 
             await waitForFrames(1);
         } finally {
+            preparationCover
+                ?.remove();
+
             shellRecord.element.remove();
             showElement(
                 expandedCardElement.value
