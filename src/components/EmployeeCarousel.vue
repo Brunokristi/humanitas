@@ -48,9 +48,19 @@ const props = defineProps({
     }
 });
 
+const scrollMotionEnabled = computed(() => {
+    return props.scrollMotion;
+});
+
 const {
     motionRoot
-} = useScrollMotion();
+} = useScrollMotion({
+    enabled:
+        scrollMotionEnabled,
+
+    disableOnCoarsePointer:
+        true
+});
 
 const currentIndex = ref(
     Math.min(
@@ -1077,8 +1087,6 @@ function selectCurrent() {
 }
 
 function selectEmployee(index) {
-    console.log('EmployeeCarousel selectEmployee', index);
-
     if (
         index === undefined ||
         index === null ||
@@ -1223,17 +1231,20 @@ onBeforeUnmount(() => {
                         justify-self-center
                         origin-[50%_92%]
                         [backface-visibility:hidden]
-                        [will-change:transform]
 
                         sm:w-[14rem]
 
                         md:w-[15rem]
                     "
-                    :class="
+                    :class="[
                         getCardWrapperClasses(
                             index
-                        )
-                    "
+                        ),
+                        {
+                            '[will-change:transform]':
+                                isDragging
+                        }
+                    ]"
                     :style="
                         getCardWrapperStyle(
                             index
@@ -1329,6 +1340,14 @@ onBeforeUnmount(() => {
                                     item
                                 )
                             "
+                            :loading="
+                                isCardActive(
+                                    index
+                                )
+                                    ? 'eager'
+                                    : 'lazy'
+                            "
+                            decoding="async"
                             draggable="false"
                             class="
                                 absolute

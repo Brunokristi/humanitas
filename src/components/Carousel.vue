@@ -45,9 +45,19 @@ const props = defineProps({
     }
 });
 
+const scrollMotionEnabled = computed(() => {
+    return props.scrollMotion;
+});
+
 const {
     motionRoot
-} = useScrollMotion();
+} = useScrollMotion({
+    enabled:
+        scrollMotionEnabled,
+
+    disableOnCoarsePointer:
+        true
+});
 
 const currentIndex = ref(
     Math.min(
@@ -1058,13 +1068,16 @@ onBeforeUnmount(() => {
                         origin-[50%_92%]
                         justify-self-center
                         [backface-visibility:hidden]
-                        [will-change:transform]
                     "
-                    :class="
+                    :class="[
                         getCardWrapperClasses(
                             index
-                        )
-                    "
+                        ),
+                        {
+                            '[will-change:transform]':
+                                isDragging
+                        }
+                    ]"
                     :style="
                         getCardWrapperStyle(
                             index

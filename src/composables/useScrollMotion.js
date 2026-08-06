@@ -1,7 +1,8 @@
 import {
     onBeforeUnmount,
     onMounted,
-    ref
+    ref,
+    watch
 } from 'vue'
 
 const DEFAULT_VARIANTS = [
@@ -127,17 +128,72 @@ export function useScrollMotion(
         options.variants ??
         DEFAULT_VARIANTS
 
+    const enabledOption =
+        options.enabled ??
+        true
+
+    const disableOnCoarsePointer =
+        options.disableOnCoarsePointer ??
+        false
+
     let motionFrame =
         null
 
     let reducedMotionQuery =
         null
 
+    let coarsePointerQuery =
+        null
+
+    let started =
+        false
+
     const sourceStates =
         new Map()
 
     const elementStates =
         new Map()
+
+    function readEnabledOption() {
+        if (
+            typeof enabledOption ===
+            'function'
+        ) {
+            return Boolean(
+                enabledOption()
+            )
+        }
+
+        if (
+            enabledOption &&
+            typeof enabledOption ===
+            'object' &&
+            'value' in enabledOption
+        ) {
+            return Boolean(
+                enabledOption.value
+            )
+        }
+
+        return Boolean(
+            enabledOption
+        )
+    }
+
+    function shouldRun() {
+        if (!readEnabledOption()) {
+            return false
+        }
+
+        if (
+            disableOnCoarsePointer &&
+            coarsePointerQuery?.matches
+        ) {
+            return false
+        }
+
+        return true
+    }
 
     function motionStyle(
         baseRotation = 0
@@ -580,6 +636,15 @@ export function useScrollMotion(
             '--scroll-scale',
             '1'
         )
+
+        element.style.setProperty(
+            'will-change',
+            'auto'
+        )
+
+        element.classList.remove(
+            'is-motion-active'
+        )
     }
 
     function resetSourceElements(
@@ -828,6 +893,15 @@ export function useScrollMotion(
                 if (moving) {
                     sourceStillMoving =
                         true
+
+                    element.style.setProperty(
+                        'will-change',
+                        'transform'
+                    )
+
+                    element.classList.add(
+                        'is-motion-active'
+                    )
 
                     return
                 }
@@ -1087,10 +1161,15 @@ export function useScrollMotion(
     function start() {
         if (
             typeof window ===
-            'undefined'
+                'undefined' ||
+            started ||
+            !shouldRun()
         ) {
             return
         }
+
+        started =
+            true
 
         reducedMotionQuery =
             window.matchMedia(
@@ -1121,6 +1200,8 @@ export function useScrollMotion(
                     }
                 )
 
+            resetAllElements()
+
             return
         }
 
@@ -1146,6 +1227,8 @@ export function useScrollMotion(
                 passive: true
             }
         )
+
+        resetAllElements()
     }
 
     function stop() {
@@ -1154,6 +1237,10 @@ export function useScrollMotion(
             'undefined'
         ) {
             return
+        }
+
+        if (started) {
+            resetAllElements()
         }
 
         window.removeEventListener(
@@ -1191,13 +1278,67 @@ export function useScrollMotion(
 
         reducedMotionQuery =
             null
+
+        started =
+            false
     }
 
+    function syncRunningState() {
+        if (
+            typeof window ===
+            'undefined'
+        ) {
+            return
+        }
+
+        if (shouldRun()) {
+            start()
+
+            return
+        }
+
+        stop()
+    }
+
+    function handleCoarsePointerChange() {
+        syncRunningState()
+    }
+
+    const stopEnabledWatch =
+        watch(
+            () => readEnabledOption(),
+            () => {
+                syncRunningState()
+            }
+        )
+
     onMounted(() => {
-        start()
+        coarsePointerQuery =
+            window.matchMedia(
+                '(max-width: 767px), (pointer: coarse)'
+            )
+
+        coarsePointerQuery
+            .addEventListener?.(
+                'change',
+                handleCoarsePointerChange
+            )
+
+        syncRunningState()
     })
 
     onBeforeUnmount(() => {
+        stopEnabledWatch()
+
+        coarsePointerQuery
+            ?.removeEventListener?.(
+                'change',
+                handleCoarsePointerChange
+            )
+
+        coarsePointerQuery =
+            null
+
         stop()
     })
 

@@ -172,6 +172,11 @@ const repositioningCards = ref([]);
 
 let repositionFrame = null;
 let revealFrame = null;
+let resizeFrame = null;
+let lastViewportWidth =
+    typeof window !== 'undefined'
+        ? window.innerWidth
+        : 1024;
 
 /*
  * Basic computed values
@@ -1357,10 +1362,48 @@ function handleKeydown(event) {
  * Resize
  */
 
-async function handleResize() {
-    updateMeasurements();
+function handleResize() {
+    const nextWidth =
+        window.innerWidth;
 
-    await updateEqualCardHeight();
+    /*
+     * Mobile Safari fires resize events while its browser
+     * chrome expands and collapses. The page width does not
+     * change, so recomputing every slider during those events
+     * only creates dropped frames while scrolling.
+     */
+    if (
+        Math.abs(
+            nextWidth -
+            lastViewportWidth
+        ) < 1
+    ) {
+        return;
+    }
+
+    lastViewportWidth =
+        nextWidth;
+
+    if (
+        resizeFrame !==
+        null
+    ) {
+        window.cancelAnimationFrame(
+            resizeFrame
+        );
+    }
+
+    resizeFrame =
+        window.requestAnimationFrame(
+            async () => {
+                resizeFrame =
+                    null;
+
+                updateMeasurements();
+
+                await updateEqualCardHeight();
+            }
+        );
 }
 
 /*
@@ -1368,7 +1411,19 @@ async function handleResize() {
  */
 
 watch(
-    () => props.items,
+    () => props.items.map(
+        (
+            item,
+            index
+        ) => {
+            return (
+                item?.id ??
+                item?.slug ??
+                item?.name ??
+                index
+            );
+        }
+    ),
 
     async () => {
         clearRepositionFrames();
@@ -1391,10 +1446,6 @@ watch(
                 scheduleAutoPlay();
             }
         );
-    },
-
-    {
-        deep: true
     }
 );
 
@@ -1472,6 +1523,18 @@ onMounted(async () => {
 onBeforeUnmount(() => {
     clearAutoPlayTimer();
     clearRepositionFrames();
+
+    if (
+        resizeFrame !==
+        null
+    ) {
+        window.cancelAnimationFrame(
+            resizeFrame
+        );
+
+        resizeFrame =
+            null;
+    }
 
     repositioningCards.value = [];
 
@@ -1601,7 +1664,6 @@ onBeforeUnmount(() => {
                         duration-300
                         ease-[cubic-bezier(0.2,0.85,0.25,1)]
                         [backface-visibility:hidden]
-                        [will-change:transform,opacity]
                     "
                     :class="{
                         'transition-none':

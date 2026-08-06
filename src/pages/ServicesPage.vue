@@ -53,6 +53,19 @@ const {
 const browserAllowsScrollMotion =
     ref(true);
 
+const isMobilePerformanceMode =
+    ref(
+        typeof window !==
+            'undefined'
+            ? window.matchMedia(
+                '(max-width: 767px), (pointer: coarse)'
+            ).matches
+            : false
+    );
+
+let performanceMediaQuery =
+    null;
+
 if (
     typeof navigator !==
     'undefined' &&
@@ -82,13 +95,20 @@ const scrollMotionEnabled =
         return (
             props.expanded &&
             !props.transitioning &&
-            browserAllowsScrollMotion.value
+            browserAllowsScrollMotion.value &&
+            !isMobilePerformanceMode.value
         );
     });
 
 const {
     motionRoot
 } = useScrollMotion({
+    enabled:
+        scrollMotionEnabled,
+
+    disableOnCoarsePointer:
+        true,
+
     axis: 'x',
 
     selector:
@@ -524,6 +544,14 @@ const showAnimatedSearchPlaceholder =
         );
     });
 
+const displayedSearchPlaceholder = computed(() => {
+    if (isMobilePerformanceMode.value) {
+        return searchPlaceholders[0];
+    }
+
+    return searchPlaceholderText.value;
+});
+
 const selectedCategoryLabel =
     computed(() => {
         return (
@@ -637,7 +665,8 @@ function startSearchPlaceholderAnimation() {
     if (
         searchFocused.value ||
         searchTerm.value ||
-        searchPlaceholderTimer
+        searchPlaceholderTimer ||
+        isMobilePerformanceMode.value
     ) {
         return;
     }
@@ -1015,48 +1044,16 @@ function removeCategoryTrackListeners(
     }
 }
 
-function setCategoryTrack(
+function attachCategoryTrackListeners(
     category,
     element
 ) {
-    const existingTrack =
-        categoryTracks.get(
-            category
-        );
-
     if (
-        existingTrack ===
-        element
+        !element ||
+        isMobilePerformanceMode.value
     ) {
-        nextTick(() => {
-            updateCategorySliderState(
-                category
-            );
-        });
-
         return;
     }
-
-    removeCategoryTrackListeners(
-        category
-    );
-
-    if (!element) {
-        categoryTracks.delete(
-            category
-        );
-
-        updateCategorySliderState(
-            category
-        );
-
-        return;
-    }
-
-    categoryTracks.set(
-        category,
-        element
-    );
 
     const handleScroll =
         () => {
@@ -1110,6 +1107,62 @@ function setCategoryTrack(
             }
         );
     });
+}
+
+function setCategoryTrack(
+    category,
+    element
+) {
+    const existingTrack =
+        categoryTracks.get(
+            category
+        );
+
+    if (
+        existingTrack ===
+        element
+    ) {
+        if (
+            element &&
+            !isMobilePerformanceMode.value &&
+            !categoryTrackHandlers.has(
+                category
+            )
+        ) {
+            attachCategoryTrackListeners(
+                category,
+                element
+            );
+        }
+
+        return;
+    }
+
+    removeCategoryTrackListeners(
+        category
+    );
+
+    if (!element) {
+        categoryTracks.delete(
+            category
+        );
+
+        updateCategorySliderState(
+            category
+        );
+
+        return;
+    }
+
+    categoryTracks.set(
+        category,
+        element
+    );
+
+    attachCategoryTrackListeners(
+        category,
+        element
+    );
 }
 
 function scrollCategory(
@@ -1188,7 +1241,10 @@ function scrollCategory(
 watch(
     groupedServices,
     async () => {
-        if (props.transitioning) {
+        if (
+            props.transitioning ||
+            isMobilePerformanceMode.value
+        ) {
             return;
         }
 
@@ -1231,6 +1287,10 @@ watch(
 
         startSearchPlaceholderAnimation();
 
+        if (isMobilePerformanceMode.value) {
+            return;
+        }
+
         await nextTick();
 
         window.requestAnimationFrame(
@@ -1254,7 +1314,53 @@ watch(
  * Lifecycle
  */
 
+function updatePerformanceMode() {
+    isMobilePerformanceMode.value =
+        Boolean(
+            performanceMediaQuery
+                ?.matches
+        );
+
+    stopSearchPlaceholderAnimation();
+
+    categoryTracks.forEach(
+        (
+            track,
+            category
+        ) => {
+            removeCategoryTrackListeners(
+                category
+            );
+
+            attachCategoryTrackListeners(
+                category,
+                track
+            );
+        }
+    );
+
+    if (
+        props.expanded &&
+        !props.transitioning
+    ) {
+        startSearchPlaceholderAnimation();
+    }
+}
+
 onMounted(() => {
+    performanceMediaQuery =
+        window.matchMedia(
+            '(max-width: 767px), (pointer: coarse)'
+        );
+
+    performanceMediaQuery
+        .addEventListener?.(
+            'change',
+            updatePerformanceMode
+        );
+
+    updatePerformanceMode();
+
     if (
         props.expanded &&
         !props.transitioning
@@ -1262,25 +1368,36 @@ onMounted(() => {
         startSearchPlaceholderAnimation();
     }
 
-    nextTick(() => {
-        window.requestAnimationFrame(
-            () => {
-                categoryTracks.forEach(
-                    (
-                        _,
-                        category
-                    ) => {
-                        updateCategorySliderState(
+    if (!isMobilePerformanceMode.value) {
+        nextTick(() => {
+            window.requestAnimationFrame(
+                () => {
+                    categoryTracks.forEach(
+                        (
+                            _,
                             category
-                        );
-                    }
-                );
-            }
-        );
-    });
+                        ) => {
+                            updateCategorySliderState(
+                                category
+                            );
+                        }
+                    );
+                }
+            );
+        });
+    }
 });
 
 onBeforeUnmount(() => {
+    performanceMediaQuery
+        ?.removeEventListener?.(
+            'change',
+            updatePerformanceMode
+        );
+
+    performanceMediaQuery =
+        null;
+
     stopSearchPlaceholderAnimation();
 
     categoryTracks.forEach(
@@ -1697,9 +1814,12 @@ onBeforeUnmount(() => {
                                     text-green/40
                                 "
                             >
-                                {{ searchPlaceholderText }}
+                                {{ displayedSearchPlaceholder }}
 
                                 <span
+                                    v-if="
+                                        !isMobilePerformanceMode
+                                    "
                                     class="
                                         ml-[1px]
                                         inline-block
@@ -1867,6 +1987,12 @@ onBeforeUnmount(() => {
                     :key="
                         group.value
                     "
+                    :class="{
+                        'services-group--lazy':
+                            props.expanded &&
+                            !props.transitioning &&
+                            isMobilePerformanceMode
+                    }"
                     class="
                         min-w-0
                         overflow-hidden
@@ -2571,6 +2697,24 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .services-track::-webkit-scrollbar {
     display: none;
+}
+
+@media (
+    max-width:
+    767px
+) {
+    .services-group--lazy {
+        content-visibility:
+            auto;
+
+        contain-intrinsic-size:
+            auto 620px;
+    }
+
+    .services-track {
+        scroll-behavior:
+            auto;
+    }
 }
 
 @media (

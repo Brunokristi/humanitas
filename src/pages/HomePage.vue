@@ -31,6 +31,126 @@ const props = defineProps({
     }
 });
 
+const isMobilePerformanceMode =
+    ref(
+        typeof window !==
+            'undefined'
+            ? window.matchMedia(
+                '(max-width: 767px), (pointer: coarse)'
+            ).matches
+            : false
+    );
+
+const heavyContentReady =
+    ref(false);
+
+let performanceMediaQuery =
+    null;
+
+let heavyContentTask =
+    null;
+
+const renderHeavyContent = computed(() => {
+    return (
+        !isMobilePerformanceMode.value ||
+        heavyContentReady.value
+    );
+});
+
+const decorativeMotionEnabled = computed(() => {
+    return (
+        props.expanded &&
+        !props.transitioning &&
+        !isMobilePerformanceMode.value
+    );
+});
+
+function cancelHeavyContentTask() {
+    if (
+        heavyContentTask ===
+        null
+    ) {
+        return;
+    }
+
+    if (
+        typeof window !==
+            'undefined' &&
+        'cancelIdleCallback' in window
+    ) {
+        window.cancelIdleCallback(
+            heavyContentTask
+        );
+    } else {
+        window.clearTimeout(
+            heavyContentTask
+        );
+    }
+
+    heavyContentTask =
+        null;
+}
+
+function scheduleHeavyContent() {
+    if (
+        !props.expanded ||
+        props.transitioning ||
+        heavyContentReady.value ||
+        !isMobilePerformanceMode.value
+    ) {
+        return;
+    }
+
+    cancelHeavyContentTask();
+
+    const reveal = () => {
+        heavyContentTask =
+            null;
+
+        heavyContentReady.value =
+            true;
+    };
+
+    if (
+        typeof window !==
+            'undefined' &&
+        'requestIdleCallback' in window
+    ) {
+        heavyContentTask =
+            window.requestIdleCallback(
+                reveal,
+                {
+                    timeout: 320
+                }
+            );
+
+        return;
+    }
+
+    heavyContentTask =
+        window.setTimeout(
+            reveal,
+            90
+        );
+}
+
+function updatePerformanceMode() {
+    isMobilePerformanceMode.value =
+        Boolean(
+            performanceMediaQuery
+                ?.matches
+        );
+
+    stopHeroPhraseAnimation();
+    startHeroPhraseAnimation();
+
+    if (
+        isMobilePerformanceMode.value
+    ) {
+        scheduleHeavyContent();
+    }
+}
+
 const publicSiteStore =
     usePublicSiteStore();
 
@@ -612,7 +732,8 @@ function startHeroPhraseAnimation() {
         heroPhraseTimer !==
             null ||
         !props.expanded ||
-        props.transitioning
+        props.transitioning ||
+        isMobilePerformanceMode.value
     ) {
         return;
     }
@@ -639,15 +760,51 @@ watch(
     () => {
         stopHeroPhraseAnimation();
         startHeroPhraseAnimation();
+
+        if (!props.expanded) {
+            cancelHeavyContentTask();
+
+            heavyContentReady.value =
+                false;
+
+            return;
+        }
+
+        if (!props.transitioning) {
+            scheduleHeavyContent();
+        }
     }
 );
 
 onMounted(() => {
+    performanceMediaQuery =
+        window.matchMedia(
+            '(max-width: 767px), (pointer: coarse)'
+        );
+
+    performanceMediaQuery
+        .addEventListener?.(
+            'change',
+            updatePerformanceMode
+        );
+
+    updatePerformanceMode();
     startHeroPhraseAnimation();
+    scheduleHeavyContent();
 });
 
 onBeforeUnmount(() => {
+    cancelHeavyContentTask();
     stopHeroPhraseAnimation();
+
+    performanceMediaQuery
+        ?.removeEventListener?.(
+            'change',
+            updatePerformanceMode
+        );
+
+    performanceMediaQuery =
+        null;
 });
 </script>
 
@@ -1008,8 +1165,7 @@ onBeforeUnmount(() => {
                         "
                         aria-label="Ponúkané služby"
                         :auto-play="
-                            props.expanded &&
-                            !props.transitioning
+                            decorativeMotionEnabled
                         "
                         @select="
                             openServiceDetails
@@ -1249,6 +1405,7 @@ onBeforeUnmount(() => {
             <!-- FAQ -->
             <section
                 class="
+                    mobile-lazy-section
                     mx-auto
                     grid
                     w-full
@@ -1307,10 +1464,15 @@ onBeforeUnmount(() => {
                     "
                 >
                     <FaqCarousel
+                        v-if="
+                            renderHeavyContent
+                        "
                         :items="
                             faqItems
                         "
-                        scroll-motion
+                        :scroll-motion="
+                            decorativeMotionEnabled
+                        "
                     />
                 </div>
 
@@ -1356,6 +1518,7 @@ onBeforeUnmount(() => {
             <!-- Team -->
             <div
                 class="
+                    mobile-lazy-section
                     mx-auto
                     grid
                     w-full
@@ -1476,11 +1639,16 @@ onBeforeUnmount(() => {
                         "
                     >
                         <EmployeeCarousel
+                            v-if="
+                                renderHeavyContent
+                            "
                             :items="
                                 orderedEmployees
                             "
                             aria-label="Náš tím"
-                            scroll-motion
+                            :scroll-motion="
+                                decorativeMotionEnabled
+                            "
                             @select="
                                 openEmployee
                             "
@@ -1582,6 +1750,19 @@ onBeforeUnmount(() => {
 
     filter:
         blur(3px);
+}
+
+@media (
+    max-width:
+    767px
+) {
+    .mobile-lazy-section {
+        content-visibility:
+            auto;
+
+        contain-intrinsic-size:
+            auto 760px;
+    }
 }
 
 @media (
