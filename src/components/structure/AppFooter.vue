@@ -6,10 +6,10 @@ import {
 
 import { storeToRefs } from 'pinia';
 
-import PrivacyPolicyBottomSheet from './PrivacyPolicy.vue';
+import PrivacyPolicyBottomSheet from '../PrivacyPolicy.vue';
 
-import { usePublicSiteStore } from '../stores/publicSite';
-import { useCookieConsent } from '../composables/useCookieConsent';
+import { usePublicSiteStore } from '../../stores/publicSite.js';
+import { useCookieConsent } from '../../composables/useCookieConsent.js';
 
 const publicSiteStore =
     usePublicSiteStore();
@@ -196,7 +196,7 @@ const companyDic = computed(() => {
 const ambulances = [
     {
         name: 'Mentis',
-        logo: '/images/mentis_logo.png',
+        logo: '/images/mentis_logo_horizontalne.svg',
         nameClass: [
             'text-[#BB5264]'
         ],
@@ -204,7 +204,7 @@ const ambulances = [
     },
     {
         name: 'Humanitas',
-        logo: '/images/humanitas_logo.png',
+        logo: '/images/humanitas_logo_horizontalne.svg',
         href: 'https://klinickapsychologiars.sk'
     }
 ];
@@ -318,7 +318,8 @@ function openingHoursSchedule(entry) {
 }
 
 function handlePrivacyPolicyClick() {
-    privacyPolicyOpen.value = true;
+    privacyPolicyOpen.value =
+        true;
 }
 
 function handleCookiesClick() {
@@ -327,21 +328,14 @@ function handleCookiesClick() {
 </script>
 
 <template>
-    <footer
+    <div
         class="
             relative
-            z-10
+            w-full
             overflow-hidden
             bg-baige
-            px-6
-            pb-4
-            pt-5
-            text-green
-
-            sm:pt-10
         "
     >
-        <!-- Decorative image behind footer content -->
         <img
             src="/images/humanitas_mamadieta_zelena.svg"
             alt=""
@@ -351,45 +345,52 @@ function handleCookiesClick() {
                 pointer-events-none
                 absolute
                 bottom-[-4rem]
-                right-[-4rem]
+                right-[-8rem]
                 z-0
                 h-auto
-                w-[150%]
-                max-h-[40rem]
+                max-h-[50rem]
                 max-w-none
                 opacity-[0.2]
 
                 sm:bottom-[-9rem]
                 sm:w-[60%]
+
+                md:bottom-[-15rem]
+                md:right-[-15rem]
+                md:w-[40rem]
+
+                lg:bottom-[-10rem]
+
+                xl:right-[-15rem]
             "
         >
 
-        <!-- Footer content -->
-        <div
+        <footer
             class="
                 relative
                 z-10
                 mx-auto
                 w-full
+                max-w-[1600px]
+                px-6
+                pb-20
+                pt-14
+                text-green
             "
         >
-            <!-- Main footer sections -->
             <div
                 class="
                     grid
                     grid-cols-1
+                    justify-items-center
                     gap-x-12
                     gap-y-14
-                    pt-15
 
-                    sm:justify-items-center
-
-                    md:grid-cols-3
+                    lg:grid-cols-3
 
                     xl:gap-x-30
                 "
             >
-                <!-- Contact -->
                 <section
                     class="
                         w-full
@@ -397,15 +398,51 @@ function handleCookiesClick() {
                         text-left
                     "
                 >
-                    <h2
+                    <div
                         class="
-                            text-regular
-                            font-bold
-                            text-green
+                            relative
+                            w-fit
+                            pb-1
                         "
                     >
-                        Kontakt
-                    </h2>
+                        <h2
+                            class="
+                                text-regular
+                                font-bold
+                                text-green
+                            "
+                        >
+                            Kontakt
+                        </h2>
+
+                        <svg
+                            viewBox="0 0 160 12"
+                            preserveAspectRatio="none"
+                            aria-hidden="true"
+                            class="
+                                pointer-events-none
+                                absolute
+                                -bottom-0.5
+                                h-2
+                                w-[calc(100%+3rem)]
+                                overflow-visible
+                                text-green
+                            "
+                        >
+                            <path
+                                d="
+                                    M2 7
+                                    C28 8.5, 54 5.5, 80 7
+                                    C106 8.5, 132 5.8, 158 6.8
+                                "
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                    </div>
 
                     <div
                         class="
@@ -445,6 +482,7 @@ function handleCookiesClick() {
                                         bi
                                         bi-telephone
                                         text-base
+                                        leading-none
                                     "
                                     aria-hidden="true"
                                 />
@@ -492,6 +530,7 @@ function handleCookiesClick() {
                                         bi
                                         bi-envelope
                                         text-base
+                                        leading-none
                                     "
                                     aria-hidden="true"
                                 />
@@ -518,7 +557,7 @@ function handleCookiesClick() {
                             class="
                                 flex
                                 min-h-9
-                                items-start
+                                items-center
                                 gap-3
                             "
                         >
@@ -536,6 +575,7 @@ function handleCookiesClick() {
                                         bi
                                         bi-geo-alt
                                         text-base
+                                        leading-none
                                     "
                                     aria-hidden="true"
                                 />
@@ -544,7 +584,6 @@ function handleCookiesClick() {
                             <span
                                 class="
                                     text-regular
-                                    pt-2
                                     text-left
                                     text-green
                                 "
@@ -557,7 +596,6 @@ function handleCookiesClick() {
                     </div>
                 </section>
 
-                <!-- Opening hours -->
                 <section
                     class="
                         w-full
@@ -565,15 +603,51 @@ function handleCookiesClick() {
                         text-left
                     "
                 >
-                    <h2
+                    <div
                         class="
-                            text-regular
-                            font-bold
-                            text-green
+                            relative
+                            w-fit
+                            pb-1
                         "
                     >
-                        Otváracie hodiny
-                    </h2>
+                        <h2
+                            class="
+                                text-regular
+                                font-bold
+                                text-green
+                            "
+                        >
+                            Otváracie hodiny
+                        </h2>
+
+                        <svg
+                            viewBox="0 0 160 12"
+                            preserveAspectRatio="none"
+                            aria-hidden="true"
+                            class="
+                                pointer-events-none
+                                absolute
+                                -bottom-0.5
+                                h-2
+                                w-[calc(100%+3rem)]
+                                overflow-visible
+                                text-green
+                            "
+                        >
+                            <path
+                                d="
+                                    M2 7
+                                    C28 8.5, 54 5.5, 80 7
+                                    C106 8.5, 132 5.8, 158 6.8
+                                "
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            />
+                        </svg>
+                    </div>
 
                     <div
                         v-if="
@@ -654,164 +728,246 @@ function handleCookiesClick() {
                     </p>
                 </section>
 
-                <!-- Company -->
-                <section
+                <div
                     class="
+                        flex
                         w-full
                         max-w-[350px]
-                        text-left
+                        flex-col
+                        gap-14
                     "
                 >
-                    <h2
+                    <!-- Prevádzkovateľ -->
+                    <section
                         class="
-                            text-regular
-                            font-bold
-                            text-green
+                            w-full
+                            text-left
                         "
                     >
-                        Prevádzkovateľ
-                    </h2>
-
-                    <div
-                        class="
-                            mt-6
-                            flex
-                            flex-col
-                            items-start
-                            gap-3
-                        "
-                    >
-                        <p
+                        <div
                             class="
-                                text-regular
-                                flex
-                                min-h-9
-                                items-center
-                                text-left
-                                text-green
+                                relative
+                                w-fit
+                                pb-1
                             "
                         >
-                            {{
-                                displayedCompanyName
-                            }}
-                        </p>
+                            <h2
+                                class="
+                                    text-regular
+                                    font-bold
+                                    text-green
+                                "
+                            >
+                                Prevádzkovateľ
+                            </h2>
+
+                            <svg
+                                viewBox="0 0 160 12"
+                                preserveAspectRatio="none"
+                                aria-hidden="true"
+                                class="
+                                    pointer-events-none
+                                    absolute
+                                    -bottom-0.5
+                                    h-2
+                                    w-[calc(100%+3rem)]
+                                    overflow-visible
+                                    text-green
+                                "
+                            >
+                                <path
+                                    d="
+                                        M2 7
+                                        C28 8.5, 54 5.5, 80 7
+                                        C106 8.5, 132 5.8, 158 6.8
+                                    "
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                />
+                            </svg>
+                        </div>
 
                         <div
                             class="
-                                text-regular
+                                mt-6
                                 flex
                                 flex-col
                                 items-start
-                                gap-1
-                                text-left
-                                text-green
+                                gap-3
                             "
                         >
                             <p
-                                v-if="
-                                    formattedCompanyAddress
-                                "
                                 class="
-                                    break-words
+                                    text-regular
+                                    flex
+                                    min-h-9
+                                    items-center
+                                    text-left
+                                    text-green
                                 "
                             >
                                 {{
-                                    formattedCompanyAddress
+                                    displayedCompanyName
                                 }}
                             </p>
 
-                            <p
-                                v-if="
-                                    companyIco
+                            <div
+                                class="
+                                    text-regular
+                                    flex
+                                    flex-col
+                                    items-start
+                                    gap-1
+                                    text-left
+                                    text-green
                                 "
                             >
-                                IČO:
-                                {{ companyIco }}
-                            </p>
+                                <p
+                                    v-if="
+                                        formattedCompanyAddress
+                                    "
+                                    class="
+                                        break-words
+                                    "
+                                >
+                                    {{
+                                        formattedCompanyAddress
+                                    }}
+                                </p>
 
-                            <p
-                                v-if="
-                                    companyDic
-                                "
-                            >
-                                DIČ:
-                                {{ companyDic }}
-                            </p>
+                                <p
+                                    v-if="
+                                        companyIco
+                                    "
+                                >
+                                    IČO:
+                                    {{ companyIco }}
+                                </p>
+
+                                <p
+                                    v-if="
+                                        companyDic
+                                    "
+                                >
+                                    DIČ:
+                                    {{ companyDic }}
+                                </p>
+                            </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <!-- Ambulances -->
-                    <div
+                    <!-- Naše ambulancie -->
+                    <section
                         class="
-                            mt-6
-                            flex
-                            flex-col
-                            items-start
-                            gap-3
+                            w-full
+                            text-left
                         "
                     >
-                        <a
-                            v-for="
-                                ambulance in
-                                ambulances
-                            "
-                            :key="
-                                ambulance.name
-                            "
-                            :href="
-                                ambulance.href
-                            "
-                            target="_blank"
-                            rel="noopener noreferrer"
+                        <div
                             class="
-                                group
-                                flex
-                                min-h-9
+                                relative
                                 w-fit
-                                items-center
-                                gap-2
-                                transition-opacity
-                                hover:opacity-60
-                            "
-                            :aria-label="
-                                `Navštíviť web ${ambulance.name}`
+                                pb-1
                             "
                         >
-                            <img
-                                :src="
-                                    ambulance.logo
-                                "
-                                :alt="
-                                    ambulance.name
-                                "
+                            <h2
                                 class="
-                                    h-7
-                                    w-auto
-                                    max-w-10
-                                    shrink-0
-                                    object-contain
+                                    text-regular
+                                    font-bold
+                                    text-green
                                 "
                             >
+                                Naše ambulancie
+                            </h2>
 
-                            <span
+                            <svg
+                                viewBox="0 0 160 12"
+                                preserveAspectRatio="none"
+                                aria-hidden="true"
                                 class="
-                                    heading
-                                    uppercase
-                                "
-                                :class="
-                                    ambulance.nameClass
+                                    pointer-events-none
+                                    absolute
+                                    -bottom-0.5
+                                    h-2
+                                    w-[calc(100%+3rem)]
+                                    overflow-visible
+                                    text-green
                                 "
                             >
-                                {{
+                                <path
+                                    d="
+                                        M2 7
+                                        C28 8.5, 54 5.5, 80 7
+                                        C106 8.5, 132 5.8, 158 6.8
+                                    "
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                />
+                            </svg>
+                        </div>
+
+                        <div
+                            class="
+                                mt-6
+                                flex
+                                flex-col
+                                items-start
+                                gap-6
+                            "
+                        >
+                            <a
+                                v-for="
+                                    ambulance in
+                                    ambulances
+                                "
+                                :key="
                                     ambulance.name
-                                }}
-                            </span>
-                        </a>
-                    </div>
-                </section>
+                                "
+                                :href="
+                                    ambulance.href
+                                "
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="
+                                    group
+                                    flex
+                                    min-h-9
+                                    w-fit
+                                    items-center
+                                    gap-2
+                                    transition-opacity
+                                    hover:opacity-60
+                                "
+                                :aria-label="
+                                    `Navštíviť web ${ambulance.name}`
+                                "
+                            >
+                                <img
+                                    :src="
+                                        ambulance.logo
+                                    "
+                                    :alt="
+                                        ambulance.name
+                                    "
+                                    class="
+                                        h-10
+                                        w-auto
+                                        shrink-0
+                                        object-contain
+                                    "
+                                >
+                            </a>
+                        </div>
+                    </section>
+                </div>
             </div>
 
-            <!-- Bottom bar -->
             <div
                 class="
                     relative
@@ -850,10 +1006,10 @@ function handleCookiesClick() {
                         type="button"
                         class="
                             text-regular
+                            cursor-pointer
                             text-green/70
                             transition-opacity
                             hover:opacity-55
-                            cursor-pointer
                         "
                         @click="
                             handlePrivacyPolicyClick
@@ -866,10 +1022,10 @@ function handleCookiesClick() {
                         type="button"
                         class="
                             text-regular
+                            cursor-pointer
                             text-green/70
                             transition-opacity
                             hover:opacity-55
-                            cursor-pointer
                         "
                         @click="
                             handleCookiesClick
@@ -879,8 +1035,8 @@ function handleCookiesClick() {
                     </button>
                 </nav>
             </div>
-        </div>
-    </footer>
+        </footer>
+    </div>
 
     <PrivacyPolicyBottomSheet
         v-model="privacyPolicyOpen"

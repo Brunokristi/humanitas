@@ -1,5 +1,5 @@
 <script setup>
-import AppShell from './components/AppShell.vue'
+import AppShell from './components/structure/AppShell.vue'
 import { usePublicSiteStore } from './stores/publicSite'
 
 const publicSiteStore = usePublicSiteStore()

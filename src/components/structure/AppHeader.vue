@@ -5,14 +5,7 @@ import {
 
 import { storeToRefs } from 'pinia';
 
-import { usePublicSiteStore } from '../stores/publicSite';
-
-defineProps({
-    isFixed: {
-        type: Boolean,
-        default: false
-    }
-});
+import { usePublicSiteStore } from '../../stores/publicSite';
 
 const publicSiteStore =
     usePublicSiteStore();
@@ -42,7 +35,7 @@ const displayedLogo = computed(() => {
         company.value?.logo_url;
 
     if (!path) {
-        return '/images/humanitas_logo.png';
+        return '/images/humanitas_logo.svg';
     }
 
     if (
@@ -66,25 +59,52 @@ const displayedLogo = computed(() => {
 
 <template>
     <header
-        class="pointer-events-none top-0 bg-transparent p-5"
-        :class="
-            isFixed
-                ? 'fixed inset-x-0'
-                : 'sticky'
+        class="
+            pointer-events-none
+            top-0
+            bg-transparent
+            p-5
         "
     >
-        <div class="flex w-full items-center justify-center">
-            <div class="pointer-events-auto flex items-center gap-3">
+        <div
+            class="
+                flex
+                w-full
+                items-center
+                justify-center
+            "
+        >
+            <RouterLink
+                to="/"
+                aria-label="Prejsť na domovskú stránku"
+                class="
+                    pointer-events-auto
+                    flex
+                    items-center
+                    gap-1
+                "
+            >
                 <img
                     :src="displayedLogo"
                     :alt="displayedName"
-                    class="h-7 w-auto max-w-10 object-contain"
+                    class="
+                        h-10
+                        w-auto
+                        max-w-10
+                        object-contain
+                    "
                 >
 
-                <span class="heading uppercase text-green">
+                <span
+                    class="
+                        heading
+                        uppercase
+                        text-green
+                    "
+                >
                     {{ displayedName }}
                 </span>
-            </div>
+            </RouterLink>
         </div>
     </header>
 </template>

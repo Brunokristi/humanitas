@@ -1,6 +1,7 @@
 <script setup>
 import {
-    computed
+    computed,
+    ref
 } from 'vue';
 
 import {
@@ -21,6 +22,16 @@ const props = defineProps({
     textColor: {
         type: String,
         default: '#ffffff',
+    },
+
+    activeBackgroundColor: {
+        type: String,
+        default: null,
+    },
+
+    activeTextColor: {
+        type: String,
+        default: null,
     },
 
     type: {
@@ -71,6 +82,9 @@ const emit = defineEmits([
 const router =
     useRouter();
 
+const isPressed =
+    ref(false);
+
 const isInternalLink = computed(() => {
     if (
         !props.href ||
@@ -88,6 +102,32 @@ const componentTag = computed(() => {
     }
 
     return 'a';
+});
+
+const resolvedActiveBackgroundColor = computed(() => {
+    return (
+        props.activeBackgroundColor ??
+        props.textColor
+    );
+});
+
+const resolvedActiveTextColor = computed(() => {
+    return (
+        props.activeTextColor ??
+        props.backgroundColor
+    );
+});
+
+const displayedBackgroundColor = computed(() => {
+    return isPressed.value
+        ? resolvedActiveBackgroundColor.value
+        : props.backgroundColor;
+});
+
+const displayedTextColor = computed(() => {
+    return isPressed.value
+        ? resolvedActiveTextColor.value
+        : props.textColor;
 });
 
 function shouldInterceptInternalClick(event) {
@@ -108,13 +148,32 @@ function shouldInterceptInternalClick(event) {
     return true;
 }
 
-const handleClick = (event) => {
+function startPress() {
     if (props.disabled) {
-        event.preventDefault();
         return;
     }
 
-    if (shouldInterceptInternalClick(event)) {
+    isPressed.value =
+        true;
+}
+
+function endPress() {
+    isPressed.value =
+        false;
+}
+
+function handleClick(event) {
+    if (props.disabled) {
+        event.preventDefault();
+
+        return;
+    }
+
+    if (
+        shouldInterceptInternalClick(
+            event
+        )
+    ) {
         event.preventDefault();
 
         router.push(
@@ -122,16 +181,33 @@ const handleClick = (event) => {
         );
     }
 
-    emit('click', event);
-};
+    emit(
+        'click',
+        event
+    );
+}
 </script>
 
 <template>
-    <span class="relative inline-flex w-fit">
+    <span
+        class="
+            relative
+            inline-flex
+            w-fit
+        "
+    >
         <component
             :is="componentTag"
-            :href="href || undefined"
-            :target="href && !isInternalLink ? target || undefined : undefined"
+            :href="
+                href ||
+                undefined
+            "
+            :target="
+                href &&
+                !isInternalLink
+                    ? target || undefined
+                    : undefined
+            "
             :rel="
                 href &&
                 !isInternalLink &&
@@ -139,16 +215,28 @@ const handleClick = (event) => {
                     ? 'noopener noreferrer'
                     : undefined
             "
-            :type="href ? undefined : type"
-            :disabled="href ? undefined : disabled"
+            :type="
+                href
+                    ? undefined
+                    : type
+            "
+            :disabled="
+                href
+                    ? undefined
+                    : disabled
+            "
             :aria-disabled="
-                href && disabled
+                href &&
+                disabled
                     ? 'true'
                     : undefined
             "
             :style="{
-                backgroundColor: backgroundColor,
-                color: textColor,
+                backgroundColor:
+                    displayedBackgroundColor,
+
+                color:
+                    displayedTextColor,
             }"
             class="
                 group
@@ -162,16 +250,26 @@ const handleClick = (event) => {
                 rounded-full
                 px-5
                 py-2
-                transition-all
-                duration-300
+                transition-[background-color,color,transform,opacity]
+                duration-200
+                ease-out
+
                 hover:-translate-y-0.5
+
                 active:translate-y-0
                 active:scale-[0.98]
+
                 disabled:pointer-events-none
                 disabled:opacity-50
+
                 aria-disabled:pointer-events-none
                 aria-disabled:opacity-50
             "
+            @pointerdown="startPress"
+            @pointerup="endPress"
+            @pointercancel="endPress"
+            @pointerleave="endPress"
+            @blur="endPress"
             @click="handleClick"
         >
             <img
@@ -190,7 +288,8 @@ const handleClick = (event) => {
                 "
                 :style="{
                     opacity: imageOpacity,
-                    transform: `scale(${imageScale})`,
+                    transform:
+                        `scale(${imageScale})`,
                 }"
             >
 
@@ -217,7 +316,8 @@ const handleClick = (event) => {
                 notification !== ''
             "
             :style="{
-                backgroundColor: notificationColor,
+                backgroundColor:
+                    notificationColor,
             }"
             class="
                 pointer-events-none
