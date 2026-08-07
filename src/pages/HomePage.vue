@@ -1521,7 +1521,6 @@ onBeforeUnmount(() => {
             min-h-full
             min-w-0
             w-full
-            overflow-x-clip
             bg-green
             text-baige
         "
@@ -1531,7 +1530,6 @@ onBeforeUnmount(() => {
                 relative
                 isolate
                 space-y-32
-                overflow-hidden
                 py-12
 
                 md:pb-24
@@ -2017,6 +2015,9 @@ onBeforeUnmount(() => {
                         min-w-0
                         w-full
                         text-center
+                        pb-10
+
+                        md:pb-14
                     "
                 >
                     <!-- Aligned copy -->
@@ -2058,6 +2059,9 @@ onBeforeUnmount(() => {
                             mt-8
                             min-w-0
                             w-full
+                            pb-4
+
+                            md:pb-6
                         "
                     >
                         <EmployeeCarousel

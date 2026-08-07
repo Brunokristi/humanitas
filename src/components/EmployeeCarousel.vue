@@ -1269,7 +1269,6 @@ onBeforeUnmount(() => {
                             aspect-[3/4.2]
                             w-full
                             cursor-pointer
-                            overflow-hidden
                             rounded-[2.1rem]
                             bg-baige
                             shadow-[var(--shadow-mid)]
@@ -1322,6 +1321,15 @@ onBeforeUnmount(() => {
                                 : undefined
                         "
                     >
+                        <div
+                            class="
+                                relative
+                                h-full
+                                w-full
+                                overflow-hidden
+                                rounded-[2.1rem]
+                            "
+                        >
                         <!-- Employee photo -->
                         <img
                             v-if="
@@ -1444,6 +1452,7 @@ onBeforeUnmount(() => {
                                     item.position
                                 }}
                             </p>
+                        </div>
                         </div>
                     </article>
                 </div>

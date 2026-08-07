@@ -996,9 +996,6 @@ onBeforeUnmount(() => {
             relative
             z-20
             w-full
-            overflow-hidden
-
-            lg:overflow-visible
         "
         :aria-label="
             ariaLabel
