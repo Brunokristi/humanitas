@@ -1640,7 +1640,7 @@ onUnmounted(() => {
                             border-baige/5
                             bg-green
                             p-2
-                            shadow-[var(--shadow-strong)]
+                            shadow-[var(--shadow-mid)]
                             [scrollbar-width:none]
                             [&::-webkit-scrollbar]:hidden
 

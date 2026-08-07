@@ -1485,8 +1485,8 @@ onBeforeUnmount(() => {
                 >
                     <Button
                         background-image=""
-                        background-color="#FBF9F3"
-                        text-color="#335940"
+                        background-color="var(--color-baige)"
+                        text-color="var(--color-green)"
                         @click="
                             resetFilters
                         "
@@ -1546,8 +1546,8 @@ onBeforeUnmount(() => {
                             contactUrl
                         "
                         background-image=""
-                        background-color="#FBF9F3"
-                        text-color="#335940"
+                        background-color="var(--color-baige)"
+                        text-color="var(--color-green)"
                     >
                         Kontakt
                     </Button>

@@ -1808,8 +1808,8 @@ onBeforeUnmount(() => {
                                         <Button
                                             type="submit"
                                             background-image=""
-                                            background-color="#335940"
-                                            text-color="#FBF9F3"
+                                            background-color="var(--color-green)"
+                                            text-color="var(--color-baige)"
                                             :disabled="
                                                 isSubmitting
                                             "
@@ -1939,8 +1939,8 @@ onBeforeUnmount(() => {
                                                 >
                                                     <Button
                                                         background-image=""
-                                                        background-color="#335940"
-                                                        text-color="#FBF9F3"
+                                                        background-color="var(--color-green)"
+                                                        text-color="var(--color-baige)"
                                                         @click="
                                                             sendAnotherMessage
                                                         "

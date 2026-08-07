@@ -1631,8 +1631,8 @@ onBeforeUnmount(() => {
                             contactUrl
                         "
                         background-image=""
-                        background-color="#FBF9F3"
-                        text-color="#335940"
+                        background-color="var(--color-baige)"
+                        text-color="var(--color-green)"
                         class="
                             mt-10
                             whitespace-nowrap
@@ -1828,8 +1828,8 @@ onBeforeUnmount(() => {
                             remainingServicesCount
                         "
                         background-image=""
-                        background-color="#FBF9F3"
-                        text-color="#335940"
+                        background-color="var(--color-baige)"
+                        text-color="var(--color-green)"
                     >
                         Ďalšie služby
                     </Button>
@@ -1947,8 +1947,8 @@ onBeforeUnmount(() => {
                         <Button
                             :href="contactUrl"
                             background-image=""
-                            background-color="#FBF9F3"
-                            text-color="#335940"
+                            background-color="var(--color-green)"
+                            text-color="var(--color-baige)"
                         >
                             Kontaktujte nás
                         </Button>
