@@ -1442,6 +1442,7 @@ onUnmounted(() => {
                     items-center
                     overflow-hidden
                     text-green
+                    px-2
                 "
             >
                 <div
@@ -1449,6 +1450,9 @@ onUnmounted(() => {
                     class="
                         w-full
                         overflow-hidden
+
+                        [mask-image:linear-gradient(to_right,transparent_0%,black_8%,black_92%,transparent_100%)]
+                        [-webkit-mask-image:linear-gradient(to_right,transparent_0%,black_8%,black_92%,transparent_100%)]
                     "
                 >
                     <div

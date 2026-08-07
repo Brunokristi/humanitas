@@ -1966,7 +1966,7 @@ onBeforeUnmount(() => {
                         justify-center
                         opacity-70
 
-                        lg:min-h-[30rem]
+                        lg:min-h-[40rem]
                         lg:overflow-visible
                     "
                 >
