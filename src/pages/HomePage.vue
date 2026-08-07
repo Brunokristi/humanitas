@@ -6,18 +6,24 @@ import {
     ref,
     watch
 } from 'vue';
+import {
+    useRoute,
+    useRouter
+} from 'vue-router';
 
 import { storeToRefs } from 'pinia';
 
-import { usePublicSiteStore } from '../stores/publicSite';
 import { usePageSeo } from '../composables/usePageSeo';
+import { SITE_URL } from '../seo/site';
+import { usePublicSiteStore } from '../stores/publicSite';
 
 import Button from '../components/Button.vue';
 import EmployeeCarousel from '../components/EmployeeCarousel.vue';
 import FaqCarousel from '../components/Carousel.vue';
-import ServiceBottomSheet from '../components/ServiceBottomSheet.vue';
+import ServiceBottomSheet from '../components/sheets/Service.vue';
 import ServicesSlider from '../components/Slider.vue';
-import EmployeeBottomSheet from '../components/EmployeeBottomSheet.vue';
+import EmployeeBottomSheet from '../components/sheets/Employee.vue';
+import ServiceCardContent from '../components/ServiceCardContent.vue';
 
 const props = defineProps({
     expanded: {
@@ -30,6 +36,57 @@ const props = defineProps({
         default: false
     }
 });
+
+const router =
+    useRouter();
+
+const route =
+    useRoute();
+
+const publicSiteStore =
+    usePublicSiteStore();
+
+const {
+    company,
+    currentBranch,
+    services,
+    employees,
+    contacts,
+    openingHours,
+    loading,
+    error
+} = storeToRefs(
+    publicSiteStore
+);
+
+const servicesUrl =
+    '/sluzby';
+
+const contactUrl =
+    '/kontakt';
+
+/*
+|--------------------------------------------------------------------------
+| SEO
+|--------------------------------------------------------------------------
+*/
+
+usePageSeo({
+    pageKey: 'home',
+
+    breadcrumbs: [
+        {
+            name: 'Domov',
+            url: 'https://klinickapsychologiars.sk/'
+        }
+    ]
+});
+
+/*
+|--------------------------------------------------------------------------
+| Performance
+|--------------------------------------------------------------------------
+*/
 
 const isMobilePerformanceMode =
     ref(
@@ -150,41 +207,11 @@ function updatePerformanceMode() {
     }
 }
 
-const publicSiteStore =
-    usePublicSiteStore();
-
-const {
-    company,
-    currentBranch,
-    services,
-    employees,
-    contacts,
-    openingHours,
-    loading,
-    error
-} = storeToRefs(
-    publicSiteStore
-);
-
-const servicesUrl =
-    '/sluzby';
-
-const contactUrl =
-    '/kontakt';
-
-usePageSeo({
-    pageKey: 'home',
-    breadcrumbs: [
-        {
-            name: 'Domov',
-            url: 'https://klinickapsychologiars.sk/'
-        }
-    ]
-});
-
 /*
- * Hero
- */
+|--------------------------------------------------------------------------
+| Hero
+|--------------------------------------------------------------------------
+*/
 
 const heroPhrases = [
     'váš príbeh',
@@ -197,18 +224,63 @@ const heroPhrases = [
 const heroPhraseIndex =
     ref(0);
 
-const heroPhrase = computed(() => {
-    return heroPhrases[
-        heroPhraseIndex.value
-    ];
-});
-
 let heroPhraseTimer =
     null;
 
+const heroPhrase = computed(() => {
+    return (
+        heroPhrases[
+            heroPhraseIndex.value
+        ] ??
+        ''
+    );
+});
+
+function stopHeroPhraseAnimation() {
+    if (
+        heroPhraseTimer ===
+        null
+    ) {
+        return;
+    }
+
+    window.clearInterval(
+        heroPhraseTimer
+    );
+
+    heroPhraseTimer =
+        null;
+}
+
+function startHeroPhraseAnimation() {
+    if (
+        heroPhraseTimer !==
+            null ||
+        !props.expanded ||
+        props.transitioning
+    ) {
+        return;
+    }
+
+    heroPhraseTimer =
+        window.setInterval(
+            () => {
+                heroPhraseIndex.value =
+                    (
+                        heroPhraseIndex.value +
+                        1
+                    ) %
+                    heroPhrases.length;
+            },
+            2800
+        );
+}
+
 /*
- * Service detail
- */
+|--------------------------------------------------------------------------
+| Services
+|--------------------------------------------------------------------------
+*/
 
 const selectedService =
     ref(null);
@@ -216,19 +288,11 @@ const selectedService =
 const serviceDetailsOpen =
     ref(false);
 
-/*
- * Employee detail
- */
+let syncingSheetFromRoute =
+    false;
 
-const selectedEmployee =
-    ref(null);
-
-const employeeSheetOpen =
-    ref(false);
-
-/*
- * Services
- */
+let syncingRouteFromSheet =
+    false;
 
 const activeServices = computed(() => {
     return services.value.filter(
@@ -239,12 +303,6 @@ const activeServices = computed(() => {
 });
 
 const homepageServices = computed(() => {
-    /*
-     * Preview and expanded cards are separate Vue instances.
-     * A random shuffle produced a different slider order in
-     * each instance, which looked like a Safari layout glitch
-     * during the transition handoff. Keep the order stable.
-     */
     return activeServices.value
         .filter(
             hasServiceDescription
@@ -264,9 +322,334 @@ const remainingServicesCount =
         );
     });
 
+function rawServiceDescription(
+    service
+) {
+    return (
+        service?.description ??
+        service?.shortDescription ??
+        service?.short_description ??
+        ''
+    );
+}
+
+function hasServiceDescription(
+    service
+) {
+    return Boolean(
+        String(
+            rawServiceDescription(
+                service
+            )
+        ).trim()
+    );
+}
+
+function serviceTitle(service) {
+    return trimText(
+        service?.name,
+        80
+    );
+}
+
+function serviceDescription(
+    service
+) {
+    return trimText(
+        rawServiceDescription(
+            service
+        ),
+        80
+    );
+}
+
+function serviceDurationLabel(
+    service
+) {
+    const minutes =
+        service?.durationMinutes ??
+        service?.duration_minutes;
+
+    const sessions =
+        service?.durationSessions ??
+        service?.duration_sessions;
+
+    if (!minutes) {
+        return null;
+    }
+
+    if (
+        sessions &&
+        sessions > 1
+    ) {
+        return `${sessions} x ${minutes} min`;
+    }
+
+    return `${minutes} min`;
+}
+
+function selfPayPrice(service) {
+    return (
+        service?.selfPayAmount ??
+        service?.self_pay_amount ??
+        null
+    );
+}
+
+function hasSelfPayPrice(service) {
+    return (
+        selfPayPrice(
+            service
+        ) !== null
+    );
+}
+
+function toRouteSlug(value) {
+    const normalized =
+        String(
+            value ??
+            ''
+        )
+            .trim()
+            .toLocaleLowerCase(
+                'sk'
+            )
+            .normalize('NFD')
+            .replace(
+                /[\u0300-\u036f]/g,
+                ''
+            )
+            .replace(
+                /[^a-z0-9\s-]/g,
+                ''
+            )
+            .replace(
+                /\s+/g,
+                '-'
+            )
+            .replace(
+                /-+/g,
+                '-'
+            )
+            .replace(
+                /^-+|-+$/g,
+                ''
+            );
+
+    return normalized || null;
+}
+
+function serviceRouteSlug(service) {
+    return toRouteSlug(
+        service?.slug ??
+        service?.serviceSlug ??
+        service?.service_slug ??
+        service?.name ??
+        service?.id
+    );
+}
+
+function routeServiceSlug() {
+    const queryValue =
+        route.query.sluzba;
+
+    const value =
+        Array.isArray(queryValue)
+            ? queryValue[0]
+            : queryValue;
+
+    if (
+        typeof value !==
+        'string'
+    ) {
+        return null;
+    }
+
+    return toRouteSlug(
+        decodeURIComponent(
+            value
+        )
+    );
+}
+
+function findServiceByRouteSlug(slug) {
+    if (!slug) {
+        return null;
+    }
+
+    return (
+        activeServices.value.find(
+            (service) => {
+                return (
+                    serviceRouteSlug(
+                        service
+                    ) === slug
+                );
+            }
+        ) ?? null
+    );
+}
+
+function updateHomeServiceQuery(
+    serviceSlug,
+    replace = false
+) {
+    const nextQuery = {
+        ...route.query
+    };
+
+    if (serviceSlug) {
+        nextQuery.sluzba =
+            serviceSlug;
+    } else {
+        delete nextQuery.sluzba;
+    }
+
+    syncingRouteFromSheet =
+        true;
+
+    const action = replace
+        ? router.replace({
+            query: nextQuery,
+            hash: route.hash
+        })
+        : router.push({
+            query: nextQuery,
+            hash: route.hash
+        });
+
+    action.finally(() => {
+        syncingRouteFromSheet =
+            false;
+    });
+}
+
+function openRouteSyncedService(
+    service,
+    options = {}
+) {
+    if (!service) {
+        return;
+    }
+
+    const {
+        syncRoute = true,
+        replace = false
+    } = options;
+
+    selectedService.value =
+        service;
+
+    serviceDetailsOpen.value =
+        true;
+
+    if (
+        !syncRoute ||
+        syncingSheetFromRoute
+    ) {
+        return;
+    }
+
+    const serviceSlug =
+        serviceRouteSlug(
+            service
+        );
+
+    if (!serviceSlug) {
+        return;
+    }
+
+    if (
+        routeServiceSlug() ===
+        serviceSlug
+    ) {
+        return;
+    }
+
+    updateHomeServiceQuery(
+        serviceSlug,
+        replace
+    );
+}
+
+function syncServiceSheetWithRoute() {
+    const slug =
+        routeServiceSlug();
+
+    if (!slug) {
+        if (serviceDetailsOpen.value) {
+            syncingSheetFromRoute =
+                true;
+
+            serviceDetailsOpen.value =
+                false;
+
+            selectedService.value =
+                null;
+
+            syncingSheetFromRoute =
+                false;
+        }
+
+        return;
+    }
+
+    const matchedService =
+        findServiceByRouteSlug(
+            slug
+        );
+
+    if (!matchedService) {
+        if (loading.value) {
+            return;
+        }
+
+        updateHomeServiceQuery(
+            null,
+            true
+        );
+
+        return;
+    }
+
+    syncingSheetFromRoute =
+        true;
+
+    selectedService.value =
+        matchedService;
+
+    serviceDetailsOpen.value =
+        true;
+
+    syncingSheetFromRoute =
+        false;
+}
+
+function openServiceDetails(
+    service
+) {
+    openRouteSyncedService(
+        service
+    );
+}
+
 /*
- * Team
- */
+|--------------------------------------------------------------------------
+| Team
+|--------------------------------------------------------------------------
+*/
+
+const selectedEmployee =
+    ref(null);
+
+const employeeSheetOpen =
+    ref(false);
+
+let syncingEmployeeSheetFromRoute =
+    false;
+
+let syncingEmployeeRouteFromSheet =
+    false;
 
 const orderedEmployees = computed(() => {
     const normalizeName = (
@@ -287,6 +670,9 @@ const orderedEmployees = computed(() => {
 
     return [
         ...employees.value
+            .filter((employee) => {
+                return employee?.isActive !== false;
+            })
     ].sort((left, right) => {
         const leftName =
             normalizeName(left);
@@ -322,9 +708,438 @@ const orderedEmployees = computed(() => {
     });
 });
 
+function employeeName(employee) {
+    return [
+        employee?.titleBefore,
+        employee?.firstName,
+        employee?.lastName,
+        employee?.titleAfter
+    ]
+        .filter(Boolean)
+        .join(' ');
+}
+
+function employeeRouteSlug(employee) {
+    const candidate =
+        employee?.slug ??
+        employeeName(employee) ??
+        employee?.id ??
+        null;
+
+    return toRouteSlug(
+        candidate
+    );
+}
+
+function routeEmployeeSlug() {
+    const rawSlug =
+        route.params.employeeSlug;
+
+    const value =
+        Array.isArray(rawSlug)
+            ? rawSlug[0]
+            : rawSlug;
+
+    if (
+        typeof value !==
+        'string'
+    ) {
+        return null;
+    }
+
+    return toRouteSlug(
+        decodeURIComponent(
+            value
+        )
+    );
+}
+
+function findEmployeeByRouteSlug(slug) {
+    if (!slug) {
+        return null;
+    }
+
+    return (
+        orderedEmployees.value.find(
+            (employee) => {
+                return (
+                    employeeRouteSlug(
+                        employee
+                    ) === slug
+                );
+            }
+        ) ?? null
+    );
+}
+
+function openRouteSyncedEmployee(
+    employee,
+    options = {}
+) {
+    if (!employee) {
+        return;
+    }
+
+    const {
+        syncRoute = true,
+        replace = false
+    } = options;
+
+    selectedEmployee.value =
+        employee;
+
+    employeeSheetOpen.value =
+        true;
+
+    if (
+        !syncRoute ||
+        syncingEmployeeSheetFromRoute
+    ) {
+        return;
+    }
+
+    const slug =
+        employeeRouteSlug(
+            employee
+        );
+
+    if (!slug) {
+        return;
+    }
+
+    if (
+        route.name ===
+            'employee-detail' &&
+        routeEmployeeSlug() === slug
+    ) {
+        return;
+    }
+
+    syncingEmployeeRouteFromSheet =
+        true;
+
+    const navigation = {
+        name: 'employee-detail',
+        params: {
+            employeeSlug: slug
+        },
+        query: route.query,
+        hash: route.hash
+    };
+
+    const action = replace
+        ? router.replace(
+            navigation
+        )
+        : router.push(
+            navigation
+        );
+
+    action.finally(() => {
+        syncingEmployeeRouteFromSheet =
+            false;
+    });
+}
+
+function syncEmployeeSheetWithRoute() {
+    if (
+        route.name !==
+            'home' &&
+        route.name !==
+            'employee-detail'
+    ) {
+        return;
+    }
+
+    const slug =
+        routeEmployeeSlug();
+
+    if (!slug) {
+        if (employeeSheetOpen.value) {
+            syncingEmployeeSheetFromRoute =
+                true;
+
+            employeeSheetOpen.value =
+                false;
+
+            selectedEmployee.value =
+                null;
+
+            syncingEmployeeSheetFromRoute =
+                false;
+        }
+
+        return;
+    }
+
+    const matchedEmployee =
+        findEmployeeByRouteSlug(
+            slug
+        );
+
+    if (!matchedEmployee) {
+        if (loading.value) {
+            return;
+        }
+
+        syncingEmployeeRouteFromSheet =
+            true;
+
+        router.replace({
+            name: 'home',
+            query: route.query,
+            hash: route.hash
+        }).finally(() => {
+            syncingEmployeeRouteFromSheet =
+                false;
+        });
+
+        return;
+    }
+
+    syncingEmployeeSheetFromRoute =
+        true;
+
+    selectedEmployee.value =
+        matchedEmployee;
+
+    employeeSheetOpen.value =
+        true;
+
+    syncingEmployeeSheetFromRoute =
+        false;
+}
+
+function openEmployee(employee) {
+    const resolvedEmployee =
+        employee ??
+        orderedEmployees.value?.[0] ??
+        null;
+
+    if (!resolvedEmployee) {
+        return;
+    }
+
+    openRouteSyncedEmployee(
+        resolvedEmployee
+    );
+}
+
+function clearEmployeeSeoTags() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    document.head
+        .querySelectorAll(
+            '[data-humanitas-employee-seo]'
+        )
+        .forEach((element) => {
+            element.remove();
+        });
+}
+
+function setEmployeeSeoTag(
+    tagName,
+    key,
+    attributes,
+    textContent = null
+) {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    const selector =
+        `[data-humanitas-employee-seo="${key}"]`;
+
+    let element =
+        document.head.querySelector(
+            selector
+        );
+
+    if (!element) {
+        element =
+            document.createElement(
+                tagName
+            );
+
+        element.setAttribute(
+            'data-humanitas-employee-seo',
+            key
+        );
+
+        document.head.appendChild(
+            element
+        );
+    }
+
+    Object.entries(attributes).forEach(
+        ([attributeName, attributeValue]) => {
+            if (
+                attributeValue === null ||
+                attributeValue === undefined ||
+                attributeValue === ''
+            ) {
+                element.removeAttribute(
+                    attributeName
+                );
+
+                return;
+            }
+
+            element.setAttribute(
+                attributeName,
+                String(attributeValue)
+            );
+        }
+    );
+
+    if (textContent !== null) {
+        element.textContent =
+            textContent;
+    }
+}
+
+function applyEmployeeRouteSeo() {
+    if (typeof document === 'undefined') {
+        return;
+    }
+
+    if (route.name !== 'employee-detail') {
+        clearEmployeeSeoTags();
+        return;
+    }
+
+    const routeSlug =
+        routeEmployeeSlug();
+
+    const employee =
+        findEmployeeByRouteSlug(
+            routeSlug
+        );
+
+    if (!employee) {
+        return;
+    }
+
+    const slug =
+        employeeRouteSlug(
+            employee
+        );
+
+    if (!slug) {
+        return;
+    }
+
+    const name =
+        employeeName(employee) ||
+        'Náš tím';
+
+    const title =
+        `${name} | Tím Humanitas`;
+
+    const position =
+        String(
+            employee?.position ??
+            ''
+        ).trim();
+
+    const bio =
+        String(
+            employee?.bio ??
+            ''
+        ).trim();
+
+    const description =
+        bio ||
+        (position
+            ? `${name} pôsobí v tíme Humanitas ako ${position}.`
+            : `${name} je členom tímu Humanitas.`);
+
+    const canonical =
+        `${SITE_URL}/tim/${slug}`;
+
+    document.title = title;
+    document.documentElement.lang = 'sk';
+
+    document.head
+        .querySelectorAll(
+            '[data-humanitas-seo]'
+        )
+        .forEach((element) => {
+            element.remove();
+        });
+
+    setEmployeeSeoTag('meta', 'description', {
+        name: 'description',
+        content: description
+    });
+
+    setEmployeeSeoTag('meta', 'robots', {
+        name: 'robots',
+        content: 'index,follow'
+    });
+
+    setEmployeeSeoTag('link', 'canonical', {
+        rel: 'canonical',
+        href: canonical
+    });
+
+    setEmployeeSeoTag('meta', 'og:title', {
+        property: 'og:title',
+        content: title
+    });
+
+    setEmployeeSeoTag('meta', 'og:description', {
+        property: 'og:description',
+        content: description
+    });
+
+    setEmployeeSeoTag('meta', 'og:url', {
+        property: 'og:url',
+        content: canonical
+    });
+
+    setEmployeeSeoTag('meta', 'og:type', {
+        property: 'og:type',
+        content: 'profile'
+    });
+
+    setEmployeeSeoTag('meta', 'twitter:title', {
+        name: 'twitter:title',
+        content: title
+    });
+
+    setEmployeeSeoTag('meta', 'twitter:description', {
+        name: 'twitter:description',
+        content: description
+    });
+
+    setEmployeeSeoTag(
+        'script',
+        'jsonld',
+        {
+            type: 'application/ld+json'
+        },
+        JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Person',
+            name,
+            description,
+            worksFor: {
+                '@type': 'MedicalClinic',
+                name: 'Humanitas'
+            },
+            url: canonical
+        })
+    );
+}
+
 /*
- * FAQ
- */
+|--------------------------------------------------------------------------
+| FAQ
+|--------------------------------------------------------------------------
+*/
 
 const todayDayOfWeek = computed(() => {
     const day =
@@ -383,9 +1198,7 @@ const primaryContact = computed(() => {
     return (
         contacts.value.find(
             (contact) => {
-                return (
-                    contact.isPrimary
-                );
+                return contact.isPrimary;
             }
         ) ??
         contacts.value.find(
@@ -479,8 +1292,10 @@ const faqItems = computed(() => {
 });
 
 /*
- * General helpers
- */
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
 
 function trimText(
     value,
@@ -510,245 +1325,11 @@ function trimText(
         .trim()}...`;
 }
 
-function buildPublicAssetUrl(
-    path
-) {
-    if (!path) {
-        return null;
-    }
-
-    if (
-        path.startsWith(
-            'http://'
-        ) ||
-        path.startsWith(
-            'https://'
-        )
-    ) {
-        return path;
-    }
-
-    const apiBaseUrl =
-        import.meta.env
-            .VITE_CLINVIA_API_URL ??
-        'https://clinvia.studiokristian.com';
-
-    const normalizedPath =
-        path.startsWith('/')
-            ? path
-            : `/${path}`;
-
-    return `${apiBaseUrl}${normalizedPath}`;
-}
-
 /*
- * Service card helpers
- */
-
-function rawServiceDescription(
-    service
-) {
-    return (
-        service?.description ??
-        service?.shortDescription ??
-        service?.short_description ??
-        ''
-    );
-}
-
-function hasServiceDescription(
-    service
-) {
-    return Boolean(
-        String(
-            rawServiceDescription(
-                service
-            )
-        ).trim()
-    );
-}
-
-function serviceTitle(service) {
-    return trimText(
-        service?.name,
-        80
-    );
-}
-
-function serviceDescription(
-    service
-) {
-    return trimText(
-        rawServiceDescription(
-            service
-        ),
-        80
-    );
-}
-
-function serviceDurationLabel(
-    service
-) {
-    const minutes =
-        service?.durationMinutes ??
-        service?.duration_minutes;
-
-    const sessions =
-        service?.durationSessions ??
-        service?.duration_sessions;
-
-    if (!minutes) {
-        return null;
-    }
-
-    if (
-        sessions &&
-        sessions > 1
-    ) {
-        return `${sessions} x ${minutes} min`;
-    }
-
-    return `${minutes} min`;
-}
-
-function selfPayPrice(service) {
-    return (
-        service?.selfPayAmount ??
-        service?.self_pay_amount ??
-        null
-    );
-}
-
-function hasSelfPayPrice(service) {
-    return (
-        selfPayPrice(
-            service
-        ) !== null
-    );
-}
-
-function openServiceDetails(
-    service
-) {
-    selectedService.value =
-        service;
-
-    serviceDetailsOpen.value =
-        true;
-}
-
-/*
- * Employee helpers
- */
-
-function employeeName(employee) {
-    return [
-        employee?.titleBefore,
-        employee?.firstName,
-        employee?.lastName,
-        employee?.titleAfter
-    ]
-        .filter(Boolean)
-        .join(' ');
-}
-
-function employeeInitials(
-    employee
-) {
-    return [
-        employee?.firstName
-            ?.charAt(0),
-
-        employee?.lastName
-            ?.charAt(0)
-    ]
-        .filter(Boolean)
-        .join('');
-}
-
-function employeePhotoUrl(
-    employee
-) {
-    return buildPublicAssetUrl(
-        employee?.photoUrl
-    );
-}
-
-function employeePositions(
-    employee
-) {
-    const value =
-        employee?.position ??
-        '';
-
-    return String(value)
-        .split(/[\n,;]+/)
-        .map((position) => {
-            return position.trim();
-        })
-        .filter(Boolean);
-}
-
-function openEmployee(employee) {
-    const resolvedEmployee =
-        employee ??
-        orderedEmployees.value?.[0] ??
-        null;
-
-    if (!resolvedEmployee) {
-        return;
-    }
-
-    selectedEmployee.value =
-        resolvedEmployee;
-
-    employeeSheetOpen.value =
-        true;
-}
-
-/*
- * Page animation lifecycle
- */
-
-function stopHeroPhraseAnimation() {
-    if (
-        heroPhraseTimer ===
-        null
-    ) {
-        return;
-    }
-
-    window.clearInterval(
-        heroPhraseTimer
-    );
-
-    heroPhraseTimer =
-        null;
-}
-
-function startHeroPhraseAnimation() {
-    if (
-        heroPhraseTimer !==
-            null ||
-        !props.expanded ||
-        props.transitioning
-    ) {
-        return;
-    }
-
-    heroPhraseTimer =
-        window.setInterval(
-            () => {
-                heroPhraseIndex.value =
-                    (
-                        heroPhraseIndex.value +
-                        1
-                    ) %
-                    heroPhrases.length;
-            },
-            2800
-        );
-}
+|--------------------------------------------------------------------------
+| Watchers
+|--------------------------------------------------------------------------
+*/
 
 watch(
     [
@@ -774,6 +1355,130 @@ watch(
     }
 );
 
+watch(
+    [
+        () => route.query.sluzba,
+        activeServices,
+        loading
+    ],
+
+    () => {
+        syncServiceSheetWithRoute();
+    },
+
+    {
+        immediate: true
+    }
+);
+
+watch(
+    serviceDetailsOpen,
+
+    (isOpen) => {
+        if (
+            syncingSheetFromRoute ||
+            syncingRouteFromSheet
+        ) {
+            return;
+        }
+
+        if (isOpen) {
+            if (
+                selectedService.value
+            ) {
+                openRouteSyncedService(
+                    selectedService.value,
+                    {
+                        replace: true
+                    }
+                );
+            }
+
+            return;
+        }
+
+        updateHomeServiceQuery(
+            null,
+            true
+        );
+
+        selectedService.value =
+            null;
+    }
+);
+
+watch(
+    [
+        () => route.name,
+        () => route.params.employeeSlug,
+        orderedEmployees,
+        loading
+    ],
+
+    () => {
+        syncEmployeeSheetWithRoute();
+        applyEmployeeRouteSeo();
+    },
+
+    {
+        immediate: true
+    }
+);
+
+watch(
+    employeeSheetOpen,
+
+    (isOpen) => {
+        if (
+            syncingEmployeeSheetFromRoute ||
+            syncingEmployeeRouteFromSheet
+        ) {
+            return;
+        }
+
+        if (isOpen) {
+            if (
+                selectedEmployee.value
+            ) {
+                openRouteSyncedEmployee(
+                    selectedEmployee.value,
+                    {
+                        replace: true
+                    }
+                );
+            }
+
+            return;
+        }
+
+        if (
+            route.name ===
+            'employee-detail'
+        ) {
+            syncingEmployeeRouteFromSheet =
+                true;
+
+            router.replace({
+                name: 'home',
+                query: route.query,
+                hash: route.hash
+            }).finally(() => {
+                syncingEmployeeRouteFromSheet =
+                    false;
+            });
+        }
+
+        selectedEmployee.value =
+            null;
+    }
+);
+
+/*
+|--------------------------------------------------------------------------
+| Lifecycle
+|--------------------------------------------------------------------------
+*/
+
 onMounted(() => {
     performanceMediaQuery =
         window.matchMedia(
@@ -794,6 +1499,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
     cancelHeavyContentTask();
     stopHeroPhraseAnimation();
+    clearEmployeeSeoTags();
 
     performanceMediaQuery
         ?.removeEventListener?.(
@@ -820,120 +1526,14 @@ onBeforeUnmount(() => {
             text-baige
         "
     >
-        <!-- Loading -->
-        <div
-            v-if="
-                loading &&
-                !company
-            "
-            class="
-                space-y-16
-                p-5
-            "
-        >
-            <section
-                class="
-                    flex
-                    flex-col
-                    items-center
-                    gap-6
-                "
-            >
-                <div
-                    class="
-                        h-6
-                        w-48
-                        animate-pulse
-                        rounded-full
-                        bg-baige/10
-                    "
-                />
-
-                <div
-                    class="
-                        h-14
-                        w-full
-                        max-w-xl
-                        animate-pulse
-                        rounded-full
-                        bg-baige/10
-                    "
-                />
-
-                <div
-                    class="
-                        h-5
-                        w-full
-                        max-w-md
-                        animate-pulse
-                        rounded-full
-                        bg-baige/10
-                    "
-                />
-            </section>
-        </div>
-
-        <!-- Error -->
-        <div
-            v-else-if="
-                error &&
-                !company
-            "
-            class="
-                mx-auto
-                max-w-xl
-                px-5
-                py-16
-                text-center
-            "
-        >
-            <h1
-                class="
-                    heading
-                    text-baige
-                "
-            >
-                Obsah sa nepodarilo načítať
-            </h1>
-
-            <p
-                class="
-                    text-regular
-                    mt-5
-                    text-baige/65
-                "
-            >
-                {{ error }}
-            </p>
-
-            <div
-                class="
-                    mt-8
-                "
-            >
-                <Button
-                    background-color="#FFE5E5"
-                    text-color="#5A1F1F"
-                    @click="
-                        publicSiteStore.reload
-                    "
-                >
-                    Skúsiť znova
-                </Button>
-            </div>
-        </div>
-
-        <!-- Content -->
         <main
-            v-else
             class="
                 relative
                 isolate
                 space-y-32
-                pb-12
                 overflow-hidden
+                py-12
 
-                md:space-y-32
                 md:pb-24
             "
         >
@@ -947,7 +1547,6 @@ onBeforeUnmount(() => {
                     grid-cols-1
                     items-center
                     gap-8
-                    pt-5
 
                     md:min-h-[36rem]
                     md:grid-cols-[minmax(0,0.9fr)_minmax(28rem,1.1fr)]
@@ -959,17 +1558,13 @@ onBeforeUnmount(() => {
                     xl:px-16
                 "
             >
-                <!-- Hero copy -->
                 <div
                     class="
                         flex
                         flex-col
                         items-center
-                        gap-3
+                        gap-6
                         text-center
-
-                        md:items-start
-                        md:text-left
                     "
                 >
                     <h1
@@ -1022,8 +1617,7 @@ onBeforeUnmount(() => {
                         class="
                             text-regular
                             max-w-lg
-                            px-5
-                            pb-6
+                            px-10
                             text-baige/70
 
                             md:px-0
@@ -1033,6 +1627,21 @@ onBeforeUnmount(() => {
                         Pomáhame deťom, dospelým aj rodinám
                         lepšie porozumieť tomu, čo prežívajú.
                     </p>
+
+                    <Button
+                        :href="
+                            contactUrl
+                        "
+                        background-image=""
+                        background-color="#FBF9F3"
+                        text-color="#335940"
+                        class="
+                            mt-10
+                            whitespace-nowrap
+                        "
+                    >
+                        Objednať sa teraz
+                    </Button>
 
                     <p
                         class="
@@ -1049,9 +1658,10 @@ onBeforeUnmount(() => {
                             'Ambulancia klinickej a dopravnej psychológie a psychoterapie v Rimavskej Sobote'
                         }}
                     </p>
+
+
                 </div>
 
-                <!-- Hero illustration -->
                 <div
                     data-transition-stable
                     class="
@@ -1075,10 +1685,9 @@ onBeforeUnmount(() => {
                             w-full
                             shrink-0
                             object-contain
-                            opacity-50
+                            opacity-70
 
                             md:max-h-[34rem]
-                            md:w-full
                             md:max-w-[42rem]
                         "
                     >
@@ -1095,12 +1704,11 @@ onBeforeUnmount(() => {
                     gap-7
                 "
             >
-                <!-- Services heading -->
                 <div
                     class="
                         flex
-                        flex-col
                         w-full
+                        flex-col
                         items-center
                         gap-3
                         px-5
@@ -1111,42 +1719,30 @@ onBeforeUnmount(() => {
                         xl:px-16
                     "
                 >
-                    <div
+                    <h2
                         class="
-                            flex
-                            flex-col
-                            items-center
-                            gap-3
-                            text-center
+                            text-xl
+                            font-bold
+                            text-baige
+
+                            md:text-2xl
                         "
                     >
-                        <h2
-                            class="
-                                text-xl
-                                font-bold
-                                text-baige
+                        Ponúkané služby
+                    </h2>
 
-                                md:text-2xl
-                            "
-                        >
-                            Ponúkané služby
-                        </h2>
-
-                        <p
-                            class="
-                                text-regular
-                                mt-3
-                                max-w-md
-                                text-baige/70
-                            "
-                        >
-                            Pozrite si, s čím sa na nás môžete
-                            obrátiť.
-                        </p>
-                    </div>
+                    <p
+                        class="
+                            text-regular
+                            max-w-md
+                            text-baige/70
+                        "
+                    >
+                        Pozrite si, s čím sa na nás môžete
+                        obrátiť.
+                    </p>
                 </div>
 
-                <!-- Service slider -->
                 <div
                     data-transition-stable
                     class="
@@ -1162,10 +1758,10 @@ onBeforeUnmount(() => {
                             homepageServices
                         "
                         aria-label="Ponúkané služby"
+                        mode="circular"
+                        :infinite="true"
+                        :equal-height="true"
                         :scroll-motion="
-                            decorativeMotionEnabled
-                        "
-                        :auto-play="
                             decorativeMotionEnabled
                         "
                         @select="
@@ -1175,173 +1771,16 @@ onBeforeUnmount(() => {
                         <template
                             #card="{ item }"
                         >
-                            <div
-                                class="
-                                    flex
-                                    h-full
-                                    w-full
-                                    flex-col
+                            <ServiceCardContent
+                                :service="
+                                    item
                                 "
-                            >
-                                <!-- Title -->
-                                <div
-                                    class="
-                                        min-h-[5.5rem]
-                                        shrink-0
-                                    "
-                                >
-                                    <h3
-                                        class="
-                                            text-regular
-                                            line-clamp-3
-                                            text-xl
-                                            font-bold
-                                            leading-[1.3]
-                                            text-green
-                                        "
-                                    >
-                                        {{
-                                            serviceTitle(
-                                                item
-                                            )
-                                        }}
-                                    </h3>
-                                </div>
-
-                                <!-- Description -->
-                                <div
-                                    class="
-                                        min-h-[3rem]
-                                        shrink-0
-                                    "
-                                >
-                                    <p
-                                        class="
-                                            text-regular
-                                            line-clamp-2
-                                            text-sm
-                                            leading-6
-                                            text-green
-                                        "
-                                    >
-                                        {{
-                                            serviceDescription(
-                                                item
-                                            )
-                                        }}
-                                    </p>
-                                </div>
-
-                                <!-- Metadata -->
-                                <div
-                                    class="
-                                        mt-5
-                                        flex
-                                        min-h-[4.25rem]
-                                        shrink-0
-                                        flex-col
-                                        gap-3
-                                    "
-                                >
-                                    <!-- Duration -->
-                                    <div
-                                        class="
-                                            min-h-5
-                                            shrink-0
-                                        "
-                                    >
-                                        <div
-                                            v-if="
-                                                serviceDurationLabel(
-                                                    item
-                                                )
-                                            "
-                                            class="
-                                                border-l-2
-                                                border-green
-                                                pl-3
-                                            "
-                                        >
-                                            <p
-                                                class="
-                                                    text-regular
-                                                    font-bold
-                                                    leading-5
-                                                    text-green
-                                                "
-                                            >
-                                                {{
-                                                    serviceDurationLabel(
-                                                        item
-                                                    )
-                                                }}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <!-- Price -->
-                                    <div
-                                        class="
-                                            min-h-5
-                                            shrink-0
-                                        "
-                                    >
-                                        <div
-                                            v-if="
-                                                hasSelfPayPrice(
-                                                    item
-                                                )
-                                            "
-                                            class="
-                                                border-l-2
-                                                border-green
-                                                pl-3
-                                            "
-                                        >
-                                            <p
-                                                class="
-                                                    text-regular
-                                                    font-bold
-                                                    leading-5
-                                                    text-green
-                                                "
-                                            >
-                                                {{
-                                                    selfPayPrice(
-                                                        item
-                                                    )
-                                                }}
-                                                €
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- CTA -->
-                                <div
-                                    class="
-                                        mt-auto
-                                        flex
-                                        w-full
-                                        shrink-0
-                                        justify-center
-                                        pt-2
-                                    "
-                                >
-                                    <Button
-                                        background-image=""
-                                        background-color="#335940"
-                                        text-color="#FBF9F3"
-                                        @click="
-                                            openServiceDetails(
-                                                item
-                                            )
-                                        "
-                                    >
-                                        Viac o službe
-                                    </Button>
-                                </div>
-                            </div>
+                                @open="
+                                    openServiceDetails(
+                                        item
+                                    )
+                                "
+                            />
                         </template>
                     </ServicesSlider>
 
@@ -1353,12 +1792,10 @@ onBeforeUnmount(() => {
                             text-baige/70
                         "
                     >
-                        Služby momentálne nie sú
-                        k dispozícii.
+                        Služby momentálne nie sú k dispozícii.
                     </p>
                 </div>
 
-                <!-- Service CTA -->
                 <div
                     class="
                         flex
@@ -1378,8 +1815,7 @@ onBeforeUnmount(() => {
                     >
                         Nenašli ste, čo hľadáte?
                         <br>
-                        Pozrite si všetky služby,
-                        ktoré ponúkame.
+                        Pozrite si všetky služby, ktoré ponúkame.
                     </p>
 
                     <Button
@@ -1402,207 +1838,48 @@ onBeforeUnmount(() => {
                 </div>
             </section>
 
-            <!-- FAQ -->
+            <!-- FAQ + Illustration + Team -->
             <section
                 class="
-                    mobile-lazy-section
+                    relative
                     mx-auto
                     grid
                     w-full
                     max-w-7xl
                     grid-cols-1
-                    items-center
-                    gap-8
+                    gap-y-24
 
-                    lg:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.5fr)_minmax(12rem,0.8fr)]
-                    lg:gap-10
+                    max-md:[content-visibility:auto]
+                    max-md:[contain-intrinsic-size:auto_1200px]
+
+                    lg:grid-cols-[minmax(0,1fr)_minmax(12rem,0.7fr)_minmax(0,1fr)]
+                    lg:items-start
+                    lg:gap-x-8
                     lg:px-10
 
-                    xl:gap-14
+                    xl:grid-cols-[minmax(0,1fr)_minmax(14rem,0.8fr)_minmax(0,1fr)]
+                    xl:gap-x-12
                     xl:px-16
                 "
             >
-                <!-- Column 1: FAQ copy -->
-                <div
-                    class="
-                        flex
-                        flex-col
-                        items-center
-                        gap-3
-                        text-center
-                    "
-                >
-                    <h2
-                        class="
-                            text-xl
-                            font-bold
-                            text-baige
-
-                            lg:text-2xl
-                        "
-                    >
-                        Časté otázky
-                    </h2>
-
-                    <p
-                        class="
-                            text-regular
-                            max-w-sm
-                            text-baige/70
-                        "
-                    >
-                        Všetko dôležité na jednom mieste.
-                    </p>
-                </div>
-
-                <!-- Column 2: FAQ cards -->
-                <div
-                    class="
-                        flex
-                        min-w-0
-                        justify-center
-                    "
-                >
-                    <FaqCarousel
-                        v-if="
-                            renderHeavyContent
-                        "
-                        :items="
-                            faqItems
-                        "
-                        :scroll-motion="
-                            decorativeMotionEnabled
-                        "
-                    />
-                </div>
-
-                <!-- Column 3: FAQ CTA -->
-                <div
-                    class="
-                        flex
-                        flex-col
-                        items-center
-                        gap-3
-                        text-center
-
-                    "
-                >
-                    <p
-                        class="
-                            text-regular
-                            max-w-xs
-                            text-baige/70
-                        "
-                    >
-                        Nenašli ste odpoveď?
-                        <br>
-                        Radi vám pomôžeme osobne.
-                    </p>
-
-                    <div class="mt-3">
-                        <Button
-                            :href="
-                                contactUrl
-                            "
-                            background-image=""
-                            background-color="#FBF9F3"
-                            text-color="#335940"
-                        >
-                            Kontaktujte nás
-                        </Button>
-                    </div>
-                </div>
-            </section>
-
-
-            <!-- Team -->
-            <div
-                class="
-                    mobile-lazy-section
-                    mx-auto
-                    grid
-                    w-full
-                    max-w-7xl
-                    grid-cols-1
-                    gap-y-32
-
-                    md:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]
-                    md:items-center
-                    md:gap-x-12
-                    md:gap-y-0
-                    md:px-10
-
-                    xl:gap-x-16
-                    xl:px-16
-                "
-            >
-                <!-- Illustration -->
+                <!-- FAQ -->
                 <section
-                    class="
-                        relative
-                        flex
-                        h-[18rem]
-                        min-w-0
-                        w-full
-                        items-center
-                        justify-center
-                        overflow-hidden
-
-                        md:overflow-visible
-                    "
-                >
-                    <img
-                        src="/images/humanitas_ruky.svg"
-                        alt="Humanitas"
-                        class="
-                            absolute
-                            left-1/2
-                            top-1/2
-                            h-auto
-                            w-[min(100vw,10rem)]
-                            max-w-[34rem]
-                            shrink-0
-                            -translate-x-1/2
-                            -translate-y-1/2
-                            rotate-[50deg]
-                            scale-[3]
-                            object-contain
-                            opacity-50
-
-                            md:static
-                            md:mx-auto
-                            md:w-full
-                            md:max-w-[34rem]
-                            md:translate-x-0
-                            md:translate-y-0
-                            md:rotate-[20deg]
-                            md:scale-[1.2]
-                        "
-                    >
-                </section>
-
-                <!-- Team content -->
-                <section
-                    v-if="
-                        orderedEmployees.length
-                    "
                     class="
                         relative
                         z-10
-                        mx-auto
                         min-w-0
                         w-full
-                        overflow-visible
+                        text-center
                     "
                 >
-                    <!-- Team copy -->
+                    <!-- Aligned copy -->
                     <div
                         class="
                             flex
+                            min-h-[6.5rem]
                             flex-col
                             items-center
                             gap-3
-                            text-center
                         "
                     >
                         <h2
@@ -1611,7 +1888,154 @@ onBeforeUnmount(() => {
                                 font-bold
                                 text-baige
 
-                                md:text-2xl
+                                lg:text-2xl
+                            "
+                        >
+                            Časté otázky
+                        </h2>
+
+                        <p
+                            class="
+                                text-regular
+                                max-w-sm
+                                text-baige/70
+                            "
+                        >
+                            Všetko dôležité na jednom mieste.
+                        </p>
+                    </div>
+
+                    <!-- FAQ carousel -->
+                    <div
+                        class="
+                            mt-8
+                            flex
+                            min-w-0
+                            w-full
+                            justify-center
+                        "
+                    >
+                        <FaqCarousel
+                            v-if="renderHeavyContent"
+                            :items="faqItems"
+                            :scroll-motion="
+                                decorativeMotionEnabled
+                            "
+                        />
+                    </div>
+
+                    <!-- FAQ CTA -->
+                    <div
+                        class="
+                            mt-8
+                            flex
+                            flex-col
+                            items-center
+                            gap-5
+                        "
+                    >
+                        <p
+                            class="
+                                text-regular
+                                max-w-xs
+                                text-baige/70
+                            "
+                        >
+                            Nenašli ste odpoveď?
+                            <br>
+                            Radi vám pomôžeme osobne.
+                        </p>
+
+                        <Button
+                            :href="contactUrl"
+                            background-image=""
+                            background-color="#FBF9F3"
+                            text-color="#335940"
+                        >
+                            Kontaktujte nás
+                        </Button>
+                    </div>
+                </section>
+
+                <!-- Illustration -->
+                <section
+                    class="
+                        relative
+                        z-0
+                        flex
+                        w-full
+                        items-center
+                        justify-center
+                        opacity-70
+
+                        lg:min-h-[30rem]
+                        lg:overflow-visible
+                    "
+                >
+                    <img
+                        src="/images/humanitas_ruky.svg"
+                        alt=""
+                        aria-hidden="true"
+                        draggable="false"
+                        class="
+                            pointer-events-none
+                            h-auto
+                            w-[min(110vw,32rem)]
+                            max-w-none
+                            rotate-[35deg]
+                            scale-[1.35]
+                            object-contain
+                            [transform-origin:center_center]
+
+                            md:w-[36rem]
+                            md:scale-[1.55]
+
+                            lg:absolute
+                            lg:left-1/2
+                            lg:top-1/2
+                            lg:w-[58rem]
+                            lg:scale-[1.65]
+                            lg:-translate-x-1/2
+                            lg:-translate-y-1/2
+                            lg:rotate-[1deg]
+
+                            xl:w-[66rem]
+                            xl:scale-[1.95]
+                            2xl:w-[72rem]
+                            2xl:scale-[2.05]
+
+                        "
+                    >
+                </section>
+
+                <!-- Team -->
+                <section
+                    v-if="orderedEmployees.length"
+                    class="
+                        relative
+                        z-10
+                        min-w-0
+                        w-full
+                        text-center
+                    "
+                >
+                    <!-- Aligned copy -->
+                    <div
+                        class="
+                            flex
+                            min-h-[6.5rem]
+                            flex-col
+                            items-center
+                            gap-3
+                        "
+                    >
+                        <h2
+                            class="
+                                text-xl
+                                font-bold
+                                text-baige
+
+                                lg:text-2xl
                             "
                         >
                             Náš tím
@@ -1620,32 +2044,25 @@ onBeforeUnmount(() => {
                         <p
                             class="
                                 text-regular
-                                max-w-md
+                                max-w-sm
                                 text-baige/70
                             "
                         >
-                            Ľudia, na ktorých sa môžete
-                            obrátiť.
+                            Ľudia, na ktorých sa môžete obrátiť.
                         </p>
                     </div>
 
                     <!-- Team carousel -->
                     <div
                         class="
-                            mx-auto
                             mt-8
                             min-w-0
                             w-full
-                            max-w-3xl
                         "
                     >
                         <EmployeeCarousel
-                            v-if="
-                                renderHeavyContent
-                            "
-                            :items="
-                                orderedEmployees
-                            "
+                            v-if="renderHeavyContent"
+                            :items="orderedEmployees"
                             aria-label="Náš tím"
                             :scroll-motion="
                                 decorativeMotionEnabled
@@ -1656,11 +2073,9 @@ onBeforeUnmount(() => {
                         />
                     </div>
                 </section>
-            </div>
-
+            </section>
         </main>
 
-        <!-- Service detail -->
         <ServiceBottomSheet
             v-if="
                 props.expanded &&
@@ -1674,7 +2089,6 @@ onBeforeUnmount(() => {
             "
         />
 
-        <!-- Employee detail -->
         <EmployeeBottomSheet
             v-if="
                 props.expanded &&
@@ -1695,83 +2109,53 @@ onBeforeUnmount(() => {
 .hero-phrase-leave-active {
     transition:
         opacity 520ms ease,
-        transform 620ms
-            cubic-bezier(
-                0.16,
-                1,
-                0.3,
-                1
-            ),
+        transform 620ms cubic-bezier(
+            0.16,
+            1,
+            0.3,
+            1
+        ),
         filter 520ms ease;
 }
 
 .hero-phrase-enter-from {
     opacity: 0;
-
-    transform:
-        translate3d(
-            0,
-            0.35em,
-            0
-        );
-
-    filter:
-        blur(4px);
+    transform: translate3d(
+        0,
+        0.35em,
+        0
+    );
+    filter: blur(4px);
 }
 
 .hero-phrase-enter-to {
     opacity: 1;
-
-    transform:
-        translate3d(
-            0,
-            0,
-            0
-        );
-
-    filter:
-        blur(0);
+    transform: translate3d(
+        0,
+        0,
+        0
+    );
+    filter: blur(0);
 }
 
 .hero-phrase-leave-from {
     opacity: 1;
-
-    transform:
-        translate3d(
-            0,
-            0,
-            0
-        );
-
-    filter:
-        blur(0);
+    transform: translate3d(
+        0,
+        0,
+        0
+    );
+    filter: blur(0);
 }
 
 .hero-phrase-leave-to {
     opacity: 0;
-
-    transform:
-        translate3d(
-            0,
-            -0.25em,
-            0
-        );
-
-    filter:
-        blur(3px);
-}
-
-@media (
-    max-width:
-    767px
-) {
-    .mobile-lazy-section {
-        content-visibility:
-            auto;
-
-        contain-intrinsic-size:
-            auto 760px;
-    }
+    transform: translate3d(
+        0,
+        -0.25em,
+        0
+    );
+    filter: blur(3px);
 }
 
 @media (
@@ -1788,11 +2172,8 @@ onBeforeUnmount(() => {
     .hero-phrase-enter-to,
     .hero-phrase-leave-from,
     .hero-phrase-leave-to {
-        transform:
-            none;
-
-        filter:
-            none;
+        transform: none;
+        filter: none;
     }
 }
 </style>

@@ -1,26 +1,32 @@
 <script setup>
 import {
     computed,
-    nextTick,
     onBeforeUnmount,
     onMounted,
-    reactive,
     ref,
     watch
 } from 'vue';
 
-import { storeToRefs } from 'pinia';
-
-import { usePublicSiteStore } from '../stores/publicSite';
-import { usePageSeo } from '../composables/usePageSeo';
+import {
+    storeToRefs
+} from 'pinia';
 
 import {
-    useScrollMotion
-} from '../composables/useScrollMotion';
+    usePublicSiteStore
+} from '../stores/publicSite';
+
+import {
+    usePageSeo
+} from '../composables/usePageSeo';
+import {
+    useRoute,
+    useRouter
+} from 'vue-router';
 
 import Button from '../components/Button.vue';
-import Card from '../components/Card.vue';
-import ServiceBottomSheet from '../components/ServiceBottomSheet.vue';
+import ServicesSlider from '../components/Slider.vue';
+import ServiceCardContent from '../components/ServiceCardContent.vue';
+import ServiceBottomSheet from '../components/sheets/Service.vue';
 
 const props = defineProps({
     expanded: {
@@ -33,6 +39,12 @@ const props = defineProps({
         default: false
     }
 });
+
+const route =
+    useRoute();
+
+const router =
+    useRouter();
 
 const publicSiteStore =
     usePublicSiteStore();
@@ -47,85 +59,37 @@ const {
     publicSiteStore
 );
 
-const isMobilePerformanceMode =
-    ref(
-        typeof window !==
-            'undefined'
-            ? window.matchMedia(
-                '(max-width: 767px), (pointer: coarse)'
-            ).matches
-            : false
-    );
-
-let performanceMediaQuery =
-    null;
-
-/*
- * Preview cards stay completely still.
- *
- * The expanded page enables its horizontal
- * scroll response only after it has mounted.
- * This gives the View Transition two stable,
- * matching snapshots instead of capturing
- * service cards in different motion states.
- */
-const scrollMotionEnabled =
-    computed(() => {
-        return (
-            props.expanded &&
-            !props.transitioning
-        );
-    });
-
-const {
-    motionRoot
-} = useScrollMotion({
-    enabled:
-        scrollMotionEnabled,
-
-    disableOnCoarsePointer:
-        false,
-
-    axis: 'x',
-
-    selector:
-        '[data-scroll-motion]',
-
-    sourceSelector:
-        '[data-scroll-motion-source]',
-
-    velocityMultiplier:
-        0.105,
-
-    velocityDecay:
-        0.82,
-
-    maxVelocity:
-        9,
-
-    travelMultiplier:
-        1.9,
-
-    straightenVelocity:
-        5.5
-});
-
 const contactUrl =
     '/kontakt';
 
 usePageSeo({
-    pageKey: 'services',
+    pageKey:
+        'services',
+
     breadcrumbs: [
         {
-            name: 'Domov',
-            url: 'https://klinickapsychologiars.sk/'
+            name:
+                'Domov',
+
+            url:
+                'https://klinickapsychologiars.sk/'
         },
+
         {
-            name: 'Služby',
-            url: 'https://klinickapsychologiars.sk/sluzby'
+            name:
+                'Služby',
+
+            url:
+                'https://klinickapsychologiars.sk/sluzby'
         }
     ]
 });
+
+/*
+|--------------------------------------------------------------------------
+| State
+|--------------------------------------------------------------------------
+*/
 
 const searchTerm =
     ref('');
@@ -139,37 +103,48 @@ const selectedService =
 const serviceDetailsOpen =
     ref(false);
 
+let syncingSheetFromRoute =
+    false;
+
+let syncingRouteFromSheet =
+    false;
+
+const searchFocused =
+    ref(false);
+
+const searchPlaceholderText =
+    ref(
+        'Psychologické vyšetrenie'
+    );
+
+const searchPlaceholderIndex =
+    ref(0);
+
+const searchPlaceholderDeleting =
+    ref(false);
+
+let searchPlaceholderTimer =
+    null;
+
 /*
- * Category slider references
- */
+|--------------------------------------------------------------------------
+| Motion
+|--------------------------------------------------------------------------
+*/
 
-const categoryTracks =
-    new Map();
-
-const categoryTrackHandlers =
-    new Map();
-
-const categoryResizeObservers =
-    new Map();
-
-const categorySliderStates =
-    reactive({});
-
-const emptyCategorySliderState =
-    Object.freeze({
-        canScroll:
-            false,
-
-        canScrollLeft:
-            false,
-
-        canScrollRight:
-            false
+const sliderMotionEnabled =
+    computed(() => {
+        return (
+            props.expanded &&
+            !props.transitioning
+        );
     });
 
 /*
- * Services
- */
+|--------------------------------------------------------------------------
+| Services
+|--------------------------------------------------------------------------
+*/
 
 const activeServices = computed(() => {
     return services.value.filter(
@@ -178,6 +153,216 @@ const activeServices = computed(() => {
         }
     );
 });
+
+function normalizeText(value) {
+    return String(
+        value ??
+        ''
+    )
+        .trim()
+        .toLocaleLowerCase(
+            'sk'
+        )
+        .normalize('NFD')
+        .replace(
+            /[\u0300-\u036f]/g,
+            ''
+        );
+}
+
+function toRouteSlug(value) {
+    const normalized =
+        normalizeText(value)
+            .replace(
+                /[^a-z0-9\s-]/g,
+                ''
+            )
+            .replace(
+                /\s+/g,
+                '-'
+            )
+            .replace(
+                /-+/g,
+                '-'
+            )
+            .replace(
+                /^-+|-+$/g,
+                ''
+            );
+
+    return normalized || null;
+}
+
+function serviceRouteSlug(service) {
+    const candidate =
+        service?.slug ??
+        service?.serviceSlug ??
+        service?.service_slug ??
+        service?.name ??
+        service?.id ??
+        null;
+
+    return toRouteSlug(
+        candidate
+    );
+}
+
+function routeServiceSlug() {
+    const rawSlug =
+        route.params.serviceSlug;
+
+    const value =
+        Array.isArray(rawSlug)
+            ? rawSlug[0]
+            : rawSlug;
+
+    if (
+        typeof value !==
+        'string'
+    ) {
+        return null;
+    }
+
+    return toRouteSlug(
+        decodeURIComponent(
+            value
+        )
+    );
+}
+
+function findServiceByRouteSlug(slug) {
+    if (!slug) {
+        return null;
+    }
+
+    const normalizedSlug =
+        toRouteSlug(slug);
+
+    if (!normalizedSlug) {
+        return null;
+    }
+
+    return (
+        activeServices.value.find(
+            (service) => {
+                return (
+                    serviceRouteSlug(
+                        service
+                    ) ===
+                    normalizedSlug
+                );
+            }
+        ) ?? null
+    );
+}
+
+function openRouteSyncedService(
+    service,
+    options = {}
+) {
+    if (!service) {
+        return;
+    }
+
+    const {
+        syncRoute = true,
+        replace = false
+    } = options;
+
+    selectedService.value =
+        service;
+
+    serviceDetailsOpen.value =
+        true;
+
+    if (
+        !syncRoute ||
+        syncingSheetFromRoute
+    ) {
+        return;
+    }
+
+    const slug =
+        serviceRouteSlug(
+            service
+        );
+
+    if (!slug) {
+        return;
+    }
+
+    const currentSlug =
+        routeServiceSlug();
+
+    if (
+        route.name ===
+            'service-detail' &&
+        currentSlug === slug
+    ) {
+        return;
+    }
+
+    syncingRouteFromSheet =
+        true;
+
+    const navigation = {
+        name: 'service-detail',
+        params: {
+            serviceSlug: slug
+        },
+        query: route.query,
+        hash: route.hash
+    };
+
+    const action = replace
+        ? router.replace(
+            navigation
+        )
+        : router.push(
+            navigation
+        );
+
+    action.finally(() => {
+        syncingRouteFromSheet =
+            false;
+    });
+}
+
+function serviceCategory(service) {
+    const label =
+        service?.category?.name ??
+        service?.categoryName ??
+        service?.category_name ??
+        'Ostatné';
+
+    const slug =
+        service?.category?.slug ??
+        null;
+
+    return {
+        label,
+
+        value:
+            slug ??
+            normalizeText(
+                label
+            ).replace(
+                /\s+/g,
+                '-'
+            )
+    };
+}
+
+function rawServiceDescription(
+    service
+) {
+    return (
+        service?.description ??
+        service?.shortDescription ??
+        service?.short_description ??
+        ''
+    );
+}
 
 const categoryOptions = computed(() => {
     const categories =
@@ -218,6 +403,21 @@ const categoryOptions = computed(() => {
     ];
 });
 
+const selectedCategoryLabel =
+    computed(() => {
+        return (
+            categoryOptions.value.find(
+                (category) => {
+                    return (
+                        category.value ===
+                        selectedCategory.value
+                    );
+                }
+            )?.label ??
+            'Všetky kategórie'
+        );
+    });
+
 const filteredServices = computed(() => {
     const query =
         normalizeText(
@@ -256,7 +456,9 @@ const filteredServices = computed(() => {
 
                         category.label
                     ]
-                        .filter(Boolean)
+                        .filter(
+                            Boolean
+                        )
                         .join(' ')
                 );
 
@@ -288,7 +490,8 @@ const groupedServices = computed(() => {
                     {
                         ...category,
 
-                        services: []
+                        services:
+                            []
                     }
                 );
             }
@@ -319,156 +522,81 @@ const pageDescription = computed(() => {
     );
 });
 
-/*
- * Helpers
- */
-
-function normalizeText(value) {
-    return String(
-        value ?? ''
-    )
-        .trim()
-        .toLocaleLowerCase(
-            'sk'
-        )
-        .normalize('NFD')
-        .replace(
-            /[\u0300-\u036f]/g,
-            ''
-        );
-}
-
-function trimText(
-    value,
-    maxLength
-) {
-    const text =
-        String(
-            value ?? ''
-        ).trim();
-
-    if (!text) {
-        return '';
-    }
-
-    if (
-        text.length <=
-        maxLength
-    ) {
-        return text;
-    }
-
-    return `${text
-        .slice(
-            0,
-            maxLength
-        )
-        .trim()}…`;
-}
-
-function serviceCategory(service) {
-    const label =
-        service?.category?.name ??
-        service?.categoryName ??
-        service?.category_name ??
-        'Ostatné';
-
-    const slug =
-        service?.category?.slug ??
-        null;
-
-    return {
-        label,
-
-        value:
-            slug ??
-            normalizeText(
-                label
-            ).replace(
-                /\s+/g,
-                '-'
-            )
-    };
-}
-
-function rawServiceDescription(
-    service
-) {
-    return (
-        service?.description ??
-        service?.shortDescription ??
-        service?.short_description ??
-        ''
-    );
-}
-
-function serviceTitle(service) {
-    return trimText(
-        service?.name,
-        80
-    );
-}
-
-function serviceDescription(
-    service
-) {
-    return trimText(
-        rawServiceDescription(
-            service
-        ),
-        105
-    );
-}
-
-function serviceDurationLabel(
-    service
-) {
-    const minutes =
-        service?.durationMinutes ??
-        service?.duration_minutes;
-
-    const sessions =
-        service?.durationSessions ??
-        service?.duration_sessions;
-
-    if (!minutes) {
-        return null;
-    }
-
-    if (
-        sessions &&
-        sessions > 1
-    ) {
-        return `${sessions} × ${minutes} min`;
-    }
-
-    return `${minutes} min`;
-}
-
-function selfPayPrice(service) {
-    return (
-        service?.selfPayAmount ??
-        service?.self_pay_amount ??
-        null
-    );
-}
-
-function hasSelfPayPrice(service) {
-    return (
-        selfPayPrice(
-            service
-        ) !== null
-    );
-}
-
 function openServiceDetails(
     service
 ) {
+    openRouteSyncedService(
+        service
+    );
+}
+
+function syncSheetWithRoute() {
+    if (
+        route.name !==
+            'services' &&
+        route.name !==
+            'service-detail'
+    ) {
+        return;
+    }
+
+    const slug =
+        routeServiceSlug();
+
+    if (!slug) {
+        if (serviceDetailsOpen.value) {
+            syncingSheetFromRoute =
+                true;
+
+            serviceDetailsOpen.value =
+                false;
+
+            selectedService.value =
+                null;
+
+            syncingSheetFromRoute =
+                false;
+        }
+
+        return;
+    }
+
+    const matchedService =
+        findServiceByRouteSlug(
+            slug
+        );
+
+    if (!matchedService) {
+        if (loading.value) {
+            return;
+        }
+
+        syncingRouteFromSheet =
+            true;
+
+        router.replace({
+            name: 'services',
+            query: route.query,
+            hash: route.hash
+        }).finally(() => {
+            syncingRouteFromSheet =
+                false;
+        });
+
+        return;
+    }
+
+    syncingSheetFromRoute =
+        true;
+
     selectedService.value =
-        service;
+        matchedService;
 
     serviceDetailsOpen.value =
         true;
+
+    syncingSheetFromRoute =
+        false;
 }
 
 function resetFilters() {
@@ -486,23 +614,10 @@ function resetFilters() {
 }
 
 /*
- * Search
- */
-
-const searchFocused =
-    ref(false);
-
-const searchPlaceholderText =
-    ref('Psychologické vyšetrenie');
-
-const searchPlaceholderIndex =
-    ref(0);
-
-const searchPlaceholderDeleting =
-    ref(false);
-
-let searchPlaceholderTimer =
-    null;
+|--------------------------------------------------------------------------
+| Search placeholder
+|--------------------------------------------------------------------------
+*/
 
 const searchPlaceholders = [
     'Psychologické vyšetrenie',
@@ -521,24 +636,26 @@ const showAnimatedSearchPlaceholder =
         );
     });
 
-const displayedSearchPlaceholder = computed(() => {
-    return searchPlaceholderText.value;
-});
-
-const selectedCategoryLabel =
+const displayedSearchPlaceholder =
     computed(() => {
-        return (
-            categoryOptions.value.find(
-                (category) => {
-                    return (
-                        category.value ===
-                        selectedCategory.value
-                    );
-                }
-            )?.label ??
-            'Všetky kategórie'
-        );
+        return searchPlaceholderText.value;
     });
+
+function stopSearchPlaceholderAnimation() {
+    if (
+        searchPlaceholderTimer ===
+        null
+    ) {
+        return;
+    }
+
+    window.clearTimeout(
+        searchPlaceholderTimer
+    );
+
+    searchPlaceholderTimer =
+        null;
+}
 
 function schedulePlaceholderTick(
     delay
@@ -648,22 +765,6 @@ function startSearchPlaceholderAnimation() {
     );
 }
 
-function stopSearchPlaceholderAnimation() {
-    if (
-        searchPlaceholderTimer ===
-        null
-    ) {
-        return;
-    }
-
-    window.clearTimeout(
-        searchPlaceholderTimer
-    );
-
-    searchPlaceholderTimer =
-        null;
-}
-
 function handleSearchFocus() {
     searchFocused.value =
         true;
@@ -694,704 +795,116 @@ function clearSearch() {
 }
 
 /*
- * Playful cards
- */
-
-const serviceCardPositions = [
-    {
-        class:
-            '-rotate-[2deg] translate-y-4',
-
-        rotation:
-            -2
-    },
-
-    {
-        class:
-            'rotate-[1.5deg] -translate-y-1',
-
-        rotation:
-            1.5
-    },
-
-    {
-        class:
-            '-rotate-[1deg] translate-y-7',
-
-        rotation:
-            -1
-    },
-
-    {
-        class:
-            'rotate-[2deg] translate-y-2',
-
-        rotation:
-            2
-    },
-
-    {
-        class:
-            '-rotate-[1.5deg] -translate-y-2',
-
-        rotation:
-            -1.5
-    },
-
-    {
-        class:
-            'rotate-[1deg] translate-y-6',
-
-        rotation:
-            1
-    }
-];
-
-const serviceCardOffsets = [
-    0,
-    2,
-    5,
-    1,
-    4,
-    3
-];
-
-function serviceCardPositionIndex(
-    index,
-    groupIndex
-) {
-    const offset =
-        serviceCardOffsets[
-            groupIndex %
-            serviceCardOffsets.length
-        ];
-
-    return (
-        index +
-        offset
-    ) %
-        serviceCardPositions.length;
-}
-
-function serviceCardPosition(
-    index,
-    groupIndex
-) {
-    return serviceCardPositions[
-        serviceCardPositionIndex(
-            index,
-            groupIndex
-        )
-    ].class;
-}
-
-function serviceCardBaseRotation(
-    index,
-    groupIndex
-) {
-    return serviceCardPositions[
-        serviceCardPositionIndex(
-            index,
-            groupIndex
-        )
-    ].rotation;
-}
-
-function serviceMotionSeed(
-    serviceIndex,
-    groupIndex
-) {
-    return (
-        groupIndex *
-        10 +
-        serviceIndex
-    );
-}
-
-function categoryHeadingPosition(
-    index
-) {
-    const positions = [
-        '-rotate-[0.8deg] translate-x-1',
-        'rotate-[0.7deg] -translate-x-1',
-        '-rotate-[0.5deg] translate-x-2'
-    ];
-
-    return positions[
-        index %
-        positions.length
-    ];
-}
-
-function serviceBackgroundPosition(
-    service
-) {
-    const seed =
-        String(
-            service?.id ??
-            service?.slug ??
-            service?.name ??
-            ''
-        );
-
-    let hash =
-        0;
-
-    for (
-        let index = 0;
-        index < seed.length;
-        index++
-    ) {
-        hash =
-            (
-                hash *
-                    31 +
-                seed.charCodeAt(
-                    index
-                )
-            ) >>> 0;
-    }
-
-    const x =
-        10 +
-        (
-            hash %
-            81
-        );
-
-    const y =
-        10 +
-        (
-            Math.floor(
-                hash /
-                81
-            ) %
-            81
-        );
-
-    return `${x}% ${y}%`;
-}
-
-/*
- * Dynamic category slider
- */
-
-function ensureCategorySliderState(
-    category
-) {
-    if (
-        !categorySliderStates[
-            category
-        ]
-    ) {
-        categorySliderStates[
-            category
-        ] = {
-            canScroll:
-                false,
-
-            canScrollLeft:
-                false,
-
-            canScrollRight:
-                false
-        };
-    }
-
-    return categorySliderStates[
-        category
-    ];
-}
-
-function categorySliderState(
-    category
-) {
-    return (
-        categorySliderStates[
-            category
-        ] ??
-        emptyCategorySliderState
-    );
-}
-
-function updateCategorySliderState(
-    category
-) {
-    /*
-     * ResizeObserver and requestAnimationFrame callbacks
-     * can otherwise change controls while the browser is
-     * taking the destination snapshot.
-     */
-    if (props.transitioning) {
-        return;
-    }
-
-    const track =
-        categoryTracks.get(
-            category
-        );
-
-    const state =
-        ensureCategorySliderState(
-            category
-        );
-
-    if (!track) {
-        state.canScroll =
-            false;
-
-        state.canScrollLeft =
-            false;
-
-        state.canScrollRight =
-            false;
-
-        return;
-    }
-
-    const tolerance =
-        3;
-
-    const maximumScroll =
-        Math.max(
-            track.scrollWidth -
-                track.clientWidth,
-            0
-        );
-
-    state.canScroll =
-        maximumScroll >
-        tolerance;
-
-    state.canScrollLeft =
-        state.canScroll &&
-        track.scrollLeft >
-            tolerance;
-
-    state.canScrollRight =
-        state.canScroll &&
-        track.scrollLeft <
-            maximumScroll -
-                tolerance;
-}
-
-function removeCategoryTrackListeners(
-    category
-) {
-    const track =
-        categoryTracks.get(
-            category
-        );
-
-    const handler =
-        categoryTrackHandlers.get(
-            category
-        );
-
-    if (
-        track &&
-        handler
-    ) {
-        track.removeEventListener(
-            'scroll',
-            handler
-        );
-    }
-
-    categoryTrackHandlers.delete(
-        category
-    );
-
-    const observer =
-        categoryResizeObservers.get(
-            category
-        );
-
-    if (observer) {
-        observer.disconnect();
-
-        categoryResizeObservers.delete(
-            category
-        );
-    }
-}
-
-function attachCategoryTrackListeners(
-    category,
-    element
-) {
-    if (
-        !element ||
-        isMobilePerformanceMode.value
-    ) {
-        return;
-    }
-
-    const handleScroll =
-        () => {
-            updateCategorySliderState(
-                category
-            );
-        };
-
-    categoryTrackHandlers.set(
-        category,
-        handleScroll
-    );
-
-    element.addEventListener(
-        'scroll',
-        handleScroll,
-        {
-            passive: true
-        }
-    );
-
-    if (
-        typeof ResizeObserver !==
-        'undefined'
-    ) {
-        const resizeObserver =
-            new ResizeObserver(
-                () => {
-                    updateCategorySliderState(
-                        category
-                    );
-                }
-            );
-
-        resizeObserver.observe(
-            element
-        );
-
-        categoryResizeObservers.set(
-            category,
-            resizeObserver
-        );
-    }
-
-    nextTick(() => {
-        window.requestAnimationFrame(
-            () => {
-                updateCategorySliderState(
-                    category
-                );
-            }
-        );
-    });
-}
-
-function setCategoryTrack(
-    category,
-    element
-) {
-    const existingTrack =
-        categoryTracks.get(
-            category
-        );
-
-    if (
-        existingTrack ===
-        element
-    ) {
-        if (
-            element &&
-            !isMobilePerformanceMode.value &&
-            !categoryTrackHandlers.has(
-                category
-            )
-        ) {
-            attachCategoryTrackListeners(
-                category,
-                element
-            );
-        }
-
-        return;
-    }
-
-    removeCategoryTrackListeners(
-        category
-    );
-
-    if (!element) {
-        categoryTracks.delete(
-            category
-        );
-
-        updateCategorySliderState(
-            category
-        );
-
-        return;
-    }
-
-    categoryTracks.set(
-        category,
-        element
-    );
-
-    attachCategoryTrackListeners(
-        category,
-        element
-    );
-}
-
-function scrollCategory(
-    category,
-    direction
-) {
-    const track =
-        categoryTracks.get(
-            category
-        );
-
-    const state =
-        categorySliderState(
-            category
-        );
-
-    if (!track) {
-        return;
-    }
-
-    if (
-        direction < 0 &&
-        !state.canScrollLeft
-    ) {
-        return;
-    }
-
-    if (
-        direction > 0 &&
-        !state.canScrollRight
-    ) {
-        return;
-    }
-
-    const card =
-        track.querySelector(
-            '[data-service-slide]'
-        );
-
-    if (!card) {
-        return;
-    }
-
-    const styles =
-        window.getComputedStyle(
-            track
-        );
-
-    const gap =
-        Number.parseFloat(
-            styles.columnGap ||
-            styles.gap ||
-            '0'
-        ) || 0;
-
-    const distance =
-        card
-            .getBoundingClientRect()
-            .width +
-        gap;
-
-    track.scrollBy({
-        left:
-            direction *
-            distance,
-
-        behavior:
-            'smooth'
-    });
-}
-
-/*
- * Watchers
- */
-
-watch(
-    groupedServices,
-    async () => {
-        if (
-            props.transitioning ||
-            isMobilePerformanceMode.value
-        ) {
-            return;
-        }
-
-        await nextTick();
-
-        window.requestAnimationFrame(
-            () => {
-                categoryTracks.forEach(
-                    (
-                        _,
-                        category
-                    ) => {
-                        updateCategorySliderState(
-                            category
-                        );
-                    }
-                );
-            }
-        );
-    },
-    {
-        deep: true
-    }
-);
+|--------------------------------------------------------------------------
+| Watch
+|--------------------------------------------------------------------------
+*/
 
 watch(
     [
         () => props.expanded,
         () => props.transitioning
     ],
-    async () => {
+
+    () => {
         stopSearchPlaceholderAnimation();
 
         if (
-            !props.expanded ||
-            props.transitioning
+            props.expanded &&
+            !props.transitioning
+        ) {
+            startSearchPlaceholderAnimation();
+        }
+    }
+);
+
+watch(
+    [
+        () => route.name,
+        () => route.params.serviceSlug,
+        activeServices,
+        loading
+    ],
+
+    () => {
+        syncSheetWithRoute();
+    },
+
+    {
+        immediate: true
+    }
+);
+
+watch(
+    serviceDetailsOpen,
+
+    (isOpen) => {
+        if (
+            syncingSheetFromRoute ||
+            syncingRouteFromSheet
         ) {
             return;
         }
 
-        startSearchPlaceholderAnimation();
-
-        if (isMobilePerformanceMode.value) {
-            return;
-        }
-
-        await nextTick();
-
-        window.requestAnimationFrame(
-            () => {
-                categoryTracks.forEach(
-                    (
-                        _,
-                        category
-                    ) => {
-                        updateCategorySliderState(
-                            category
-                        );
+        if (isOpen) {
+            if (
+                selectedService.value
+            ) {
+                openRouteSyncedService(
+                    selectedService.value,
+                    {
+                        replace: true
                     }
                 );
             }
-        );
+
+            return;
+        }
+
+        if (
+            route.name ===
+            'service-detail'
+        ) {
+            syncingRouteFromSheet =
+                true;
+
+            router.replace({
+                name: 'services',
+                query: route.query,
+                hash: route.hash
+            }).finally(() => {
+                syncingRouteFromSheet =
+                    false;
+            });
+        }
+
+        selectedService.value =
+            null;
     }
 );
 
 /*
- * Lifecycle
- */
-
-function updatePerformanceMode() {
-    isMobilePerformanceMode.value =
-        Boolean(
-            performanceMediaQuery
-                ?.matches
-        );
-
-    stopSearchPlaceholderAnimation();
-
-    categoryTracks.forEach(
-        (
-            track,
-            category
-        ) => {
-            removeCategoryTrackListeners(
-                category
-            );
-
-            attachCategoryTrackListeners(
-                category,
-                track
-            );
-        }
-    );
-
-    if (
-        props.expanded &&
-        !props.transitioning
-    ) {
-        startSearchPlaceholderAnimation();
-    }
-}
+|--------------------------------------------------------------------------
+| Lifecycle
+|--------------------------------------------------------------------------
+*/
 
 onMounted(() => {
-    performanceMediaQuery =
-        window.matchMedia(
-            '(max-width: 767px), (pointer: coarse)'
-        );
-
-    performanceMediaQuery
-        .addEventListener?.(
-            'change',
-            updatePerformanceMode
-        );
-
-    updatePerformanceMode();
-
     if (
         props.expanded &&
         !props.transitioning
     ) {
         startSearchPlaceholderAnimation();
-    }
-
-    if (!isMobilePerformanceMode.value) {
-        nextTick(() => {
-            window.requestAnimationFrame(
-                () => {
-                    categoryTracks.forEach(
-                        (
-                            _,
-                            category
-                        ) => {
-                            updateCategorySliderState(
-                                category
-                            );
-                        }
-                    );
-                }
-            );
-        });
     }
 });
 
 onBeforeUnmount(() => {
-    performanceMediaQuery
-        ?.removeEventListener?.(
-            'change',
-            updatePerformanceMode
-        );
-
-    performanceMediaQuery =
-        null;
-
     stopSearchPlaceholderAnimation();
-
-    categoryTracks.forEach(
-        (
-            _,
-            category
-        ) => {
-            removeCategoryTrackListeners(
-                category
-            );
-        }
-    );
-
-    categoryTracks.clear();
-    categoryTrackHandlers.clear();
-    categoryResizeObservers.clear();
 });
 </script>
 
 <template>
     <div
-        ref="motionRoot"
         data-transition-needs-settle
         class="
             page-paint-surface
@@ -1404,151 +917,12 @@ onBeforeUnmount(() => {
             text-baige
         "
     >
-        <!-- Loading -->
-        <div
-            v-if="
-                loading &&
-                !company
-            "
-            class="
-                mx-auto
-                w-full
-                px-5
-                py-10
-                lg:px-15
-            "
-        >
-            <div
-                class="
-                    mx-auto
-                    max-w-xl
-                    space-y-4
-                "
-            >
-                <div
-                    class="
-                        mx-auto
-                        h-10
-                        w-60
-                        animate-pulse
-                        rounded-full
-                        bg-baige/10
-                    "
-                />
-
-                <div
-                    class="
-                        h-5
-                        w-full
-                        animate-pulse
-                        rounded-full
-                        bg-baige/10
-                    "
-                />
-            </div>
-
-            <div
-                class="
-                    mx-auto
-                    mt-12
-                    h-16
-                    max-w-5xl
-                    animate-pulse
-                    rounded-[2rem]
-                    bg-baige/10
-                "
-            />
-
-            <div
-                class="
-                    mt-16
-                    flex
-                    gap-5
-                    overflow-hidden
-                "
-            >
-                <div
-                    v-for="
-                        index in 4
-                    "
-                    :key="
-                        index
-                    "
-                    class="
-                        h-[27rem]
-                        w-[72vw]
-                        max-w-[21rem]
-                        shrink-0
-                        animate-pulse
-                        rounded-[2.5rem]
-                        bg-baige/10
-
-                        lg:w-[19rem]
-                    "
-                />
-            </div>
-        </div>
-
-        <!-- Error -->
-        <div
-            v-else-if="
-                error &&
-                !company
-            "
-            class="
-                mx-auto
-                max-w-xl
-                px-5
-                py-16
-                text-center
-            "
-        >
-            <h1
-                class="
-                    text-xl
-                    font-bold
-                    text-baige
-                "
-            >
-                Obsah sa nepodarilo načítať
-            </h1>
-
-            <p
-                class="
-                    text-regular
-                    mt-5
-                    text-baige/65
-                "
-            >
-                {{ error }}
-            </p>
-
-            <div
-                class="
-                    mt-8
-                "
-            >
-                <Button
-                    background-image=""
-                    background-color="#FBF9F3"
-                    text-color="#335940"
-                    @click="
-                        publicSiteStore.reload
-                    "
-                >
-                    Skúsiť znova
-                </Button>
-            </div>
-        </div>
-
         <!-- Page -->
         <main
-            v-else
             class="
                 mx-auto
                 w-full
-                pt-5
-
+                py-12
             "
         >
             <!-- Hero -->
@@ -1571,35 +945,29 @@ onBeforeUnmount(() => {
                         text-center
                     "
                 >
-                    <div
+                    <h1
                         class="
-                            lg:rotate-0
+                            text-xl
+                            font-bold
+                            text-baige
                         "
                     >
-                        <h1
-                            class="
-                                text-xl
-                                font-bold
-                                text-baige
-                            "
-                        >
-                            Ponúkané služby
-                        </h1>
+                        Ponúkané služby
+                    </h1>
 
-                        <p
-                            class="
-                                text-regular
-                                mt-4
-                                max-w-xl
-                                leading-[1.65]
-                                text-baige/70
+                    <p
+                        class="
+                            text-regular
+                            mt-4
+                            max-w-xl
+                            leading-[1.65]
+                            text-baige/70
 
-                                lg:text-lg
-                            "
-                        >
-                            {{ pageDescription }}
-                        </p>
-                    </div>
+                            lg:text-lg
+                        "
+                    >
+                        {{ pageDescription }}
+                    </p>
                 </div>
             </section>
 
@@ -1668,7 +1036,9 @@ onBeforeUnmount(() => {
                                     text-green
                                 "
                             >
-                                {{ selectedCategoryLabel }}
+                                {{
+                                    selectedCategoryLabel
+                                }}
                             </span>
                         </div>
 
@@ -1712,7 +1082,9 @@ onBeforeUnmount(() => {
                                     text-green
                                 "
                             >
-                                {{ category.label }}
+                                {{
+                                    category.label
+                                }}
                             </option>
                         </select>
 
@@ -1786,12 +1158,11 @@ onBeforeUnmount(() => {
                                     text-green/40
                                 "
                             >
-                                {{ displayedSearchPlaceholder }}
+                                {{
+                                    displayedSearchPlaceholder
+                                }}
 
                                 <span
-                                    v-if="
-                                        !isMobilePerformanceMode
-                                    "
                                     class="
                                         ml-[1px]
                                         inline-block
@@ -1881,14 +1252,12 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
 
-                    <!-- Search button -->
                     <button
                         type="submit"
                         class="
                             flex
                             h-12
                             w-full
-                            max-w-full
                             shrink-0
                             items-center
                             justify-center
@@ -1935,569 +1304,118 @@ onBeforeUnmount(() => {
                 </form>
             </section>
 
-            <!-- Grouped services -->
+            <!-- Groups -->
             <section
                 v-if="
                     groupedServices.length
                 "
                 class="
                     mt-16
-                    space-y-10
+                    space-y-20
 
                     lg:mt-24
-                    lg:space-y-20
+                    lg:space-y-28
                 "
             >
                 <section
                     v-for="
-                        (
-                            group,
-                            groupIndex
-                        ) in
+                        group in
                         groupedServices
                     "
                     :key="
                         group.value
                     "
-                    :class="{
-                        'services-group--lazy':
-                            props.expanded &&
-                            !props.transitioning &&
-                            isMobilePerformanceMode
-                    }"
                     class="
                         min-w-0
-                        overflow-hidden
                     "
                 >
-                    <!-- Header -->
+                    <!-- Category heading -->
                     <div
                         class="
                             px-5
+                            text-center
+
                             lg:px-10
                         "
                     >
-                        <div
+                        <h2
                             class="
-                                mx-auto
-                                flex
-                                items-center
-                                gap-10
+                                text-xl
+                                font-bold
+                                text-baige
                             "
                         >
-                            <div
-                                :class="
-                                    categoryHeadingPosition(
-                                        groupIndex
-                                    )
-                                "
-                                class="
-                                    origin-left
-                                    transition-transform
+                            {{ group.label }}
+                        </h2>
 
-                                    lg:translate-x-0
-                                "
-                            >
-                                <h2
-                                    class="
-                                        mt-2
-                                        max-w-xl
-                                        text-xl
-                                        font-bold
-                                        text-baige
-                                    "
-                                >
-                                    {{ group.label }}
-                                </h2>
+                        <p
+                            class="
+                                text-regular
+                                mt-2
+                                text-sm
+                                text-baige/60
+                            "
+                        >
+                            {{
+                                group.services.length
+                            }}
 
-                                <p
-                                    class="
-                                        text-regular
-                                        mt-2
-                                        text-sm
-                                        text-baige/60
-                                    "
-                                >
-                                    {{
-                                        group.services.length
-                                    }}
-
-                                    {{
-                                        group.services.length ===
-                                        1
-                                            ? 'služba'
-                                            : group.services.length <=
-                                                4
-                                                ? 'služby'
-                                                : 'služieb'
-                                    }}
-                                </p>
-                            </div>
-
-                            <!-- Dynamic desktop controls -->
-                            <div
-                                v-if="
-                                    categorySliderState(
-                                        group.value
-                                    ).canScroll
-                                "
-                                class="
-                                    hidden
-                                    shrink-0
-                                    items-center
-                                    gap-2
-
-                                    md:flex
-                                "
-                            >
-                                <!-- Previous -->
-                                <Button
-                                    type="button"
-                                    background-image=""
-                                    :background-color="
-                                        categorySliderState(
-                                            group.value
-                                        ).canScrollLeft
-                                            ? '#FBF9F3'
-                                            : 'transparent'
-                                    "
-                                    :text-color="
-                                        categorySliderState(
-                                            group.value
-                                        ).canScrollLeft
-                                            ? '#335940'
-                                            : '#FBF9F3'
-                                    "
-                                    :disabled="
-                                        !categorySliderState(
-                                            group.value
-                                        ).canScrollLeft
-                                    "
-                                    :aria-label="
-                                        `Predchádzajúce služby v kategórii ${group.label}`
-                                    "
-                                    class="
-                                        flex
-                                        size-11
-                                        min-h-0
-                                        min-w-0
-                                        shrink-0
-                                        items-center
-                                        justify-center
-                                        p-0
-                                    "
-                                    @click="
-                                        scrollCategory(
-                                            group.value,
-                                            -1
-                                        )
-                                    "
-                                >
-                                    <i
-                                        class="
-                                            bi
-                                            bi-arrow-left
-                                            text-base
-                                        "
-                                        aria-hidden="true"
-                                    />
-                                </Button>
-
-                                <!-- Next -->
-                                <Button
-                                    type="button"
-                                    background-image=""
-                                    :background-color="
-                                        categorySliderState(
-                                            group.value
-                                        ).canScrollRight
-                                            ? '#FBF9F3'
-                                            : 'transparent'
-                                    "
-                                    :text-color="
-                                        categorySliderState(
-                                            group.value
-                                        ).canScrollRight
-                                            ? '#335940'
-                                            : 'rgba(251, 249, 243, 0.25)'
-                                    "
-                                    :disabled="
-                                        !categorySliderState(
-                                            group.value
-                                        ).canScrollRight
-                                    "
-                                    :aria-label="
-                                        `Ďalšie služby v kategórii ${group.label}`
-                                    "
-                                    class="
-                                        flex
-                                        size-11
-                                        min-h-0
-                                        min-w-0
-                                        shrink-0
-                                        items-center
-                                        justify-center
-                                        p-0
-                                    "
-                                    @click="
-                                        scrollCategory(
-                                            group.value,
-                                            1
-                                        )
-                                    "
-                                >
-                                    <i
-                                        class="
-                                            bi
-                                            bi-arrow-right
-                                            text-base
-                                        "
-                                        aria-hidden="true"
-                                    />
-                                </Button>
-                            </div>
-                        </div>
+                            {{
+                                group.services.length ===
+                                1
+                                    ? 'služba'
+                                    : group.services.length <=
+                                        4
+                                        ? 'služby'
+                                        : 'služieb'
+                            }}
+                        </p>
                     </div>
 
-                    <!-- Slider -->
-                    <div>
-                        <div
-                            :ref="
-                                (element) => {
-                                    setCategoryTrack(
-                                        group.value,
-                                        element
-                                    );
-                                }
+                    <!-- Same slider, straight + finite -->
+                    <div
+                        data-transition-stable
+                        class="
+                            mt-7
+                            min-w-0
+                        "
+                    >
+                        <ServicesSlider
+                            :items="
+                                group.services
                             "
-                            data-scroll-motion-source
-                            data-transition-stable
-                            class="
-                                services-track
-                                flex
-                                snap-x
-                                snap-mandatory
-                                items-start
-                                gap-5
-                                overflow-x-auto
-                                overscroll-x-contain
-                                scroll-smooth
-                                px-5
-                                pb-14
-                                pt-5
-
-                                md:px-10
-
-                                lg:gap-8
-                                lg:pb-16
-                                lg:px-0
-                                lg:pl-10
-                                lg:pt-6
+                            :aria-label="
+                                group.label
+                            "
+                            mode="linear"
+                            :infinite="
+                                false
+                            "
+                            :equal-height="
+                                true
+                            "
+                            :scroll-motion="
+                                sliderMotionEnabled
+                            "
+                            @select="
+                                openServiceDetails
                             "
                         >
-                            <div
-                                v-for="
-                                    (
-                                        service,
-                                        serviceIndex
-                                    ) in
-                                    group.services
-                                "
-                                :key="
-                                    service.id ??
-                                    service.slug ??
-                                    service.name
-                                "
-                                data-service-slide
-                                class="
-                                    flex
-                                    w-[72vw]
-                                    max-w-[19rem]
-                                    shrink-0
-                                    snap-center
-                                    justify-center
-
-                                    sm:w-[20rem]
-
-                                    lg:w-[19rem]
-                                    lg:max-w-none
-
-                                    xl:w-[20.5rem]
-                                "
-                                :class="
-                                    serviceCardPosition(
-                                        serviceIndex,
-                                        groupIndex
-                                    )
-                                "
-                                role="button"
-                                tabindex="0"
-                                @click="
-                                    openServiceDetails(
-                                        service
-                                    )
-                                "
-                                @keydown.enter="
-                                    openServiceDetails(
-                                        service
-                                    )
-                                "
-                                @keydown.space.prevent="
-                                    openServiceDetails(
-                                        service
-                                    )
-                                "
+                            <template
+                                #card="{ item }"
                             >
-                                <!-- Horizontal motion wrapper -->
-                                <div
-                                    class="
-                                        h-full
-                                        w-full
+                                <ServiceCardContent
+                                    :service="
+                                        item
                                     "
-                                    :class="{
-                                        'scroll-motion':
-                                            scrollMotionEnabled
-                                    }"
-                                    :data-scroll-motion="
-                                        scrollMotionEnabled
-                                            ? ''
-                                            : undefined
+                                    @open="
+                                        openServiceDetails(
+                                            item
+                                        )
                                     "
-                                    :data-motion-seed="
-                                        scrollMotionEnabled
-                                            ? serviceMotionSeed(
-                                                serviceIndex,
-                                                groupIndex
-                                            )
-                                            : undefined
-                                    "
-                                    :data-base-rotation="
-                                        scrollMotionEnabled
-                                            ? serviceCardBaseRotation(
-                                                serviceIndex,
-                                                groupIndex
-                                            )
-                                            : undefined
-                                    "
-                                    :data-rotation-mode="
-                                        scrollMotionEnabled
-                                            ? 'offset'
-                                            : undefined
-                                    "
-                                    :data-motion-strength="
-                                        scrollMotionEnabled
-                                            ? 1
-                                            : undefined
-                                    "
-                                    :data-straighten-strength="
-                                        scrollMotionEnabled
-                                            ? 0.96
-                                            : undefined
-                                    "
-                                    :data-max-x="
-                                        scrollMotionEnabled
-                                            ? 16
-                                            : undefined
-                                    "
-                                    :data-max-scale="
-                                        scrollMotionEnabled
-                                            ? 0.005
-                                            : undefined
-                                    "
-                                >
-                                    <Card
-                                        :item="
-                                            service
-                                        "
-                                        :equal-height="
-                                            true
-                                        "
-                                        :background-position="
-                                            serviceBackgroundPosition(
-                                                service
-                                            )
-                                        "
-                                        class="
-                                            group/service
-                                            h-[27rem]
-                                            w-full
-                                            max-w-none
-                                            cursor-pointer
-                                            transition-all
-                                            duration-500
-                                            ease-out
-
-                                            hover:z-20
-                                            hover:-translate-y-2
-                                            hover:rotate-0
-                                            hover:shadow-[var(--shadow-strong)]
-
-                                            lg:h-[29rem]
-                                        "
-                                    >
-                                        <template
-                                            #default="{ item }"
-                                        >
-                                            <div
-                                                class="
-                                                    flex
-                                                    h-full
-                                                    w-full
-                                                    flex-col
-                                                "
-                                            >
-                                                <!-- Title -->
-                                                <div
-                                                    class="
-                                                        min-h-[6rem]
-                                                        shrink-0
-                                                    "
-                                                >
-                                                    <h3
-                                                        class="
-                                                            text-regular
-                                                            line-clamp-3
-                                                            text-xl
-                                                            font-bold
-                                                            leading-[1.25]
-                                                            text-green
-
-                                                            lg:text-[1.35rem]
-                                                        "
-                                                    >
-                                                        {{
-                                                            serviceTitle(
-                                                                item
-                                                            )
-                                                        }}
-                                                    </h3>
-                                                </div>
-
-                                                <!-- Description -->
-                                                <div
-                                                    class="
-                                                        min-h-[4rem]
-                                                        shrink-0
-                                                    "
-                                                >
-                                                    <p
-                                                        v-if="
-                                                            serviceDescription(
-                                                                item
-                                                            )
-                                                        "
-                                                        class="
-                                                            text-regular
-                                                            line-clamp-3
-                                                            text-sm
-                                                            leading-[1.55]
-                                                            text-green/70
-                                                        "
-                                                    >
-                                                        {{
-                                                            serviceDescription(
-                                                                item
-                                                            )
-                                                        }}
-                                                    </p>
-                                                </div>
-
-                                                <!-- Metadata -->
-                                                <div
-                                                    class="
-                                                        mt-auto
-                                                        flex
-                                                        flex-col
-                                                        gap-3
-                                                        pt-6
-                                                    "
-                                                >
-                                                    <div
-                                                        v-if="
-                                                            serviceDurationLabel(
-                                                                item
-                                                            )
-                                                        "
-                                                        class="
-                                                            border-l-2
-                                                            border-green
-                                                            pl-3
-                                                        "
-                                                    >
-                                                        <p
-                                                            class="
-                                                                text-regular
-                                                                font-bold
-                                                                leading-5
-                                                                text-green
-                                                            "
-                                                        >
-                                                            {{
-                                                                serviceDurationLabel(
-                                                                    item
-                                                                )
-                                                            }}
-                                                        </p>
-                                                    </div>
-
-                                                    <div
-                                                        v-if="
-                                                            hasSelfPayPrice(
-                                                                item
-                                                            )
-                                                        "
-                                                        class="
-                                                            border-l-2
-                                                            border-green
-                                                            pl-3
-                                                        "
-                                                    >
-                                                        <p
-                                                            class="
-                                                                text-regular
-                                                                font-bold
-                                                                leading-5
-                                                                text-green
-                                                            "
-                                                        >
-                                                            {{
-                                                                selfPayPrice(
-                                                                    item
-                                                                )
-                                                            }}
-                                                            €
-                                                        </p>
-                                                    </div>
-                                                </div>
-
-                                                <!-- CTA -->
-                                                <div
-                                                    class="
-                                                        flex
-                                                        shrink-0
-                                                        justify-center
-                                                        pt-6
-                                                    "
-                                                >
-                                                    <Button
-                                                        background-image=""
-                                                        background-color="#335940"
-                                                        text-color="#FBF9F3"
-                                                        @click.stop="
-                                                            openServiceDetails(
-                                                                item
-                                                            )
-                                                        "
-                                                    >
-                                                        Viac o službe
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </template>
-                                    </Card>
-                                </div>
-                            </div>
-                        </div>
+                                />
+                            </template>
+                        </ServicesSlider>
                     </div>
                 </section>
             </section>
@@ -2582,7 +1500,7 @@ onBeforeUnmount(() => {
             <section
                 class="
                     mx-auto
-                    mt-16
+                    mt-20
                     flex
                     w-full
                     max-w-4xl
@@ -2621,10 +1539,6 @@ onBeforeUnmount(() => {
                 <div
                     class="
                         my-6
-                        flex
-                        flex-wrap
-                        justify-center
-                        gap-3
                     "
                 >
                     <Button
@@ -2663,53 +1577,5 @@ input[type="search"]::-webkit-search-results-button,
 input[type="search"]::-webkit-search-results-decoration {
     appearance: none;
     -webkit-appearance: none;
-}
-
-.services-track {
-    scrollbar-width: none;
-
-    scroll-padding-inline:
-        8vw;
-}
-
-.services-track::-webkit-scrollbar {
-    display: none;
-}
-
-@media (
-    max-width:
-    767px
-) {
-    .services-group--lazy {
-        content-visibility:
-            auto;
-
-        contain-intrinsic-size:
-            auto 620px;
-    }
-
-    .services-track {
-        scroll-behavior:
-            auto;
-    }
-}
-
-@media (
-    min-width:
-    1024px
-) {
-    .services-track {
-        scroll-padding-inline:
-            max(
-                2.5rem,
-                calc(
-                    (
-                        100vw -
-                        90rem
-                    ) /
-                    2
-                )
-            );
-    }
 }
 </style>

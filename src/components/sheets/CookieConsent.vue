@@ -7,14 +7,14 @@ import {
 
 import {
     DEFAULT_COOKIE_PREFERENCES
-} from '../utils/cookieConsent';
+} from '../../utils/cookieConsent.js';
 
 import {
     useCookieConsent
-} from '../composables/useCookieConsent';
+} from '../../composables/useCookieConsent.js';
 
-import BottomSheet from './BottomSheet.vue';
-import Button from './Button.vue';
+import BottomSheet from '../BottomSheet.vue';
+import Button from '../Button.vue';
 
 const {
     isSheetOpen,
@@ -355,13 +355,13 @@ function handleSavePreferences() {
                                         background-image=""
                                         :background-color="
                                             draftPreferences.analytics
-                                                ? '#335940'
-                                                : 'rgba(51, 89, 64, 0.15)'
+                                                ? 'var(--color-green)'
+                                                : 'var(--color-baige)'
                                         "
                                         :text-color="
                                             draftPreferences.analytics
-                                                ? '#FBF9F3'
-                                                : 'rgba(51, 89, 64, 0.70)'
+                                                ? 'var(--color-baige)'
+                                                : 'var(--color-green)'
                                         "
                                         class="
                                             min-h-0
@@ -450,13 +450,13 @@ function handleSavePreferences() {
                                         background-image=""
                                         :background-color="
                                             draftPreferences.marketing
-                                                ? '#335940'
-                                                : 'rgba(51, 89, 64, 0.15)'
+                                                ? 'var(--color-green)'
+                                                : 'var(--color-baige)'
                                         "
                                         :text-color="
                                             draftPreferences.marketing
-                                                ? '#FBF9F3'
-                                                : 'rgba(51, 89, 64, 0.70)'
+                                                ? 'var(--color-baige)'
+                                                : 'var(--color-green)'
                                         "
                                         class="
                                             min-h-0
@@ -531,8 +531,8 @@ function handleSavePreferences() {
                         >
                             <Button
                                 background-image=""
-                                background-color="#335940"
-                                text-color="#FBF9F3"
+                                background-color="var(--color-green)"
+                                text-color="var(--color-baige)"
                                 @click="
                                     acceptAll
                                 "
@@ -542,8 +542,8 @@ function handleSavePreferences() {
 
                             <Button
                                 background-image=""
-                                background-color="#DCE5DC"
-                                text-color="#335940"
+                                background-color="var(--color-baige)"
+                                text-color="var(--color-green)"
                                 @click="
                                     rejectOptional
                                 "
@@ -553,8 +553,8 @@ function handleSavePreferences() {
 
                             <Button
                                 background-image=""
-                                background-color="#FBF9F3"
-                                text-color="#335940"
+                                background-color="var(--color-baige)"
+                                text-color="var(--color-green)"
                                 @click="
                                     handleSavePreferences
                                 "

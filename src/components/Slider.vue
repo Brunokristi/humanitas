@@ -12,8 +12,8 @@ import {
     useScrollMotion
 } from '../composables/useScrollMotion';
 
-import Button from './Button.vue';
 import Card from './Card.vue';
+import DesktopCarouselControls from './DesktopCarouselControls.vue';
 
 const props = defineProps({
     items: {
@@ -29,6 +29,25 @@ const props = defineProps({
     ariaLabel: {
         type: String,
         default: 'Posuvník'
+    },
+
+    mode: {
+        type: String,
+        default: 'circular',
+
+        validator(value) {
+            return [
+                'circular',
+                'linear'
+            ].includes(
+                value
+            );
+        }
+    },
+
+    infinite: {
+        type: Boolean,
+        default: true
     },
 
     equalHeight: {
@@ -56,16 +75,6 @@ const props = defineProps({
         default: 2.8
     },
 
-    autoPlay: {
-        type: Boolean,
-        default: true
-    },
-
-    autoPlayDelay: {
-        type: Number,
-        default: 3000
-    },
-
     scrollMotion: {
         type: Boolean,
         default: false
@@ -76,9 +85,16 @@ const emit = defineEmits([
     'select'
 ]);
 
-const scrollMotionEnabled = computed(() => {
-    return props.scrollMotion;
-});
+/*
+|--------------------------------------------------------------------------
+| Motion
+|--------------------------------------------------------------------------
+*/
+
+const scrollMotionEnabled =
+    computed(() => {
+        return props.scrollMotion;
+    });
 
 const {
     motionRoot
@@ -91,128 +107,177 @@ const {
 });
 
 /*
- * =========================================================
- * EASY SLIDER CONTROLS
- * =========================================================
- *
- * Mobile card spacing:
- *
- * 0.50 = very close together
- * 0.60 = close together
- * 0.68 = current setting
- * 0.80 = more space
- * 1.00 = approximately one card width apart
- *
- * Lower mobile.spacing to bring the cards closer.
- */
+|--------------------------------------------------------------------------
+| Settings
+|--------------------------------------------------------------------------
+*/
 
-const SLIDER_SETTINGS = Object.freeze({
-    mobile: {
-        spacing: 0.8,
+const SLIDER_SETTINGS =
+    Object.freeze({
+        mobile: {
+            spacing:
+                1,
 
-        radiusUnder480: 1150,
-        radiusUnder768: 1350,
+            radiusUnder480:
+                1150,
 
-        wheelOffsetUnder480: 28,
-        wheelOffsetUnder768: 34,
+            radiusUnder768:
+                1350,
 
-        minimumAngle: 0
-    },
+            wheelOffsetUnder480:
+                28,
 
-    tablet: {
-        gap: 4,
-        radius: 1750,
-        wheelOffset: 42
-    },
+            wheelOffsetUnder768:
+                34,
 
-    desktop: {
-        gap: 18,
-        edgePeek: 24
-    }
-});
+            minimumAngle:
+                0
+        },
 
-/*
- * General behaviour settings
- */
+        tablet: {
+            gap:
+                4,
 
-const CLICK_DRAG_THRESHOLD = 8;
-const MIN_CARD_WIDTH = 240;
+            radius:
+                1750,
 
-/*
- * Elements and measurements
- */
+            wheelOffset:
+                42
+        },
 
-const sliderElement = ref(null);
+        desktop: {
+            gap:
+                18,
 
-const sliderWidth = ref(1024);
-const cardWidth = ref(360);
-const equalCardHeight = ref(null);
+            edgePeek:
+                24
+        },
 
-const viewportWidth = ref(
-    typeof window !== 'undefined'
-        ? window.innerWidth
-        : 1024
-);
+        linear: {
+            mobileGap:
+                12,
 
-/*
- * Drag state
- */
+            desktopGap:
+                28
+        }
+    });
 
-const dragX = ref(0);
-const isDragging = ref(false);
-const hasDragged = ref(false);
-const pointerId = ref(null);
+const CLICK_DRAG_THRESHOLD =
+    8;
 
-const pointerStartX = ref(0);
-const previousPointerX = ref(0);
-const previousPointerTime = ref(0);
-const pointerVelocity = ref(0);
+const MIN_CARD_WIDTH =
+    240;
+
+const COPY_COUNT =
+    9;
+
+const MIDDLE_COPY_INDEX =
+    Math.floor(
+        COPY_COUNT / 2
+    );
+
+const SETTLE_DURATION_MS =
+    700;
 
 /*
- * A button or link may be the element where the drag starts.
- * Suppress only the click generated after a real drag.
- */
-let suppressClickUntil = 0;
+|--------------------------------------------------------------------------
+| Elements
+|--------------------------------------------------------------------------
+*/
 
-/*
- * Autoplay
- */
+const sliderElement =
+    ref(null);
 
-const isPointerInside = ref(false);
-const hasFocusWithin = ref(false);
-const prefersReducedMotion = ref(false);
+const sliderWidth =
+    ref(1024);
 
-let autoPlayTimer = null;
-let reducedMotionMediaQuery = null;
+const cardWidth =
+    ref(360);
 
-/*
- * Slider position
- */
+const equalCardHeight =
+    ref(null);
 
-const virtualIndex = ref(0);
-const suppressTransitions = ref(false);
+const viewportWidth =
+    ref(
+        typeof window !==
+            'undefined'
+            ? window.innerWidth
+            : 1024
+    );
 
-/*
- * Cards which need to move instantly from one
- * side of the circular slider to the other.
- */
+let resizeFrame =
+    null;
 
-const repositioningCards = ref([]);
+let settleTimer =
+    null;
 
-let repositionFrame = null;
-let revealFrame = null;
-let resizeFrame = null;
 let lastViewportWidth =
-    typeof window !== 'undefined'
+    typeof window !==
+        'undefined'
         ? window.innerWidth
         : 1024;
 
 /*
- * Basic computed values
- */
+|--------------------------------------------------------------------------
+| Drag
+|--------------------------------------------------------------------------
+*/
+
+const dragX =
+    ref(0);
+
+const isDragging =
+    ref(false);
+
+const hasDragged =
+    ref(false);
+
+const pointerId =
+    ref(null);
+
+const pointerStartX =
+    ref(0);
+
+const previousPointerX =
+    ref(0);
+
+const previousPointerTime =
+    ref(0);
+
+const pointerVelocity =
+    ref(0);
+
+let suppressClickUntil =
+    0;
+
+/*
+|--------------------------------------------------------------------------
+| Position
+|--------------------------------------------------------------------------
+*/
+
+const virtualIndex =
+    ref(0);
+
+const suppressTransitions =
+    ref(true);
 
 const cardCount = computed(() => {
     return props.items.length;
+});
+
+const isInfinite = computed(() => {
+    return (
+        props.infinite &&
+        cardCount.value > 1
+    );
+});
+
+const isLinear = computed(() => {
+    return (
+        props.mode ===
+        'linear'
+    );
 });
 
 const renderedItems = computed(() => {
@@ -220,218 +285,85 @@ const renderedItems = computed(() => {
         return [];
     }
 
-    return props.items.map((item, originalIndex) => {
-        return {
-            item,
-            originalIndex,
-
-            renderKey: `${
-                item?.id ??
-                item?.slug ??
-                originalIndex
-            }`
-        };
-    });
-});
-
-const currentIndex = computed(() => {
-    return circularIndex(
-        virtualIndex.value
-    );
-});
-
-const isMobile = computed(() => {
-    return viewportWidth.value < 768;
-});
-
-const isDesktop = computed(() => {
-    return viewportWidth.value >= 1024;
-});
-
-/*
- * Mobile and tablet:
- * active card + one card on each side.
- *
- * Desktop:
- * active card + two cards on each side.
- */
-
-const visibleSideCount = computed(() => {
-    return isDesktop.value
-        ? 2
-        : 1;
-});
-
-/*
- * Circular mobile settings
- */
-
-const circleRadius = computed(() => {
-    if (viewportWidth.value < 480) {
-        return SLIDER_SETTINGS.mobile.radiusUnder480;
-    }
-
-    if (viewportWidth.value < 768) {
-        return SLIDER_SETTINGS.mobile.radiusUnder768;
-    }
-
-    return SLIDER_SETTINGS.tablet.radius;
-});
-
-const wheelOffsetY = computed(() => {
-    if (viewportWidth.value < 480) {
-        return SLIDER_SETTINGS.mobile.wheelOffsetUnder480;
-    }
-
-    if (viewportWidth.value < 768) {
-        return SLIDER_SETTINGS.mobile.wheelOffsetUnder768;
-    }
-
-    return SLIDER_SETTINGS.tablet.wheelOffset;
-});
-
-/*
- * Distance between mobile card centres.
- *
- * On mobile, this is controlled by:
- *
- * SLIDER_SETTINGS.mobile.spacing
- */
-
-const mobileCardStep = computed(() => {
-    const measuredWidth = Math.max(
-        cardWidth.value,
-        MIN_CARD_WIDTH
-    );
-
-    if (isMobile.value) {
-        return measuredWidth *
-            SLIDER_SETTINGS.mobile.spacing;
-    }
-
-    return measuredWidth +
-        SLIDER_SETTINGS.tablet.gap;
-});
-
-const mobileAngleGap = computed(() => {
-    const radius = Math.max(
-        circleRadius.value,
-        1
-    );
-
-    const ratio = Math.min(
-        mobileCardStep.value /
+    /*
+     * Finite mode:
+     * render exactly one copy.
+     */
+    if (!isInfinite.value) {
+        return props.items.map(
             (
-                radius *
-                2
-            ),
-        0.999
-    );
+                item,
+                originalIndex
+            ) => {
+                return {
+                    item,
+                    originalIndex,
 
-    const calculatedAngle =
-        2 *
-        Math.asin(
-            ratio
-        ) *
-        (
-            180 /
-            Math.PI
+                    copyIndex:
+                        0,
+
+                    renderedIndex:
+                        originalIndex,
+
+                    renderKey:
+                        `finite-${
+                            item?.id ??
+                            item?.slug ??
+                            item?.name ??
+                            originalIndex
+                        }`
+                };
+            }
         );
-
-    return Math.max(
-        calculatedAngle,
-        SLIDER_SETTINGS.mobile.minimumAngle
-    );
-});
-
-/*
- * Desktop spacing
- */
-
-const desktopCardStep = computed(() => {
-    const measuredWidth = Math.max(
-        cardWidth.value,
-        MIN_CARD_WIDTH
-    );
-
-    const preferredStep =
-        measuredWidth +
-        SLIDER_SETTINGS.desktop.gap;
-
-    const maximumVisibleStep =
-        sliderWidth.value /
-            4 +
-        measuredWidth /
-            4 -
-        SLIDER_SETTINGS.desktop.edgePeek /
-            2;
-
-    return Math.max(
-        measuredWidth,
-
-        Math.min(
-            preferredStep,
-            maximumVisibleStep
-        )
-    );
-});
-
-/*
- * Drag progress
- *
- * Mobile uses the actual mobile card spacing so
- * the card follows the pointer more naturally.
- */
-
-const dragStep = computed(() => {
-    return isDesktop.value
-        ? desktopCardStep.value
-        : mobileCardStep.value;
-});
-
-const dragProgress = computed(() => {
-    if (!dragStep.value) {
-        return 0;
     }
 
-    return dragX.value /
-        dragStep.value;
-});
+    /*
+     * Infinite mode:
+     * permanent repeated copies.
+     */
+    const result =
+        [];
 
-/*
- * Cards are absolutely positioned, so the stage
- * requires an explicit height.
- */
-
-const sliderHeight = computed(() => {
-    if (
-        props.equalHeight &&
-        equalCardHeight.value
+    for (
+        let copyIndex = 0;
+        copyIndex < COPY_COUNT;
+        copyIndex += 1
     ) {
-        const extraSpace = isDesktop.value
-            ? 115
-            : 85;
+        props.items.forEach(
+            (
+                item,
+                originalIndex
+            ) => {
+                const renderedIndex =
+                    copyIndex *
+                        cardCount.value +
+                    originalIndex;
 
-        return `${
-            equalCardHeight.value +
-            extraSpace
-        }px`;
+                result.push({
+                    item,
+                    originalIndex,
+                    copyIndex,
+                    renderedIndex,
+
+                    renderKey:
+                        `${copyIndex}-${
+                            item?.id ??
+                            item?.slug ??
+                            item?.name ??
+                            originalIndex
+                        }`
+                });
+            }
+        );
     }
 
-    if (isDesktop.value) {
-        return '30rem';
-    }
-
-    if (viewportWidth.value >= 768) {
-        return '30rem';
-    }
-
-    return '25rem';
+    return result;
 });
 
-/*
- * Index helpers
- */
+const totalRenderedCardCount =
+    computed(() => {
+        return renderedItems.value.length;
+    });
 
 function circularIndex(index) {
     if (!cardCount.value) {
@@ -448,307 +380,442 @@ function circularIndex(index) {
         cardCount.value;
 }
 
-function middleCopyIndex(originalIndex) {
-    return circularIndex(
-        originalIndex
-    );
-}
-
-function initializeVirtualIndex() {
-    if (!cardCount.value) {
-        virtualIndex.value = 0;
-
-        return;
-    }
-
-    virtualIndex.value = middleCopyIndex(
-        Math.min(
-            Math.max(
-                props.initialIndex,
-                0
-            ),
-
+function clampIndex(index) {
+    return Math.min(
+        Math.max(
+            index,
+            0
+        ),
+        Math.max(
             cardCount.value -
-                1
+                1,
+            0
         )
     );
 }
 
-/*
- * Returns the circular position without applying
- * the current drag movement.
- */
+const currentIndex = computed(() => {
+    if (isInfinite.value) {
+        return circularIndex(
+            virtualIndex.value
+        );
+    }
 
-function getStaticCardPosition(
-    renderIndex,
-    activeIndex
-) {
+    return clampIndex(
+        virtualIndex.value
+    );
+});
+
+const canGoPrevious =
+    computed(() => {
+        if (
+            cardCount.value <=
+            1
+        ) {
+            return false;
+        }
+
+        if (isInfinite.value) {
+            return true;
+        }
+
+        return (
+            currentIndex.value >
+            0
+        );
+    });
+
+const canGoNext =
+    computed(() => {
+        if (
+            cardCount.value <=
+            1
+        ) {
+            return false;
+        }
+
+        if (isInfinite.value) {
+            return true;
+        }
+
+        return (
+            currentIndex.value <
+            cardCount.value -
+                1
+        );
+    });
+
+const isMobile = computed(() => {
+    return (
+        viewportWidth.value <
+        768
+    );
+});
+
+const isDesktop = computed(() => {
+    return (
+        viewportWidth.value >=
+        1024
+    );
+});
+
+const visibleSideCount =
+    computed(() => {
+        return isDesktop.value
+            ? 2
+            : 1;
+    });
+
+function initializeVirtualIndex() {
     if (!cardCount.value) {
-        return 0;
+        virtualIndex.value =
+            0;
+
+        return;
     }
 
-    let delta =
-        renderIndex -
-        activeIndex;
+    const initialIndex =
+        clampIndex(
+            props.initialIndex
+        );
 
-    const halfCount =
-        cardCount.value /
-        2;
+    if (!isInfinite.value) {
+        virtualIndex.value =
+            initialIndex;
 
-    if (delta > halfCount) {
-        delta -= cardCount.value;
-    } else if (delta < -halfCount) {
-        delta += cardCount.value;
+        return;
     }
 
-    return delta;
+    virtualIndex.value =
+        MIDDLE_COPY_INDEX *
+            cardCount.value +
+        initialIndex;
 }
 
-function getCardPosition(renderIndex) {
+/*
+|--------------------------------------------------------------------------
+| Circular geometry
+|--------------------------------------------------------------------------
+*/
+
+const circleRadius = computed(() => {
+    if (
+        viewportWidth.value <
+        480
+    ) {
+        return (
+            SLIDER_SETTINGS.mobile
+                .radiusUnder480
+        );
+    }
+
+    if (
+        viewportWidth.value <
+        768
+    ) {
+        return (
+            SLIDER_SETTINGS.mobile
+                .radiusUnder768
+        );
+    }
+
     return (
-        getStaticCardPosition(
-            renderIndex,
-            currentIndex.value
-        ) +
+        SLIDER_SETTINGS.tablet
+            .radius
+    );
+});
+
+const wheelOffsetY = computed(() => {
+    if (
+        viewportWidth.value <
+        480
+    ) {
+        return (
+            SLIDER_SETTINGS.mobile
+                .wheelOffsetUnder480
+        );
+    }
+
+    if (
+        viewportWidth.value <
+        768
+    ) {
+        return (
+            SLIDER_SETTINGS.mobile
+                .wheelOffsetUnder768
+        );
+    }
+
+    return (
+        SLIDER_SETTINGS.tablet
+            .wheelOffset
+    );
+});
+
+const mobileCardStep =
+    computed(() => {
+        const measuredWidth =
+            Math.max(
+                cardWidth.value,
+                MIN_CARD_WIDTH
+            );
+
+        if (isMobile.value) {
+            return (
+                measuredWidth *
+                SLIDER_SETTINGS.mobile
+                    .spacing
+            );
+        }
+
+        return (
+            measuredWidth +
+            SLIDER_SETTINGS.tablet
+                .gap
+        );
+    });
+
+const mobileAngleGap =
+    computed(() => {
+        const radius =
+            Math.max(
+                circleRadius.value,
+                1
+            );
+
+        const ratio =
+            Math.min(
+                mobileCardStep.value /
+                    (
+                        radius *
+                        2
+                    ),
+                0.999
+            );
+
+        const calculatedAngle =
+            2 *
+            Math.asin(
+                ratio
+            ) *
+            (
+                180 /
+                Math.PI
+            );
+
+        return Math.max(
+            calculatedAngle,
+            SLIDER_SETTINGS.mobile
+                .minimumAngle
+        );
+    });
+
+const desktopCardStep =
+    computed(() => {
+        const measuredWidth =
+            Math.max(
+                cardWidth.value,
+                MIN_CARD_WIDTH
+            );
+
+        const preferredStep =
+            measuredWidth +
+            SLIDER_SETTINGS.desktop
+                .gap;
+
+        const maximumVisibleStep =
+            sliderWidth.value /
+                4 +
+            measuredWidth /
+                4 -
+            SLIDER_SETTINGS.desktop
+                .edgePeek /
+                2;
+
+        return Math.max(
+            measuredWidth,
+
+            Math.min(
+                preferredStep,
+                maximumVisibleStep
+            )
+        );
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Linear geometry
+|--------------------------------------------------------------------------
+*/
+
+const linearCardStep =
+    computed(() => {
+        const measuredWidth =
+            Math.max(
+                cardWidth.value,
+                MIN_CARD_WIDTH
+            );
+
+        const gap =
+            isDesktop.value
+                ? SLIDER_SETTINGS.linear
+                    .desktopGap
+                : SLIDER_SETTINGS.linear
+                    .mobileGap;
+
+        return (
+            measuredWidth +
+            gap
+        );
+    });
+
+const dragStep = computed(() => {
+    if (isLinear.value) {
+        return (
+            linearCardStep.value
+        );
+    }
+
+    return isDesktop.value
+        ? desktopCardStep.value
+        : mobileCardStep.value;
+});
+
+const dragProgress =
+    computed(() => {
+        if (!dragStep.value) {
+            return 0;
+        }
+
+        return (
+            dragX.value /
+            dragStep.value
+        );
+    });
+
+/*
+|--------------------------------------------------------------------------
+| Height
+|--------------------------------------------------------------------------
+*/
+
+const sliderHeight = computed(() => {
+    if (
+        props.equalHeight &&
+        equalCardHeight.value
+    ) {
+        const extraSpace =
+            isLinear.value
+                ? 50
+                : isDesktop.value
+                    ? 90
+                    : 85;
+
+        return `${
+            equalCardHeight.value +
+            extraSpace
+        }px`;
+    }
+
+    if (
+        viewportWidth.value >=
+        768
+    ) {
+        return isLinear.value
+            ? '25rem'
+            : '28rem';
+    }
+
+    return '25rem';
+});
+
+/*
+|--------------------------------------------------------------------------
+| Card position
+|--------------------------------------------------------------------------
+*/
+
+function getCardPosition(
+    renderedIndex
+) {
+    return (
+        renderedIndex -
+        virtualIndex.value +
         dragProgress.value
     );
 }
 
-function isCardSelectable(renderIndex) {
+function isCardSelectable(
+    renderedIndex
+) {
+    const position =
+        getCardPosition(
+            renderedIndex
+        );
+
+    if (isLinear.value) {
+        return (
+            position >=
+                -0.25 &&
+            position <=
+                visibleSideCount.value +
+                    1
+        );
+    }
+
     return (
         Math.abs(
-            getCardPosition(
-                renderIndex
-            )
+            position
         ) <=
         visibleSideCount.value
     );
 }
 
-function isCardVisible(renderIndex) {
-    const distance = Math.abs(
-        getCardPosition(
-            renderIndex
-        )
-    );
-
-    return (
-        distance <
-        visibleSideCount.value +
-            0.8
-    );
-}
-
-function shouldRenderCard(renderIndex) {
-    if (
-        cardCount.value <=
-        visibleSideCount.value *
-            2 +
-            3
-    ) {
-        return true;
-    }
-
-    const distance = Math.abs(
-        getCardPosition(
-            renderIndex
-        )
-    );
-
-    return (
-        distance <=
-        visibleSideCount.value +
-            1.35
-    );
-}
-
-/*
- * Circular repositioning
- */
-
-function isCardRepositioning(renderIndex) {
-    return repositioningCards.value.includes(
-        renderIndex
-    );
-}
-
-function clearRepositionFrames() {
-    if (repositionFrame !== null) {
-        window.cancelAnimationFrame(
-            repositionFrame
-        );
-
-        repositionFrame = null;
-    }
-
-    if (revealFrame !== null) {
-        window.cancelAnimationFrame(
-            revealFrame
-        );
-
-        revealFrame = null;
-    }
-}
-
-function prepareWrappedReposition(
-    nextVirtualIndex
+function isCardVisible(
+    renderedIndex
 ) {
-    clearRepositionFrames();
-
-    const previousIndex =
-        currentIndex.value;
-
-    const nextIndex = circularIndex(
-        nextVirtualIndex
-    );
-
-    repositioningCards.value = props.items
-        .map((_, renderIndex) => {
-            const previousPosition =
-                getStaticCardPosition(
-                    renderIndex,
-                    previousIndex
-                );
-
-            const nextPosition =
-                getStaticCardPosition(
-                    renderIndex,
-                    nextIndex
-                );
-
-            /*
-             * Normal movement changes the position
-             * by approximately one.
-             *
-             * A larger change means that this card
-             * wrapped from one side to the other.
-             */
-
-            if (
-                Math.abs(
-                    nextPosition -
-                    previousPosition
-                ) >
-                1.5
-            ) {
-                return renderIndex;
-            }
-
-            return null;
-        })
-        .filter((renderIndex) => {
-            return renderIndex !== null;
-        });
-
-    if (!repositioningCards.value.length) {
-        return;
-    }
-
-    /*
-     * First frame:
-     * move the invisible card immediately.
-     *
-     * Second frame:
-     * reveal it in its new position.
-     */
-
-    repositionFrame =
-        window.requestAnimationFrame(
-            () => {
-                repositionFrame = null;
-
-                revealFrame =
-                    window.requestAnimationFrame(
-                        () => {
-                            revealFrame = null;
-
-                            repositioningCards.value =
-                                [];
-                        }
-                    );
-            }
+    const position =
+        getCardPosition(
+            renderedIndex
         );
-}
 
-/*
- * Measurements
- */
-
-function updateMeasurements() {
-    if (typeof window !== 'undefined') {
-        viewportWidth.value =
-            window.innerWidth;
+    if (isLinear.value) {
+        return (
+            position >
+                -1.5 &&
+            position <
+                visibleSideCount.value +
+                    2.5
+        );
     }
 
-    if (
-        sliderElement.value
-            ?.clientWidth
-    ) {
-        sliderWidth.value =
-            sliderElement.value.clientWidth;
-    }
-
-    const card =
-        sliderElement.value
-            ?.querySelector(
-                '[data-slider-card]'
-            );
-
-    if (!card) {
-        return;
-    }
-
-    const width = card.offsetWidth;
-
-    if (width) {
-        cardWidth.value = width;
-    }
-}
-
-async function updateEqualCardHeight() {
-    if (!props.equalHeight) {
-        equalCardHeight.value = null;
-
-        return;
-    }
-
-    equalCardHeight.value = null;
-
-    await nextTick();
-
-    const cards =
-        sliderElement.value
-            ?.querySelectorAll(
-                '[data-slider-card-content]'
-            );
-
-    if (!cards?.length) {
-        return;
-    }
-
-    const heights = Array.from(
-        cards
-    ).map((card) => {
-        return card.scrollHeight;
-    });
-
-    equalCardHeight.value = Math.max(
-        ...heights
+    return (
+        Math.abs(
+            position
+        ) <
+        visibleSideCount.value +
+            1.5
     );
 }
 
 /*
- * Card positioning
- */
+|--------------------------------------------------------------------------
+| Circular desktop
+|--------------------------------------------------------------------------
+*/
 
-function getDesktopCardStyle(renderIndex) {
-    const position = getCardPosition(
-        renderIndex
-    );
+function getDesktopCircularCardStyle(
+    renderedIndex
+) {
+    const position =
+        getCardPosition(
+            renderedIndex
+        );
 
-    const distance = Math.abs(
-        position
-    );
+    const distance =
+        Math.abs(
+            position
+        );
 
     const x =
         desktopCardStep.value *
@@ -757,7 +824,10 @@ function getDesktopCardStyle(renderIndex) {
     const y =
         64 -
         Math.pow(
-            distance,
+            Math.min(
+                distance,
+                4
+            ),
             1.65
         ) *
             24;
@@ -770,30 +840,30 @@ function getDesktopCardStyle(renderIndex) {
         1 -
         Math.min(
             distance,
-            2
+            3
         ) *
             0.025;
 
-    let opacity = 1;
+    let opacity =
+        1;
 
-    if (distance > 2.05) {
-        opacity = Math.max(
-            0,
-
-            (
-                2.7 -
-                distance
-            ) /
-                0.65
-        );
+    if (
+        distance >
+        2.25
+    ) {
+        opacity =
+            Math.max(
+                0,
+                Math.min(
+                    1,
+                    (
+                        3.75 -
+                        distance
+                    ) /
+                        1.5
+                )
+            );
     }
-
-    const zIndex =
-        1000 -
-        Math.round(
-            distance *
-            100
-        );
 
     return {
         transform: [
@@ -815,14 +885,34 @@ function getDesktopCardStyle(renderIndex) {
         ].join(' '),
 
         opacity,
-        zIndex
+
+        zIndex:
+            1000 -
+            Math.round(
+                distance *
+                100
+            ),
+
+        pointerEvents:
+            opacity <= 0
+                ? 'none'
+                : undefined
     };
 }
 
-function getMobileCardStyle(renderIndex) {
-    const position = getCardPosition(
-        renderIndex
-    );
+/*
+|--------------------------------------------------------------------------
+| Circular mobile
+|--------------------------------------------------------------------------
+*/
+
+function getMobileCircularCardStyle(
+    renderedIndex
+) {
+    const position =
+        getCardPosition(
+            renderedIndex
+        );
 
     const angleDegrees =
         position *
@@ -858,30 +948,28 @@ function getMobileCardStyle(renderIndex) {
     const rotation =
         -angleDegrees;
 
-    const distance = Math.abs(
-        position
-    );
-
-    let opacity = 1;
-
-    if (distance > 1.05) {
-        opacity = Math.max(
-            0,
-
-            (
-                1.8 -
-                distance
-            ) /
-                0.75
+    const distance =
+        Math.abs(
+            position
         );
+
+    let opacity =
+        1;
+
+    if (
+        distance >
+        1
+    ) {
+        opacity =
+            Math.max(
+                0,
+                Math.min(
+                    1,
+                    2 -
+                        distance
+                )
+            );
     }
-
-    const zIndex =
-        1000 -
-        Math.round(
-            distance *
-            100
-        );
 
     return {
         transform: [
@@ -899,250 +987,443 @@ function getMobileCardStyle(renderIndex) {
         ].join(' '),
 
         opacity,
-        zIndex
-    };
-}
 
-function getCardStyle(renderIndex) {
-    const style = isDesktop.value
-        ? getDesktopCardStyle(
-            renderIndex
-        )
-        : getMobileCardStyle(
-            renderIndex
-        );
-
-    if (
-        !isCardRepositioning(
-            renderIndex
-        )
-    ) {
-        return style;
-    }
-
-    return {
-        ...style,
-
-        opacity: 0,
+        zIndex:
+            1000 -
+            Math.round(
+                distance *
+                100
+            ),
 
         pointerEvents:
-            'none',
-
-        transitionProperty:
-            'none'
+            opacity <= 0
+                ? 'none'
+                : undefined
     };
 }
 
 /*
- * Autoplay
- */
+|--------------------------------------------------------------------------
+| Linear
+|--------------------------------------------------------------------------
+*/
 
-function clearAutoPlayTimer() {
-    if (autoPlayTimer === null) {
+function getLinearCardStyle(
+    renderedIndex
+) {
+    const position =
+        getCardPosition(
+            renderedIndex
+        );
+
+    const x =
+        linearCardStep.value *
+        position;
+
+    /*
+     * Cards behind the left edge fade quickly.
+     * Cards approaching from the right remain
+     * visible naturally.
+     */
+    let opacity =
+        1;
+
+    if (
+        position <
+        -0.15
+    ) {
+        opacity =
+            Math.max(
+                0,
+                1 +
+                    position
+            );
+    }
+
+    const rightFadeStart =
+        visibleSideCount.value +
+        1.4;
+
+    const rightFadeEnd =
+        visibleSideCount.value +
+        2.25;
+
+    if (
+        position >
+        rightFadeStart
+    ) {
+        opacity =
+            Math.min(
+                opacity,
+
+                Math.max(
+                    0,
+                    (
+                        rightFadeEnd -
+                        position
+                    ) /
+                        (
+                            rightFadeEnd -
+                            rightFadeStart
+                        )
+                )
+            );
+    }
+
+    return {
+        transform:
+            `translate3d(
+                ${x}px,
+                0,
+                0
+            )`,
+
+        opacity,
+
+        zIndex:
+            1000,
+
+        pointerEvents:
+            opacity <= 0
+                ? 'none'
+                : undefined
+    };
+}
+
+function getCardStyle(
+    renderedIndex
+) {
+    if (isLinear.value) {
+        return getLinearCardStyle(
+            renderedIndex
+        );
+    }
+
+    if (isDesktop.value) {
+        return getDesktopCircularCardStyle(
+            renderedIndex
+        );
+    }
+
+    return getMobileCircularCardStyle(
+        renderedIndex
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| Measurements
+|--------------------------------------------------------------------------
+*/
+
+function updateMeasurements() {
+    if (
+        typeof window !==
+        'undefined'
+    ) {
+        viewportWidth.value =
+            window.innerWidth;
+    }
+
+    if (
+        sliderElement.value
+            ?.clientWidth
+    ) {
+        sliderWidth.value =
+            sliderElement.value
+                .clientWidth;
+    }
+
+    const card =
+        sliderElement.value
+            ?.querySelector(
+                '[data-slider-card]'
+            );
+
+    if (!card) {
+        return;
+    }
+
+    const width =
+        card.offsetWidth;
+
+    if (width) {
+        cardWidth.value =
+            width;
+    }
+}
+
+async function updateEqualCardHeight() {
+    if (!props.equalHeight) {
+        equalCardHeight.value =
+            null;
+
+        return;
+    }
+
+    equalCardHeight.value =
+        null;
+
+    await nextTick();
+
+    const cards =
+        sliderElement.value
+            ?.querySelectorAll(
+                '[data-slider-card-content]'
+            );
+
+    if (!cards?.length) {
+        return;
+    }
+
+    const heights =
+        Array.from(
+            cards
+        ).map((card) => {
+            return card.scrollHeight;
+        });
+
+    equalCardHeight.value =
+        Math.max(
+            ...heights
+        );
+}
+
+/*
+|--------------------------------------------------------------------------
+| Infinite recenter
+|--------------------------------------------------------------------------
+*/
+
+function clearSettleTimer() {
+    if (
+        settleTimer ===
+        null
+    ) {
         return;
     }
 
     window.clearTimeout(
-        autoPlayTimer
+        settleTimer
     );
 
-    autoPlayTimer = null;
+    settleTimer =
+        null;
 }
 
-function canRunAutoPlay() {
-    return (
-        props.autoPlay &&
-        props.autoPlayDelay > 0 &&
-        cardCount.value > 1 &&
-        !isDragging.value &&
-        !isPointerInside.value &&
-        !hasFocusWithin.value &&
-        !prefersReducedMotion.value &&
-        (
-            typeof document ===
-                'undefined' ||
-            !document.hidden
-        )
-    );
-}
-
-function scheduleAutoPlay() {
-    clearAutoPlayTimer();
-
-    if (!canRunAutoPlay()) {
-        return;
+function isVirtualIndexNearEdge() {
+    if (
+        !isInfinite.value ||
+        !cardCount.value
+    ) {
+        return false;
     }
 
-    const delay = Math.max(
-        props.autoPlayDelay,
-        500
-    );
+    const minimumSafeIndex =
+        cardCount.value *
+        2;
 
-    autoPlayTimer = window.setTimeout(
-        () => {
-            autoPlayTimer = null;
+    const maximumSafeIndex =
+        totalRenderedCardCount.value -
+        cardCount.value *
+            2 -
+        1;
 
-            if (!canRunAutoPlay()) {
-                scheduleAutoPlay();
-
-                return;
-            }
-
-            goNext();
-        },
-        delay
+    return (
+        virtualIndex.value <
+            minimumSafeIndex ||
+        virtualIndex.value >
+            maximumSafeIndex
     );
 }
 
-function handleMouseEnter() {
-    isPointerInside.value = true;
-
-    clearAutoPlayTimer();
-}
-
-function handleMouseLeave() {
-    isPointerInside.value = false;
-
-    scheduleAutoPlay();
-}
-
-function handleFocusIn() {
-    hasFocusWithin.value = true;
-
-    clearAutoPlayTimer();
-}
-
-function handleFocusOut(event) {
+async function recenterVirtualIndex() {
     if (
-        event.currentTarget
-            ?.contains(
-                event.relatedTarget
-            )
+        !isVirtualIndexNearEdge()
     ) {
         return;
     }
 
-    hasFocusWithin.value = false;
+    const centeredIndex =
+        MIDDLE_COPY_INDEX *
+            cardCount.value +
+        currentIndex.value;
 
-    scheduleAutoPlay();
+    suppressTransitions.value =
+        true;
+
+    virtualIndex.value =
+        centeredIndex;
+
+    await nextTick();
+
+    window.requestAnimationFrame(
+        () => {
+            window.requestAnimationFrame(
+                () => {
+                    suppressTransitions.value =
+                        false;
+                }
+            );
+        }
+    );
 }
 
-function handleVisibilityChange() {
-    if (document.hidden) {
-        clearAutoPlayTimer();
+function scheduleRecentering() {
+    clearSettleTimer();
 
+    if (
+        !isVirtualIndexNearEdge()
+    ) {
         return;
     }
 
-    scheduleAutoPlay();
-}
+    settleTimer =
+        window.setTimeout(
+            async () => {
+                settleTimer =
+                    null;
 
-function handleReducedMotionChange(event) {
-    prefersReducedMotion.value =
-        event.matches;
-
-    scheduleAutoPlay();
+                await recenterVirtualIndex();
+            },
+            SETTLE_DURATION_MS +
+                40
+        );
 }
 
 /*
- * Navigation
- */
+|--------------------------------------------------------------------------
+| Navigation
+|--------------------------------------------------------------------------
+*/
 
 function moveToVirtualIndex(
     nextVirtualIndex
 ) {
-    if (cardCount.value <= 1) {
-        dragX.value = 0;
+    if (
+        cardCount.value <=
+        1
+    ) {
+        dragX.value =
+            0;
 
         return;
     }
 
-    prepareWrappedReposition(
-        nextVirtualIndex
-    );
+    const resolvedIndex =
+        isInfinite.value
+            ? nextVirtualIndex
+            : clampIndex(
+                nextVirtualIndex
+            );
 
-    suppressTransitions.value = false;
+    suppressTransitions.value =
+        false;
 
     virtualIndex.value =
-        nextVirtualIndex;
+        resolvedIndex;
 
-    dragX.value = 0;
+    dragX.value =
+        0;
+
+    scheduleRecentering();
 }
 
 function goNext() {
+    if (!canGoNext.value) {
+        return;
+    }
+
     moveToVirtualIndex(
         virtualIndex.value +
             1
     );
-
-    scheduleAutoPlay();
 }
 
 function goPrevious() {
+    if (!canGoPrevious.value) {
+        return;
+    }
+
     moveToVirtualIndex(
         virtualIndex.value -
             1
     );
-
-    scheduleAutoPlay();
 }
 
 function goTo(originalIndex) {
-    if (cardCount.value <= 1) {
+    if (
+        cardCount.value <=
+        1
+    ) {
+        return;
+    }
+
+    const targetIndex =
+        clampIndex(
+            originalIndex
+        );
+
+    if (!isInfinite.value) {
+        moveToVirtualIndex(
+            targetIndex
+        );
+
         return;
     }
 
     const normalizedTarget =
         circularIndex(
-            originalIndex
+            targetIndex
         );
-
-    const currentOriginalIndex =
-        currentIndex.value;
 
     const forwardDistance =
         (
             normalizedTarget -
-            currentOriginalIndex +
+            currentIndex.value +
             cardCount.value
         ) %
         cardCount.value;
 
     const backwardDistance =
         (
-            currentOriginalIndex -
+            currentIndex.value -
             normalizedTarget +
             cardCount.value
         ) %
         cardCount.value;
 
-    const targetVirtualIndex =
+    if (
         forwardDistance <=
         backwardDistance
-            ? virtualIndex.value +
+    ) {
+        moveToVirtualIndex(
+            virtualIndex.value +
                 forwardDistance
-            : virtualIndex.value -
-                backwardDistance;
+        );
+
+        return;
+    }
 
     moveToVirtualIndex(
-        targetVirtualIndex
+        virtualIndex.value -
+            backwardDistance
     );
-
-    scheduleAutoPlay();
 }
 
 /*
- * Card selection
- */
+|--------------------------------------------------------------------------
+| Selection
+|--------------------------------------------------------------------------
+*/
 
 function handleCardClick(
     event,
-    renderedItem,
-    renderIndex
+    renderedItem
 ) {
     if (
         !isCardSelectable(
-            renderIndex
+            renderedItem.renderedIndex
         )
     ) {
         return;
@@ -1152,11 +1433,6 @@ function handleCardClick(
         return;
     }
 
-    /*
-     * Buttons and links are allowed to start a drag.
-     * A tap still activates them. A horizontal drag
-     * suppresses the click generated on release.
-     */
     if (
         event.target.closest(
             [
@@ -1178,8 +1454,10 @@ function handleCardClick(
 }
 
 /*
- * Drag
- */
+|--------------------------------------------------------------------------
+| Drag
+|--------------------------------------------------------------------------
+*/
 
 function suppressClickAfterDrag() {
     suppressClickUntil =
@@ -1202,7 +1480,10 @@ function handleSliderClickCapture(
 }
 
 function handlePointerDown(event) {
-    if (event.button !== 0) {
+    if (
+        event.button !==
+        0
+    ) {
         return;
     }
 
@@ -1221,16 +1502,22 @@ function handlePointerDown(event) {
         return;
     }
 
-    hasDragged.value = false;
+    hasDragged.value =
+        false;
 
-    if (cardCount.value <= 1) {
+    if (
+        cardCount.value <=
+        1
+    ) {
         return;
     }
 
-    updateMeasurements();
-    clearAutoPlayTimer();
+    clearSettleTimer();
 
-    isDragging.value = true;
+    updateMeasurements();
+
+    isDragging.value =
+        true;
 
     pointerId.value =
         event.pointerId;
@@ -1244,7 +1531,8 @@ function handlePointerDown(event) {
     previousPointerTime.value =
         performance.now();
 
-    pointerVelocity.value = 0;
+    pointerVelocity.value =
+        0;
 
     try {
         event.currentTarget
@@ -1268,11 +1556,12 @@ function handlePointerMove(event) {
     const now =
         performance.now();
 
-    const elapsed = Math.max(
-        now -
-            previousPointerTime.value,
-        1
-    );
+    const elapsed =
+        Math.max(
+            now -
+                previousPointerTime.value,
+            1
+        );
 
     const movement =
         event.clientX -
@@ -1288,9 +1577,33 @@ function handlePointerMove(event) {
     previousPointerTime.value =
         now;
 
-    const distance =
+    let distance =
         event.clientX -
         pointerStartX.value;
+
+    /*
+     * Finite mode gets soft resistance
+     * at the first and final card.
+     */
+    if (!isInfinite.value) {
+        const pullingPastStart =
+            !canGoPrevious.value &&
+            distance >
+                0;
+
+        const pullingPastEnd =
+            !canGoNext.value &&
+            distance <
+                0;
+
+        if (
+            pullingPastStart ||
+            pullingPastEnd
+        ) {
+            distance *=
+                0.18;
+        }
+    }
 
     if (
         Math.abs(
@@ -1304,7 +1617,8 @@ function handlePointerMove(event) {
             suppressClickAfterDrag();
         }
 
-        hasDragged.value = true;
+        hasDragged.value =
+            true;
 
         event.preventDefault();
     }
@@ -1313,14 +1627,15 @@ function handlePointerMove(event) {
         dragStep.value *
         0.95;
 
-    dragX.value = Math.max(
-        -maximumDrag,
+    dragX.value =
+        Math.max(
+            -maximumDrag,
 
-        Math.min(
-            maximumDrag,
-            distance
-        )
-    );
+            Math.min(
+                maximumDrag,
+                distance
+            )
+        );
 }
 
 function handlePointerEnd(event) {
@@ -1341,18 +1656,21 @@ function handlePointerEnd(event) {
         //
     }
 
-    const distance = Math.abs(
-        dragX.value
-    );
+    const distance =
+        Math.abs(
+            dragX.value
+        );
 
     const threshold =
         dragStep.value *
         0.14;
 
-    const velocityThreshold = 0.2;
+    const velocityThreshold =
+        0.2;
 
     const shouldMove =
-        distance >= threshold ||
+        distance >=
+            threshold ||
         Math.abs(
             pointerVelocity.value
         ) >=
@@ -1374,45 +1692,75 @@ function handlePointerEnd(event) {
 
     restorePointerState();
 
-    if (directionValue < 0) {
-        goNext();
-    } else {
+    if (
+        directionValue <
+        0
+    ) {
+        if (canGoNext.value) {
+            goNext();
+        } else {
+            dragX.value =
+                0;
+        }
+
+        return;
+    }
+
+    if (canGoPrevious.value) {
         goPrevious();
+    } else {
+        dragX.value =
+            0;
     }
 }
 
 function handlePointerCancel() {
-    hasDragged.value = true;
+    hasDragged.value =
+        true;
 
     restoreSlider();
 }
 
 function restorePointerState() {
-    isDragging.value = false;
-    pointerId.value = null;
-    pointerVelocity.value = 0;
+    isDragging.value =
+        false;
+
+    pointerId.value =
+        null;
+
+    pointerVelocity.value =
+        0;
 }
 
 function restoreSlider() {
     restorePointerState();
 
-    dragX.value = 0;
-
-    scheduleAutoPlay();
+    dragX.value =
+        0;
 }
 
 /*
- * Keyboard
- */
+|--------------------------------------------------------------------------
+| Keyboard
+|--------------------------------------------------------------------------
+*/
 
 function handleKeydown(event) {
-    if (event.key === 'ArrowLeft') {
+    if (
+        event.key ===
+            'ArrowLeft' &&
+        canGoPrevious.value
+    ) {
         event.preventDefault();
 
         goPrevious();
     }
 
-    if (event.key === 'ArrowRight') {
+    if (
+        event.key ===
+            'ArrowRight' &&
+        canGoNext.value
+    ) {
         event.preventDefault();
 
         goNext();
@@ -1420,24 +1768,21 @@ function handleKeydown(event) {
 }
 
 /*
- * Resize
- */
+|--------------------------------------------------------------------------
+| Resize
+|--------------------------------------------------------------------------
+*/
 
 function handleResize() {
     const nextWidth =
         window.innerWidth;
 
-    /*
-     * Mobile Safari fires resize events while its browser
-     * chrome expands and collapses. The page width does not
-     * change, so recomputing every slider during those events
-     * only creates dropped frames while scrolling.
-     */
     if (
         Math.abs(
             nextWidth -
             lastViewportWidth
-        ) < 1
+        ) <
+        1
     ) {
         return;
     }
@@ -1468,8 +1813,42 @@ function handleResize() {
 }
 
 /*
- * Watchers
- */
+|--------------------------------------------------------------------------
+| Reset
+|--------------------------------------------------------------------------
+*/
+
+async function resetSlider() {
+    clearSettleTimer();
+
+    suppressTransitions.value =
+        true;
+
+    initializeVirtualIndex();
+
+    await nextTick();
+
+    updateMeasurements();
+
+    await updateEqualCardHeight();
+
+    window.requestAnimationFrame(
+        () => {
+            window.requestAnimationFrame(
+                () => {
+                    suppressTransitions.value =
+                        false;
+                }
+            );
+        }
+    );
+}
+
+/*
+|--------------------------------------------------------------------------
+| Watchers
+|--------------------------------------------------------------------------
+*/
 
 watch(
     () => props.items.map(
@@ -1487,26 +1866,18 @@ watch(
     ),
 
     async () => {
-        clearRepositionFrames();
+        await resetSlider();
+    }
+);
 
-        repositioningCards.value = [];
-        suppressTransitions.value = true;
+watch(
+    [
+        () => props.mode,
+        () => props.infinite
+    ],
 
-        initializeVirtualIndex();
-
-        await nextTick();
-        await updateEqualCardHeight();
-
-        updateMeasurements();
-
-        window.requestAnimationFrame(
-            () => {
-                suppressTransitions.value =
-                    false;
-
-                scheduleAutoPlay();
-            }
-        );
+    async () => {
+        await resetSlider();
     }
 );
 
@@ -1518,21 +1889,11 @@ watch(
     }
 );
 
-watch(
-    [
-        () => props.autoPlay,
-        () => props.autoPlayDelay,
-        () => cardCount.value
-    ],
-
-    () => {
-        scheduleAutoPlay();
-    }
-);
-
 /*
- * Lifecycle
- */
+|--------------------------------------------------------------------------
+| Lifecycle
+|--------------------------------------------------------------------------
+*/
 
 onMounted(async () => {
     initializeVirtualIndex();
@@ -1543,47 +1904,25 @@ onMounted(async () => {
 
     await updateEqualCardHeight();
 
-    reducedMotionMediaQuery =
-        window.matchMedia(
-            '(prefers-reduced-motion: reduce)'
-        );
-
-    prefersReducedMotion.value =
-        reducedMotionMediaQuery.matches;
-
-    if (
-        typeof reducedMotionMediaQuery
-            .addEventListener ===
-        'function'
-    ) {
-        reducedMotionMediaQuery
-            .addEventListener(
-                'change',
-                handleReducedMotionChange
-            );
-    } else {
-        reducedMotionMediaQuery
-            .addListener?.(
-                handleReducedMotionChange
-            );
-    }
-
-    document.addEventListener(
-        'visibilitychange',
-        handleVisibilityChange
-    );
-
     window.addEventListener(
         'resize',
         handleResize
     );
 
-    scheduleAutoPlay();
+    window.requestAnimationFrame(
+        () => {
+            window.requestAnimationFrame(
+                () => {
+                    suppressTransitions.value =
+                        false;
+                }
+            );
+        }
+    );
 });
 
 onBeforeUnmount(() => {
-    clearAutoPlayTimer();
-    clearRepositionFrames();
+    clearSettleTimer();
 
     if (
         resizeFrame !==
@@ -1597,33 +1936,10 @@ onBeforeUnmount(() => {
             null;
     }
 
-    repositioningCards.value = [];
-
     restorePointerState();
 
-    dragX.value = 0;
-
-    if (
-        typeof reducedMotionMediaQuery
-            ?.removeEventListener ===
-        'function'
-    ) {
-        reducedMotionMediaQuery
-            .removeEventListener(
-                'change',
-                handleReducedMotionChange
-            );
-    } else {
-        reducedMotionMediaQuery
-            ?.removeListener?.(
-                handleReducedMotionChange
-            );
-    }
-
-    document.removeEventListener(
-        'visibilitychange',
-        handleVisibilityChange
-    );
+    dragX.value =
+        0;
 
     window.removeEventListener(
         'resize',
@@ -1646,24 +1962,10 @@ onBeforeUnmount(() => {
         :aria-label="
             ariaLabel
         "
-        @mouseenter="
-            handleMouseEnter
-        "
-        @mouseleave="
-            handleMouseLeave
-        "
-        @focusin="
-            handleFocusIn
-        "
-        @focusout="
-            handleFocusOut
-        "
     >
-        <!-- Slider stage -->
+        <!-- Stage -->
         <div
-            ref="
-                sliderElement
-            "
+            ref="sliderElement"
             tabindex="0"
             class="
                 relative
@@ -1702,7 +2004,7 @@ onBeforeUnmount(() => {
                 handleSliderClickCapture
             "
         >
-            <template
+            <div
                 v-for="
                     renderedItem in
                     renderedItems
@@ -1710,313 +2012,192 @@ onBeforeUnmount(() => {
                 :key="
                     renderedItem.renderKey
                 "
-            >
-                <div
-                    v-if="
-                        shouldRenderCard(
-                            renderedItem.originalIndex
-                        )
-                    "
-                    data-slider-card
-                    class="
-                        absolute
-                        left-1/2
-                        top-0
-                        w-[min(72vw,18rem)]
-                        min-w-[15rem]
-                        [transform-origin:50%_0%]
-                        transition-[transform,opacity]
-                        duration-300
-                        ease-[cubic-bezier(0.2,0.85,0.25,1)]
-                        [backface-visibility:hidden]
-                    "
-                    :class="{
+                data-slider-card
+                class="
+                    absolute
+                    top-0
+                    w-[min(72vw,18rem)]
+                    min-w-[15rem]
+                    transition-[transform,opacity]
+                    duration-[700ms]
+                    ease-[cubic-bezier(0.16,1,0.3,1)]
+                    [backface-visibility:hidden]
+                    [transform-style:preserve-3d]
+                    will-change-[transform,opacity]
+
+                    motion-reduce:duration-150
+                "
+                :class="[
+                    isLinear
+                        ? [
+                            'left-5',
+                            'md:left-10',
+                            'xl:left-16',
+                            '[transform-origin:0%_0%]'
+                        ]
+                        : [
+                            'left-1/2',
+                            '[transform-origin:50%_0%]'
+                        ],
+
+                    {
                         'transition-none':
                             isDragging ||
                             suppressTransitions,
 
                         'pointer-events-none':
                             !isCardSelectable(
-                                renderedItem.originalIndex
-                            ) ||
-                            isCardRepositioning(
-                                renderedItem.originalIndex
+                                renderedItem.renderedIndex
                             ),
 
                         'cursor-pointer':
                             isCardSelectable(
-                                renderedItem.originalIndex
-                            ) &&
-                            !isCardRepositioning(
-                                renderedItem.originalIndex
+                                renderedItem.renderedIndex
                             )
-                    }"
-                    :style="
-                        getCardStyle(
-                            renderedItem.originalIndex
-                        )
-                    "
-                    :aria-hidden="
-                        !isCardVisible(
-                            renderedItem.originalIndex
-                        ) ||
-                        isCardRepositioning(
-                            renderedItem.originalIndex
-                        )
-                    "
-                    @click="
-                        handleCardClick(
-                            $event,
-                            renderedItem,
-                            renderedItem.originalIndex
-                        )
-                    "
-                >
-                    <div
-                        data-slider-card-content
-                        :style="{
-                            height:
-                                equalHeight &&
-                                equalCardHeight
-                                    ? `${equalCardHeight}px`
-                                    : 'auto'
-                        }"
-                    >
-                        <Card
-                            :item="
-                                renderedItem.item
-                            "
-                            :active="
-                                renderedItem.originalIndex ===
-                                currentIndex
-                            "
-                            :class="{
-                                'scroll-motion':
-                                    scrollMotion
-                            }"
-                            :data-scroll-motion="
-                                scrollMotion
-                                    ? ''
-                                    : undefined
-                            "
-                            :data-motion-seed="
-                                scrollMotion
-                                    ? renderedItem.originalIndex + 1
-                                    : undefined
-                            "
-                            :data-motion-strength="
-                                scrollMotion
-                                    ? 1
-                                    : undefined
-                            "
-                            :data-straighten-strength="
-                                scrollMotion
-                                    ? 0.96
-                                    : undefined
-                            "
-                            :data-max-y="
-                                scrollMotion
-                                    ? 10
-                                    : undefined
-                            "
-                            :data-max-scale="
-                                scrollMotion
-                                    ? 0.004
-                                    : undefined
-                            "
-                            :equal-height="
-                                equalHeight
-                            "
-                            :background-image="
-                                backgroundImage
-                            "
-                            :background-color="
-                                backgroundColor
-                            "
-                            :image-opacity="
-                                imageOpacity
-                            "
-                            :image-scale="
-                                imageScale
-                            "
-                        >
-                            <template
-                                #default="
-                                    slotProps
-                                "
-                            >
-                                <slot
-                                    name="card"
-                                    :item="
-                                        slotProps.item
-                                    "
-                                    :index="
-                                        renderedItem.originalIndex
-                                    "
-                                    :active="
-                                        slotProps.active
-                                    "
-                                />
-                            </template>
-                        </Card>
-                    </div>
-                </div>
-            </template>
-        </div>
-
-        <!-- Desktop controls -->
-        <div
-            v-if="
-                cardCount >
-                1
-            "
-            class="
-                hidden
-                w-full
-                items-center
-                justify-center
-
-                md:flex
-            "
-        >
-            <div
-                class="
-                    mx-auto
-                    flex
-                    items-center
-                    justify-center
-                    gap-3
-                    px-10
+                    }
+                ]"
+                :style="
+                    getCardStyle(
+                        renderedItem.renderedIndex
+                    )
+                "
+                :aria-hidden="
+                    !isCardVisible(
+                        renderedItem.renderedIndex
+                    )
+                "
+                @click="
+                    handleCardClick(
+                        $event,
+                        renderedItem
+                    )
                 "
             >
-                <!-- Previous -->
-                <Button
-                    type="button"
-                    background-image=""
-                    background-color=""
-                    text-color="#FBF9F3"
-                    aria-label="Predchádzajúca karta"
-                    class="
-                        flex
-                        size-11
-                        min-h-0
-                        min-w-0
-                        shrink-0
-                        items-center
-                        justify-center
-                        p-0
-                    "
-                    @click="
-                        goPrevious
-                    "
-                >
-                    <i
-                        class="
-                            bi
-                            bi-arrow-left
-                            text-base
-                        "
-                        aria-hidden="true"
-                    />
-                </Button>
-
-                <!-- Indicators -->
                 <div
-                    class="
-                        flex
-                        min-w-20
-                        items-center
-                        justify-center
-                        gap-2
-                    "
-                    role="tablist"
-                    aria-label="Výber služby"
+                    data-slider-card-content
+                    :style="{
+                        height:
+                            equalHeight &&
+                            equalCardHeight
+                                ? `${equalCardHeight}px`
+                                : 'auto'
+                    }"
                 >
-                    <button
-                        v-for="
-                            (
-                                _,
-                                index
-                            ) in
-                            items
+                    <Card
+                        :item="
+                            renderedItem.item
                         "
-                        :key="
-                            index
+                        :active="
+                            renderedItem.originalIndex ===
+                            currentIndex &&
+                            Math.abs(
+                                getCardPosition(
+                                    renderedItem.renderedIndex
+                                )
+                            ) <
+                            0.5
                         "
-                        type="button"
-                        class="
-                            h-[2px]
-                            cursor-pointer
-                            rounded-full
-                            bg-baige/50
-                            transition-[width,background-color,transform]
-                            duration-300
-                            ease-[cubic-bezier(0.22,1,0.36,1)]
-
-                            hover:scale-110
-                            hover:bg-baige/65
-
-                            focus-visible:outline
-                            focus-visible:outline-2
-                            focus-visible:outline-offset-4
-                            focus-visible:outline-baige/70
+                        :class="{
+                            'scroll-motion':
+                                scrollMotion
+                        }"
+                        :data-scroll-motion="
+                            scrollMotion
+                                ? ''
+                                : undefined
                         "
-                        :class="
-                            index ===
-                            currentIndex
-                                ? 'w-8 bg-baige'
-                                : 'w-1.5'
+                        :data-motion-seed="
+                            scrollMotion
+                                ? renderedItem.originalIndex +
+                                    1
+                                : undefined
                         "
-                        :aria-label="
-                            `Zobraziť kartu ${
-                                index +
-                                1
-                            }`
+                        :data-motion-strength="
+                            scrollMotion
+                                ? 1
+                                : undefined
                         "
-                        :aria-selected="
-                            index ===
-                            currentIndex
+                        :data-straighten-strength="
+                            scrollMotion
+                                ? 0.96
+                                : undefined
                         "
-                        role="tab"
-                        @click="
-                            goTo(
-                                index
-                            )
+                        :data-max-y="
+                            scrollMotion
+                                ? 10
+                                : undefined
                         "
-                    />
+                        :data-max-scale="
+                            scrollMotion
+                                ? 0.004
+                                : undefined
+                        "
+                        :equal-height="
+                            equalHeight
+                        "
+                        :background-image="
+                            backgroundImage
+                        "
+                        :background-color="
+                            backgroundColor
+                        "
+                        :image-opacity="
+                            imageOpacity
+                        "
+                        :image-scale="
+                            imageScale
+                        "
+                    >
+                        <template
+                            #default="
+                                slotProps
+                            "
+                        >
+                            <slot
+                                name="card"
+                                :item="
+                                    slotProps.item
+                                "
+                                :index="
+                                    renderedItem.originalIndex
+                                "
+                                :active="
+                                    slotProps.active
+                                "
+                            />
+                        </template>
+                    </Card>
                 </div>
-
-                <!-- Next -->
-                <Button
-                    type="button"
-                    background-image=""
-                    background-color=""
-                    text-color="#FBF9F3"
-                    aria-label="Nasledujúca karta"
-                    class="
-                        flex
-                        size-11
-                        min-h-0
-                        min-w-0
-                        shrink-0
-                        items-center
-                        justify-center
-                        p-0
-                    "
-                    @click="
-                        goNext
-                    "
-                >
-                    <i
-                        class="
-                            bi
-                            bi-arrow-right
-                            text-base
-                        "
-                        aria-hidden="true"
-                    />
-                </Button>
             </div>
         </div>
+
+        <!-- Controls -->
+        <DesktopCarouselControls
+            :count="
+                cardCount
+            "
+            :current-index="
+                currentIndex
+            "
+            tablist-label="Výber služby"
+            card-aria-prefix="Zobraziť kartu"
+            previous-label="Predchádzajúca karta"
+            next-label="Nasledujúca karta"
+            :previous-disabled="
+                !canGoPrevious
+            "
+            :next-disabled="
+                !canGoNext
+            "
+            @previous="
+                goPrevious
+            "
+            @next="
+                goNext
+            "
+            @select="
+                goTo
+            "
+        />
     </section>
 </template>

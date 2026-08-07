@@ -6,7 +6,7 @@ import {
 
 import { storeToRefs } from 'pinia';
 
-import PrivacyPolicyBottomSheet from '../PrivacyPolicy.vue';
+import PrivacyPolicyBottomSheet from '../sheets/PrivacyPolicy.vue';
 
 import { usePublicSiteStore } from '../../stores/publicSite.js';
 import { useCookieConsent } from '../../composables/useCookieConsent.js';

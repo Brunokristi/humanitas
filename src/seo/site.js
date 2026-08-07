@@ -12,6 +12,7 @@ export const STRUCTURED_DATA_LOGO_PATH = '/images/humanitas_logo.png'
 
 export const PUBLIC_ROUTES = Object.freeze({
     home: '/',
+    team: '/tim',
     services: '/sluzby',
     contact: '/kontakt'
 })

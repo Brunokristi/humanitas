@@ -10,7 +10,7 @@ import {
     useScrollMotion
 } from '../composables/useScrollMotion';
 
-import Button from './Button.vue';
+import DesktopCarouselControls from './DesktopCarouselControls.vue';
 
 const emit = defineEmits([
     'select'
@@ -1451,158 +1451,32 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Desktop controls -->
-        <div
-            v-if="
-                cardCount > 1
+        <DesktopCarouselControls
+            :count="
+                cardCount
             "
-            class="
-                hidden
-                w-full
-                items-center
-                justify-center
-
-                md:flex
+            :current-index="
+                currentIndex
             "
-        >
-            <div
-                class="
-                    mx-auto
-                    flex
-                    items-center
-                    justify-center
-                    gap-3
-                    px-10
-                "
-            >
-                <!-- Previous -->
-                <Button
-                    type="button"
-                    background-image=""
-                    background-color=""
-                    text-color="#FBF9F3"
-                    :aria-label="
-                        previousLabel
-                    "
-                    class="
-                        flex
-                        size-11
-                        min-h-0
-                        min-w-0
-                        shrink-0
-                        items-center
-                        justify-center
-                        p-0
-                    "
-                    @click="
-                        goPrevious
-                    "
-                >
-                    <i
-                        class="
-                            bi
-                            bi-arrow-left
-                            text-base
-                        "
-                        aria-hidden="true"
-                    />
-                </Button>
-
-                <!-- Indicators -->
-                <div
-                    class="
-                        flex
-                        min-w-20
-                        items-center
-                        justify-center
-                        gap-2
-                    "
-                    role="tablist"
-                    aria-label="Výber karty"
-                >
-                    <button
-                        v-for="
-                            (
-                                _,
-                                index
-                            ) in
-                            items
-                        "
-                        :key="
-                            index
-                        "
-                        type="button"
-                        class="
-                            h-[2px]
-                            cursor-pointer
-                            rounded-full
-                            bg-baige/50
-                            transition-[width,background-color,transform]
-                            duration-300
-                            ease-[cubic-bezier(0.22,1,0.36,1)]
-
-                            hover:scale-110
-
-                            focus-visible:outline
-                            focus-visible:outline-2
-                            focus-visible:outline-offset-4
-                            focus-visible:outline-baige/70
-                        "
-                        :class="
-                            index ===
-                            currentIndex
-                                ? 'w-8 bg-baige'
-                                : 'w-1.5'
-                        "
-                        :aria-label="
-                            `Zobraziť kartu ${index + 1}`
-                        "
-                        :aria-selected="
-                            index ===
-                            currentIndex
-                        "
-                        role="tab"
-                        @click="
-                            goTo(
-                                index
-                            )
-                        "
-                    />
-                </div>
-
-                <!-- Next -->
-                <Button
-                    type="button"
-                    background-image=""
-                    background-color=""
-                    text-color="#FBF9F3"
-                    :aria-label="
-                        nextLabel
-                    "
-                    class="
-                        flex
-                        size-11
-                        min-h-0
-                        min-w-0
-                        shrink-0
-                        items-center
-                        justify-center
-                        p-0
-                    "
-                    @click="
-                        goNext
-                    "
-                >
-                    <i
-                        class="
-                            bi
-                            bi-arrow-right
-                            text-base
-                        "
-                        aria-hidden="true"
-                    />
-                </Button>
-            </div>
-        </div>
+            :previous-label="
+                previousLabel
+            "
+            :next-label="
+                nextLabel
+            "
+            tablist-label="Výber karty"
+            card-aria-prefix="Zobraziť kartu"
+            variant="stacked"
+            @previous="
+                goPrevious
+            "
+            @next="
+                goNext
+            "
+            @select="
+                goTo
+            "
+        />
 
         <p
             class="

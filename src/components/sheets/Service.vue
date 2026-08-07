@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 
-import BottomSheet from './BottomSheet.vue';
+import BottomSheet from '../BottomSheet.vue';
 
 const props = defineProps({
     modelValue: {

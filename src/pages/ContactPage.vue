@@ -1239,7 +1239,7 @@ onBeforeUnmount(() => {
                 w-full
                 px-5
                 pb-20
-                pt-5
+                py-12
 
                 lg:px-15
                 lg:pb-28
@@ -1250,7 +1250,6 @@ onBeforeUnmount(() => {
             <section
                 class="
                     mx-auto
-                    mt-12
                     grid
                     w-full
                     max-w-6xl

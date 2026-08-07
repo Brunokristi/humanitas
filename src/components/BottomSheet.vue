@@ -1642,7 +1642,7 @@ onBeforeUnmount(() => {
             class="
                 fixed
                 inset-0
-                z-[999]
+                z-[1000]
                 bg-green/35
                 [will-change:opacity]
             "
@@ -1659,7 +1659,7 @@ onBeforeUnmount(() => {
             fixed
             inset-x-0
             bottom-0
-            z-[1000]
+            z-[2000]
             flex
             max-h-[92dvh]
             w-full

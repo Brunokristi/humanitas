@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
     PAGE_SEO,
+    PUBLIC_ROUTES,
     PRIMARY_OG_IMAGE_PATH,
     SITE_ALTERNATE_NAME,
     SITE_NAME,
@@ -11,12 +12,253 @@ import {
     absoluteUrl,
     STRUCTURED_DATA_LOGO_PATH
 } from '../src/seo/site.js'
+import { buildClinviaPublicEndpoint } from '../src/utils/clinviaFooter.js'
+import { normalizeCompany } from '../src/normalizers/clinvia.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const projectRoot = path.resolve(__dirname, '..')
 const distDir = path.join(projectRoot, 'dist')
 const indexFilePath = path.join(distDir, 'index.html')
+
+function parseEnvFile(envContent) {
+    return envContent
+        .split(/\r?\n/)
+        .reduce((result, line) => {
+            const trimmedLine = line.trim()
+
+            if (!trimmedLine || trimmedLine.startsWith('#')) {
+                return result
+            }
+
+            const delimiterIndex = trimmedLine.indexOf('=')
+
+            if (delimiterIndex <= 0) {
+                return result
+            }
+
+            const key = trimmedLine.slice(0, delimiterIndex).trim()
+            let value = trimmedLine.slice(delimiterIndex + 1).trim()
+
+            if (
+                (value.startsWith('"') && value.endsWith('"')) ||
+                (value.startsWith("'") && value.endsWith("'"))
+            ) {
+                value = value.slice(1, -1)
+            }
+
+            result[key] = value
+            return result
+        }, {})
+}
+
+async function readEnvFromFile(filePath) {
+    try {
+        const content = await readFile(filePath, 'utf8')
+        return parseEnvFile(content)
+    } catch {
+        return {}
+    }
+}
+
+function normalizeRouteSlug(value) {
+    return String(value ?? '')
+        .trim()
+        .toLocaleLowerCase('sk')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+|-+$/g, '')
+}
+
+function serviceRouteSlug(service) {
+    const candidate =
+        service?.slug ??
+        service?.serviceSlug ??
+        service?.service_slug ??
+        service?.name ??
+        service?.id ??
+        null
+
+    const slug = normalizeRouteSlug(candidate)
+
+    return slug || null
+}
+
+function employeeRouteSlug(employee) {
+    const nameCandidate = [
+        employee?.titleBefore,
+        employee?.firstName,
+        employee?.lastName,
+        employee?.titleAfter
+    ]
+        .filter(Boolean)
+        .join(' ')
+
+    const candidate =
+        employee?.slug ??
+        (nameCandidate
+            ? nameCandidate
+            : employee?.id ?? null)
+
+    const slug = normalizeRouteSlug(candidate)
+
+    return slug || null
+}
+
+async function fetchDynamicRoutes(envValues) {
+    const apiBaseUrl =
+        envValues.VITE_CLINVIA_API_URL ||
+        process.env.VITE_CLINVIA_API_URL ||
+        ''
+
+    const companyId =
+        envValues.VITE_CLINVIA_COMPANY_ID ||
+        process.env.VITE_CLINVIA_COMPANY_ID ||
+        envValues.VITE_CLINVIA_COMPANY_SLUG ||
+        process.env.VITE_CLINVIA_COMPANY_SLUG ||
+        envValues.VITE_CLINVIA_COMPANY_IDENTIFIER ||
+        process.env.VITE_CLINVIA_COMPANY_IDENTIFIER ||
+        ''
+
+    const endpoint = buildClinviaPublicEndpoint(
+        apiBaseUrl,
+        companyId
+    )
+
+    if (!endpoint) {
+        return []
+    }
+
+    const apiKey =
+        envValues.VITE_CLINVIA_API_KEY ||
+        process.env.VITE_CLINVIA_API_KEY ||
+        ''
+
+    const response = await fetch(endpoint, {
+        headers: {
+            Accept: 'application/json',
+            ...(apiKey ? { 'X-API-Key': apiKey } : {})
+        }
+    })
+
+    if (!response.ok) {
+        throw new Error(`Clinvia API returned ${response.status} while building sitemap.`)
+    }
+
+    const responseData = await response.json()
+    const rawCompany = responseData?.data ?? responseData
+    const normalizedCompany = normalizeCompany(rawCompany)
+
+    const uniqueServicePaths = new Set()
+    const uniqueEmployeePaths = new Set()
+
+    for (const branch of normalizedCompany?.branches ?? []) {
+        for (const service of branch?.services ?? []) {
+            if (!service?.isActive) {
+                continue
+            }
+
+            const slug = serviceRouteSlug(service)
+
+            if (!slug) {
+                continue
+            }
+
+            uniqueServicePaths.add(`${PUBLIC_ROUTES.services}/${slug}`)
+        }
+
+        for (const employee of branch?.employees ?? []) {
+            if (!employee?.isActive) {
+                continue
+            }
+
+            const slug = employeeRouteSlug(employee)
+
+            if (!slug) {
+                continue
+            }
+
+            uniqueEmployeePaths.add(`${PUBLIC_ROUTES.team}/${slug}`)
+        }
+    }
+
+    return {
+        services: Array.from(uniqueServicePaths).sort((left, right) => left.localeCompare(right, 'sk')),
+        employees: Array.from(uniqueEmployeePaths).sort((left, right) => left.localeCompare(right, 'sk'))
+    }
+}
+
+function buildSitemapXml(dynamicServicePaths, dynamicEmployeePaths) {
+    const today = new Date().toISOString().slice(0, 10)
+
+    const staticEntries = [
+        {
+            path: PUBLIC_ROUTES.home,
+            changefreq: 'weekly',
+            priority: '1.0'
+        },
+        {
+            path: PUBLIC_ROUTES.services,
+            changefreq: 'weekly',
+            priority: '0.9'
+        },
+        {
+            path: PUBLIC_ROUTES.contact,
+            changefreq: 'monthly',
+            priority: '0.8'
+        }
+    ]
+
+    const dynamicServiceEntries = dynamicServicePaths.map((pathValue) => {
+        return {
+            path: pathValue,
+            changefreq: 'weekly',
+            priority: '0.7'
+        }
+    })
+
+    const dynamicEmployeeEntries = dynamicEmployeePaths.map((pathValue) => {
+        return {
+            path: pathValue,
+            changefreq: 'monthly',
+            priority: '0.6'
+        }
+    })
+
+    const allEntries = [
+        ...staticEntries,
+        ...dynamicServiceEntries,
+        ...dynamicEmployeeEntries
+    ]
+
+    const urls = allEntries
+        .map((entry) => {
+            const absolutePath = entry.path === '/'
+                ? `${SITE_URL}/`
+                : `${SITE_URL}${entry.path}`
+
+            return [
+                '  <url>',
+                `    <loc>${escapeHtml(absolutePath)}</loc>`,
+                `    <lastmod>${today}</lastmod>`,
+                `    <changefreq>${entry.changefreq}</changefreq>`,
+                `    <priority>${entry.priority}</priority>`,
+                '  </url>'
+            ].join('\n')
+        })
+        .join('\n')
+
+    return [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        urls,
+        '</urlset>',
+        ''
+    ].join('\n')
+}
 
 const sharedText = {
     home: {
@@ -185,6 +427,23 @@ ${metaTags}
 
 async function main() {
     const templateHtml = await readFile(indexFilePath, 'utf8')
+    const rootEnv = await readEnvFromFile(path.join(projectRoot, '.env'))
+    const productionEnv = await readEnvFromFile(path.join(projectRoot, '.env.production'))
+    const envValues = {
+        ...rootEnv,
+        ...productionEnv
+    }
+
+    let dynamicServicePaths = []
+    let dynamicEmployeePaths = []
+
+    try {
+        const dynamicRoutes = await fetchDynamicRoutes(envValues)
+        dynamicServicePaths = dynamicRoutes.services
+        dynamicEmployeePaths = dynamicRoutes.employees
+    } catch (error) {
+        console.warn(`[prerender] Dynamic sitemap generation skipped: ${error.message}`)
+    }
 
     await renderRoute(templateHtml, 'home', '', PAGE_SEO.home)
     await renderRoute(templateHtml, 'services', 'sluzby', PAGE_SEO.services)
@@ -194,6 +453,9 @@ async function main() {
         title: 'Domov – Humanitas',
         description: 'Presmerovanie na hlavnú stránku Humanitas.'
     })
+
+    const sitemapXml = buildSitemapXml(dynamicServicePaths, dynamicEmployeePaths)
+    await writeFile(path.join(distDir, 'sitemap.xml'), sitemapXml, 'utf8')
 }
 
 main().catch((error) => {

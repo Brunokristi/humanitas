@@ -3,7 +3,7 @@ import {
     computed
 } from 'vue';
 
-import BottomSheet from './BottomSheet.vue';
+import BottomSheet from '../BottomSheet.vue';
 
 const props = defineProps({
     modelValue: {
@@ -210,95 +210,6 @@ function scrollToSection(id) {
                             {{ updatedAt }}
                         </p>
                     </div>
-
-                    <!-- Navigation -->
-                    <nav
-                        v-if="
-                            normalizedSections.length
-                        "
-                        class="
-                            mt-10
-                        "
-                        aria-label="
-                            Obsah ochrany osobných údajov
-                        "
-                    >
-                        <h3
-                            class="
-                                text-regular
-                                font-bold
-                                text-green
-                            "
-                        >
-                            Obsah
-                        </h3>
-
-                        <div
-                            class="
-                                mt-5
-                                flex
-                                gap-4
-                                overflow-x-auto
-                                pb-2
-
-                                md:flex-col
-                                md:overflow-visible
-                                md:pb-0
-                            "
-                        >
-                            <button
-                                v-for="
-                                    section in
-                                    normalizedSections
-                                "
-                                :key="
-                                    `navigation-${section.id}`
-                                "
-                                type="button"
-                                class="
-                                    group
-                                    w-full
-                                    min-w-[13rem]
-                                    shrink-0
-                                    border-l-2
-                                    border-green/15
-                                    pl-3
-                                    text-left
-                                    transition-colors
-                                    duration-200
-
-                                    hover:border-green
-
-                                    md:min-w-0
-                                "
-                                @click="
-                                    scrollToSection(
-                                        section.id
-                                    )
-                                "
-                            >
-                                <span
-                                    class="
-                                        text-regular
-                                        mt-1
-                                        block
-                                        max-w-64
-                                        font-bold
-                                        leading-[1.35]
-                                        text-green/70
-                                        transition-colors
-                                        duration-200
-
-                                        group-hover:text-green
-
-                                        md:max-w-none
-                                    "
-                                >
-                                    {{ section.title }}
-                                </span>
-                            </button>
-                        </div>
-                    </nav>
                 </div>
 
                 <!-- Right column -->

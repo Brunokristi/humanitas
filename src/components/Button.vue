@@ -248,6 +248,8 @@ function handleClick(event) {
                 justify-center
                 overflow-hidden
                 rounded-full
+                border-0
+                outline-none
                 px-5
                 py-2
                 transition-[background-color,color,transform,opacity]
@@ -255,6 +257,12 @@ function handleClick(event) {
                 ease-out
 
                 hover:-translate-y-0.5
+
+                focus:outline-none
+                focus:ring-0
+
+                focus-visible:outline-none
+                focus-visible:ring-0
 
                 active:translate-y-0
                 active:scale-[0.98]

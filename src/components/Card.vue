@@ -98,8 +98,20 @@ defineProps({
                 flex-col
                 justify-center
                 overflow-hidden
-                px-[clamp(2.1rem,8vw,4.2rem)]
-                py-[clamp(2.4rem,8vw,4rem)]
+                px-8
+                py-10
+
+                sm:px-10
+                sm:py-12
+
+                md:px-12
+                md:py-12
+
+                lg:px-10
+                lg:py-10
+
+                xl:px-8
+                xl:py-8
             "
         >
             <slot

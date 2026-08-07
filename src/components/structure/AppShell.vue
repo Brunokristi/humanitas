@@ -21,7 +21,7 @@ import { usePublicSiteStore } from '../../stores/publicSite.js';
 import AppFooter from './AppFooter.vue';
 import AppHeader from './AppHeader.vue';
 import Button from '../Button.vue';
-import CookieConsentSheet from '../CookieConsentSheet.vue';
+import CookieConsentSheet from '../sheets/CookieConsent.vue';
 
 const route =
     useRoute();
@@ -108,7 +108,7 @@ let navigationResizeObserver =
 
 function isActiveRoute(path) {
     if (path === '/') {
-        return route.path === '/';
+        return route.path === '/' || route.path.startsWith('/tim/');
     }
 
     return (
@@ -1592,7 +1592,7 @@ onUnmounted(() => {
                     fixed
                     bottom-[max(0.5rem,env(safe-area-inset-bottom))]
                     left-1/2
-                    z-[999]
+                    z-[1200]
                     w-max
                     max-w-[calc(100%-1rem)]
                     -translate-x-1/2
